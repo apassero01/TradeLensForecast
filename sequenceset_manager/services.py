@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 import numpy as np
 
+
 class SequencesetManagerService:
 
     # def update_recent_sequences(ticker, interval, sequence_length):
@@ -20,12 +21,12 @@ class SequencesetManagerService:
     #     if most_recent_seq is None:
     #         print(f"No sequences found for {ticker}")
     #         return None
-        
+
     #     # get most recent date
     #     most_recent_date = most_recent_seq.start_timestamp
 
-
-    def create_new_sequence_set(ticker, interval, sequence_length, start_date = None, end_date = None):
+    @staticmethod
+    def create_new_sequence_set(ticker, interval, sequence_length, start_date=None, end_date=None):
         '''
         Create a new sequence set for a given stock ticker
         '''
@@ -40,17 +41,19 @@ class SequencesetManagerService:
             print(f"Error fetching stock data for {ticker}")
             return None
         print("Creating Sequence objects")
-        stock_sequences, feature_dict = SequencesetManagerService.create_sequence_objects(ticker, interval, sequence_length, df)
+        stock_sequences, feature_dict = SequencesetManagerService.create_sequence_objects(ticker, interval,
+                                                                                          sequence_length, df)
         print("Saving Sequence objects")
         SequencesetManagerService.save_stock_sequences(stock_sequences, feature_dict)
         return stock_sequences
 
+    @staticmethod
     def create_sequence_objects(ticker, timeframe, sequence_length, df):
         '''
         Create a 3D sequence from a DataFrame
         '''
         ticker = ticker.upper()
-        
+
         df_cols = df.columns
         df_cols = sorted(df_cols)
         df = df[df_cols]
@@ -60,7 +63,10 @@ class SequencesetManagerService:
 
         indices_seq = list(range(len(df_cols)))
 
-        feature_dict = {col: index for col, index in zip(df_cols, indices_seq)}
+        if FeatureDict.objects.first() is not None:
+            feature_dict = FeatureDict.objects.get().first()
+        else:
+            feature_dict = {col: index for col, index in zip(df_cols, indices_seq)}
 
         stock_sequences = []
 
@@ -68,7 +74,7 @@ class SequencesetManagerService:
             start_index = i - sequence_length + 1
             if start_index < 0:
                 break
-            
+
             end_idx = i
 
             seq = df_values[start_index:end_idx + 1, :]
@@ -91,7 +97,8 @@ class SequencesetManagerService:
         )
 
         return stock_sequences, feature_dict_obj
-    
+
+    @staticmethod
     def save_stock_sequences(stock_sequences, feature_dict):
         '''
         Save a list of StockSequence objects to the database
@@ -103,10 +110,12 @@ class SequencesetManagerService:
         batch_size = 1000
         with transaction.atomic():
             for i in range(0, len(stock_sequences), batch_size):
-                StockSequence.objects.bulk_create(stock_sequences[i:i+batch_size])
-            feature_dict.save()
-    
-    def get_stock_dataset(ticker, interval = "1d", start_date = None, end_date = None):
+                StockSequence.objects.bulk_create(stock_sequences[i:i + batch_size])
+            if FeatureDict.objects.first() is None:
+                feature_dict.save()
+
+    @staticmethod
+    def get_stock_dataset(ticker, interval="1d", start_date=None, end_date=None):
         '''
         retreive stock dataset from dataset_manager
         '''
@@ -119,19 +128,18 @@ class SequencesetManagerService:
         try:
             response = requests.get(f"http://localhost:8000/dataset_manager/get_stock_data/{ticker}", params=params)
             data = response.json()
-            return pd.DataFrame(data).T 
+            return pd.DataFrame(data).T
         except requests.exceptions.RequestException as e:
             print(e)
-            return None    
-    
+            return None
 
     @staticmethod
-    def retrieve_sequence_slice(ticker, features, interval= '1d', start_date=None, end_date=None, sequence_length=None):
-        queryset = StockSequence.objects.filter(ticker = ticker)
+    def retrieve_sequence_slice(ticker, features, interval='1d', start_date=None, end_date=None, sequence_length=None):
+        queryset = StockSequence.objects.filter(ticker=ticker)
         print(queryset.count())
 
-        ## TODO Fix what I am about to write 
-        column_dict = FeatureDict.objects.get(ticker=ticker).feature_dict
+        ## TODO Fix what I am about to write
+        column_dict = FeatureDict.objects.first().feature_dict
         indices = [column_dict[feature] for feature in features]
 
         print(interval)
@@ -149,7 +157,7 @@ class SequencesetManagerService:
         # Prepare the SQL for selecting specific indices
         queryset = queryset.annotate(
             sliced_data=RawSQL(
-                f"ARRAY[{', '.join([f'sequence_data[{i+1}:{i+1}]' for i in indices])}]",
+                f"ARRAY[{', '.join([f'sequence_data[{i + 1}:{i + 1}]' for i in indices])}]",
                 []
             )
         ).values('id', 'ticker', 'start_timestamp', 'end_timestamp', 'sequence_length', 'sliced_data')
@@ -166,14 +174,9 @@ class SequencesetManagerService:
 
         return result
 
-
-    
+    @staticmethod
     def transpose(matrix_list):
         '''
         Transpose a list of matrices
         '''
         return [list(row) for row in zip(*matrix_list)]
-
-        
-
-
