@@ -1,10 +1,11 @@
 from django.shortcuts import render
-from dataset_manager.services import DatasetManagerService
+from dataset_manager.services import DatasetManagerService, FeatureTrackerService
 
 import json
 from django.http import JsonResponse
 from dataset_manager.models import StockData
 from django.views.decorators.http import require_http_methods
+from dataset_manager.models import FeatureTracker
 
 
 # Create your views here.
@@ -51,5 +52,24 @@ def create_stock_data(request):
         df.index = df.index.astype(str)
 
         return JsonResponse(df.to_dict(orient='index'))
-    
+
+
+
+
+def get_stock_features(request):
+    '''
+    Retrieve stock features from the database and return it as a JSON response
+    '''
+
+    FeatureTrackerService.update_feature_tracker()
+
+    try:
+        FeatureTrackerService.ensure_synced_features()
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+    features = FeatureTrackerService.get_feature_tracker()
+
+    return JsonResponse(features.features, safe=False)
+
 

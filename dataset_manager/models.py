@@ -28,5 +28,18 @@ class StockData(models.Model):
     features = models.JSONField()
 
 
+class FeatureTracker(models.Model):
+
+    features = models.JSONField()
+
+class DataSetTracker(models.Model):
+    ticker = models.CharField(max_length=10)
+    timeframe = models.CharField(max_length=3)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    features = models.JSONField()
+
+
+
 
 

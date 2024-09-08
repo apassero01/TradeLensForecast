@@ -1,4 +1,7 @@
-from sequenceset_manager.models import StockSequence, FeatureDict
+import json
+import math
+
+from sequenceset_manager.models import StockSequence, FeatureDict, SequenceSetTracker
 from django.db import transaction
 import requests
 import pandas as pd
@@ -26,13 +29,99 @@ class SequencesetManagerService:
     #     most_recent_date = most_recent_seq.start_timestamp
 
     @staticmethod
+    def refresh_features():
+        '''
+        Refresh the feature dictionary for a given stock ticker
+        '''
+
+        try:
+            response = requests.get(f"http://localhost:8000/dataset_manager/get_stock_features/")
+            true_list = response.json()
+        except requests.exceptions.RequestException as e:
+            print(e)
+
+        feature_dict = FeatureDict.objects.first()
+        feature_dict_list = list(feature_dict.feature_dict.keys())
+
+        if sorted(true_list) == sorted(feature_dict_list):
+            print("No new features to add")
+            return
+
+        new_features = list(set(true_list) - set(feature_dict_list))
+
+        sequenceSetTrackers = SequenceSetTracker.objects.all()
+
+        sorted_cols = sorted(new_features)
+        indices_seq = list(range(len(new_features)))
+        start_value = max(feature_dict.feature_dict.values()) + 1
+
+        indices_seq = [start_value + i for i in indices_seq]
+
+        with transaction.atomic():
+            for sequenceSetTracker in sequenceSetTrackers:
+                df = SequencesetManagerService.get_stock_dataset(sequenceSetTracker.ticker, sequenceSetTracker.timeframe,
+                                                                 sequenceSetTracker.start_timestamp, sequenceSetTracker.end_timestamp)
+
+                df.fillna(-999)
+                df_new_features = df[sorted_cols]
+                df_values = df_new_features.values
+                timestamps = df_new_features.index
+
+                new_feature_dict = {col: index for col, index in zip(sorted_cols, indices_seq)}
+
+                sequences = []
+                for i in range(len(df_new_features) - 1, -1, -1):
+                    start_index = i - sequenceSetTracker.sequence_length + 1
+                    if start_index < 0:
+                        break
+
+                    end_idx = i
+
+                    seq = df_values[start_index:end_idx + 1, :]
+                    start_date = timestamps[start_index]
+                    end_date = timestamps[end_idx]
+
+                    sequences.append(seq)
+
+                SequencesetManagerService.add_feature_row(sequenceSetTracker, sequences)
+
+            feature_dict.feature_dict.update(new_feature_dict)
+            feature_dict.save()
+
+
+    @staticmethod
+    def add_feature_row(sequenceSetTracker, new_features):
+        seq_objs = StockSequence.objects.filter(ticker=sequenceSetTracker.ticker, timeframe=sequenceSetTracker.timeframe,
+                                                sequence_length=sequenceSetTracker.sequence_length).order_by('start_timestamp').reverse()
+        if len(seq_objs) != len(new_features):
+            raise ValidationError("Length of new features does not match the length of the sequence objects")
+
+        with transaction.atomic():
+            for index, seq_obj in enumerate(seq_objs):
+                obj_id = seq_obj.id
+                seq_data = new_features[index]
+
+                seq_data = [[None if math.isnan(val) else val for val in row] for row in seq_data]
+
+                seq_data = SequencesetManagerService.transpose(seq_data)
+
+                # Construct the SQL string, ensuring 'None' is replaced with 'NULL'
+                array2d_str = ','.join([
+                    f"ARRAY[{','.join('NULL' if x is None else str(x) for x in row)}]::float8[]" for row in seq_data
+                ])
+                StockSequence.objects.filter(pk=obj_id).update(
+                    sequence_data=RawSQL(f"\"sequence_data\" || ARRAY[{array2d_str}]::float8[]", [])
+                )
+
+
+    @staticmethod
     def create_new_sequence_set(ticker, interval, sequence_length, start_date=None, end_date=None):
         '''
         Create a new sequence set for a given stock ticker
         '''
         ticker = ticker.upper()
         # Check if the sequence set already exists
-        existing_sequences = StockSequence.objects.filter(ticker=ticker, timeframe=interval)
+        existing_sequences = StockSequence.objects.filter(ticker=ticker, timeframe=interval, sequence_length=sequence_length)
         if existing_sequences.exists():
             print(f"Sequence set for {ticker} already exists")
             return
@@ -44,8 +133,19 @@ class SequencesetManagerService:
         stock_sequences, feature_dict = SequencesetManagerService.create_sequence_objects(ticker, interval,
                                                                                           sequence_length, df)
         print("Saving Sequence objects")
-        SequencesetManagerService.save_stock_sequences(stock_sequences, feature_dict)
+
+        with transaction.atomic():
+            SequencesetManagerService.save_stock_sequences(stock_sequences, feature_dict)
+
+            if start_date is None:
+                start_date = df.index[0]
+            if end_date is None:
+                end_date = df.index[-1]
+
+            tracker = SequenceSetTrackerService.create_sequence_set_tracker(ticker, interval, sequence_length, start_date, end_date)
+
         return stock_sequences
+
 
     @staticmethod
     def create_sequence_objects(ticker, timeframe, sequence_length, df):
@@ -64,7 +164,7 @@ class SequencesetManagerService:
         indices_seq = list(range(len(df_cols)))
 
         if FeatureDict.objects.first() is not None:
-            feature_dict = FeatureDict.objects.get().first()
+            feature_dict = FeatureDict.objects.first()
         else:
             feature_dict = {col: index for col, index in zip(df_cols, indices_seq)}
 
@@ -167,10 +267,15 @@ class SequencesetManagerService:
 
         # Flatten and transpose the array
         for record in result:
-            record['sliced_data'] = np.squeeze(np.array(record['sliced_data']))
-            # print(record['sliced_data'].shape)
-            record['sliced_data'] = record['sliced_data'].T.tolist()
-            # print(record['sliced_data'].shape)
+            # Replace None with NaN
+            record['sliced_data'] = [
+                [np.nan if val is None else val for val in row]
+                for row in record['sliced_data']
+            ]
+
+            # Convert to a NumPy array, squeeze it, transpose, and convert back to a list
+            record['sliced_data'] = np.array(record['sliced_data'])
+            record['sliced_data'] = np.squeeze(record['sliced_data']).T.tolist()
 
         return result
 
@@ -180,3 +285,91 @@ class SequencesetManagerService:
         Transpose a list of matrices
         '''
         return [list(row) for row in zip(*matrix_list)]
+
+
+
+
+class FeatureDictService:
+
+    @staticmethod
+    def get_feature_dict():
+        '''
+        Get the feature dictionary
+        '''
+        feature_dict = FeatureDict.objects.first()
+        if feature_dict is None:
+            raise ValidationError("Feature dictionary not found")
+        return feature_dict.feature_dict
+
+    @staticmethod
+    def generate_new_feature_dict(df_cols):
+        indices_seq = list(range(len(df_cols)))
+
+        feature_dict = {col: index for col, index in zip(df_cols, indices_seq)}
+
+        return feature_dict
+
+    @staticmethod
+    def add_new_feature(new_features):
+        current_feature_dict = FeatureDict.objects.first()
+
+        if current_feature_dict is None:
+            raise ValidationError("Feature dictionary not found")
+
+        dict = current_feature_dict.feature_dict
+
+        max_index = max(dict.values())
+
+        new_feature_dict = {feature: max_index + i + 1 for i, feature in enumerate(new_features)}
+
+        current_feature_dict.feature_dict.update(new_feature_dict)
+
+        current_feature_dict.save()
+
+        return current_feature_dict.feature_dict
+
+
+
+class SequenceSetTrackerService:
+
+    @staticmethod
+    def get_sequence_set_tracker(ticker, interval, sequence_length):
+        '''
+        Get the SequenceSetTracker object for a given stock ticker
+        '''
+        sequence_set_tracker = SequenceSetTracker.objects.filter(ticker=ticker, timeframe=interval,
+                                                                 sequence_length=sequence_length).first()
+        return sequence_set_tracker
+
+    @staticmethod
+    def create_sequence_set_tracker(ticker, interval, sequence_length, start_date, end_date):
+        '''
+        Create a new SequenceSetTracker object
+        '''
+        sequence_set_tracker = SequenceSetTracker(
+            ticker=ticker,
+            timeframe=interval,
+            sequence_length=sequence_length,
+            start_timestamp=start_date,
+            end_timestamp=end_date
+        )
+        sequence_set_tracker.save()
+        return sequence_set_tracker
+
+    @staticmethod
+    def update_sequence_set_tracker(ticker, interval, sequence_length, start_date, end_date):
+        '''
+        Update the SequenceSetTracker object
+        '''
+        sequence_set_tracker = SequenceSetTracker.objects.filter(ticker=ticker, timeframe=interval,
+                                                                 sequence_length=sequence_length).first()
+        if sequence_set_tracker is None:
+            return None
+        sequence_set_tracker.start_date = start_date
+        sequence_set_tracker.end_date = end_date
+        sequence_set_tracker.save()
+        return sequence_set_tracker
+
+
+
+

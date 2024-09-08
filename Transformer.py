@@ -22,6 +22,8 @@ class Transformer(nn.Module):
 
         self.traversable_layers = [self.encoder, self.decoder]
 
+        self._init_weights()
+
         print(f"Transformer initialized with {len(self.traversable_layers)} layers")
 
     def forward(self, encoder_input, decoder_input, target_mask=None):
@@ -38,6 +40,17 @@ class Transformer(nn.Module):
 
         encoder_output = self.encoder(encoder_input)
         return self.decoder.inference(encoder_output, start_token, max_len)
+
+    def _init_weights(self):
+        # Apply Xavier Initialization to all linear layers
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight)
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
 class TransformerEncoder(nn.Module):
     def __init__(self, num_layers, d_model, num_heads, d_ff, max_length=200, dropout=.1, name = "transformer_encoder"):
@@ -72,7 +85,7 @@ class EncoderLayer(nn.Module):
         super(EncoderLayer, self).__init__()
 
         self.name = name
-        self.multi_head_attention = MultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
+        self.multi_head_attention = ChannelWiseMultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
 
         self.feed_forward = nn.Sequential(
             nn.Linear(d_model, d_ff),
@@ -87,13 +100,39 @@ class EncoderLayer(nn.Module):
 
         self.traversable_layers = nn.ModuleList([self.multi_head_attention])
 
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight)
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
     def forward(self, x):
-        self.attn_output = self.multi_head_attention(x,x,x)
-        x = self.norm1(x + self.dropout(self.attn_output))
+        ## pre norm
+        # self.attn_output = self.multi_head_attention(x,x,x)
+        # x = self.norm1(x + self.dropout(self.attn_output))
+        #
+        # ff_output = self.feed_forward(x)
+        #
+        # output = self.norm2(x + self.dropout(ff_output))
 
-        ff_output = self.feed_forward(x)
+        ## post norm
+        # print(f"EncoderLayer {self.name} input shape: {x.shape}")
+        x_norm = self.norm1(x)  # Pre-Norm before attention
+        # print(f"EncoderLayer {self.name} norm1 shape: {x_norm.shape}")
+        self.attn_output = self.multi_head_attention(x_norm, x_norm, x_norm)
+        # print(f"EncoderLayer {self.name} attn_output shape: {self.attn_output.shape}")
+        x = x + self.dropout(self.attn_output)  # Residual connection
 
-        output = self.norm2(x + self.dropout(ff_output))
+        # Feed-Forward with Pre-Norm
+        x_norm = self.norm2(x)  # Pre-Norm before feed-forward
+        ff_output = self.feed_forward(x_norm)
+        output = x + self.dropout(ff_output)
 
         return output
 
@@ -121,9 +160,22 @@ class MultiHeadAttention(nn.Module):
         self.out = nn.Linear(d_model, d_model)
 
         self.traversable_layers = []
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight)
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def forward(self, Q, K, V, mask=None):
         batch_size = Q.size(0)
+        seq_len = Q.size(1)
+        num_features = Q.size(2)
 
         Q = self.query(Q)
         K = self.key(K)
@@ -132,6 +184,14 @@ class MultiHeadAttention(nn.Module):
         Q = Q.view(batch_size, -1, self.num_heads, self.dk).transpose(1, 2)
         K = K.view(batch_size, -1, self.num_heads, self.dk).transpose(1, 2)
         V = V.view(batch_size, -1, self.num_heads, self.dk).transpose(1, 2)
+
+        # Q = self.query(Q).permute(0, 2, 1)  # shape: (batch_size, num_features, seq_len)
+        # K = self.key(K).permute(0, 2, 1)
+        # V = self.value(V).permute(0, 2, 1)
+        #
+        # Q = Q.view(batch_size, num_features, self.num_heads, self.dk).transpose(1, 2)
+        # K = K.view(batch_size, num_features, self.num_heads, self.dk).transpose(1, 2)
+        # V = V.view(batch_size, num_features, self.num_heads, self.dk).transpose(1, 2)
 
 
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(
@@ -219,6 +279,19 @@ class TransformerDecoder(nn.Module):
         self.d_model = d_model
 
         self.traversable_layers = nn.ModuleList(self.layers)
+        self._init_weights()
+
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight)
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
 
 
     def forward(self, x, encoder_output, target_mask=None):
@@ -291,17 +364,47 @@ class DecoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.traversable_layers =  nn.ModuleList([self.self_attention, self.cross_attention])
 
+        self._init_weights()
+
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight)
+                # if module.bias is not None:
+                # nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def forward(self, x, encoder_output, target_mask):
-        self_attn_output = self.self_attention(x, x, x, mask=target_mask)
+        # self_attn_output = self.self_attention(x, x, x, mask=target_mask)
+        # x = self.norm1(x + self.dropout(self_attn_output))
 
-        x = self.norm1(x + self.dropout(self_attn_output))
 
-        cross_attn_output = self.cross_attention(x, encoder_output, encoder_output)
-        x = self.norm2(x + self.dropout(cross_attn_output))
+        # cross_attn_output = self.cross_attention(x, encoder_output, encoder_output)
+        # x = self.norm2(x + self.dropout(cross_attn_output))
 
-        ff_output = self.feed_forward(x)
-        output = self.norm3(x + self.dropout(ff_output))
+        self_attn_output = self.self_attention(Q=self.norm1(x),
+                                                  K=self.norm1(x),
+                                                  V=self.norm1(x),
+                                                  mask=target_mask)
+        x = x + self.dropout(self_attn_output)
+
+        cross_attn_output = self.cross_attention(Q=self.norm2(self_attn_output),
+                                                    K=encoder_output,
+                                                    V=encoder_output,
+                                                    mask=None)
+
+        x = x + self.dropout(cross_attn_output)
+
+        # ff_output = self.feed_forward(x)
+        # output = self.norm3(x + self.dropout(ff_output))
+
+        # Feed-Forward Network
+        ff_output = self.feed_forward(self.norm3(x))
+        output = x + self.dropout(ff_output)  # Residual connection
+
         self.cross_attention_output = cross_attn_output
         return output
 
@@ -369,6 +472,93 @@ class SAM(torch.optim.Optimizer):
             p=2
         )
         return norm
+
+
+def custom_loss_with_zero_penalty(y_true, y_pred, penalty_weight=50.0, zero_threshold=0.1):
+    # Calculate the standard MSE loss
+    mse_loss = nn.functional.mse_loss(y_pred, y_true)
+
+    # Apply a penalty to predictions close to zero
+    zero_penalty = torch.mean(torch.exp(-torch.abs(y_pred) / zero_threshold))
+
+    # Combine the MSE loss with the zero-penalty term
+    total_loss = mse_loss + penalty_weight * zero_penalty
+
+    return total_loss
+
+class ChannelWiseMultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads, name="multi_head_attention"):
+        super(ChannelWiseMultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.dk = d_model // num_heads
+        self.name = name
+
+        if self.dk * num_heads != d_model:
+            raise ValueError(f"d_model ({d_model}) must be divisible by num_heads ({num_heads})")
+
+        # Define linear layers for query, key, value, and output
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+        self.out = nn.Linear(d_model, d_model)
+
+        self.traversable_layers = []
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight)
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, Q, K, V, mask=None):
+        batch_size = Q.size(0)
+        seq_len = Q.size(1)
+        num_features = Q.size(2)
+
+        # Apply linear transformations to Q, K, V without permuting yet
+        Q = self.query(Q)  # (batch_size, seq_len, d_model)
+        K = self.key(K)    # (batch_size, seq_len, d_model)
+        V = self.value(V)  # (batch_size, seq_len, d_model)
+
+        # Permute to move features to the second dimension for channel-wise attention
+        Q = Q.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+        K = K.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+        V = V.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+
+        # Reshape for multi-head attention: (batch_size, num_heads, feature_head_size, seq_len)
+        Q = Q.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+        K = K.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+        V = V.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+
+        # Compute attention scores across features (channels)
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.dk, dtype=torch.float32))
+
+        # Apply mask if provided
+        if mask is not None:
+            attention_scores = attention_scores.masked_fill(mask == True, float('-inf'))
+
+        # Compute attention weights and apply them to values
+        attention_weights = torch.nn.functional.softmax(attention_scores, dim=-1)
+        attention_output = torch.matmul(attention_weights, V)
+
+        # Reshape back to (batch_size, num_features, seq_len)
+        attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, num_features, seq_len)
+
+        # Permute back to original shape (batch_size, seq_len, num_features)
+        attention_output = attention_output.permute(0, 2, 1)
+
+        # Apply final linear transformation and return output
+        self.output = self.out(attention_output)
+        return self.output
+
+    def get_attention(self):
+        return self.output
 
 
 

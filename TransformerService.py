@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from django.utils.timezone import override
 from tensorflow.python.ops.gen_array_ops import deep_copy
 
 from collections import deque
@@ -31,7 +32,6 @@ class Trainer:
         decoder_input = torch.cat([start_token, y_target[:, :-1, :]], dim=1)
         return decoder_input
 
-
     def train_epoch(self, dataloader, clip_value=None):
         self.model.train()
         epoch_loss = 0
@@ -42,13 +42,44 @@ class Trainer:
 
             self.optimizer.zero_grad()
 
-            output = self.model(encoder_input, decoder_input)
+            # Get the sequence predictions and continuation signals from the model
+            sequence_predictions = self.model(encoder_input, decoder_input)
 
-            loss = self.criterion(output, y_target)
+            # Calculate the custom loss
+            loss = self.criterion(sequence_predictions, y_target)
 
             loss.backward()
+
             if clip_value:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), clip_value)
+
+            self.optimizer.step()
+
+            epoch_loss += loss.item()
+
+        return epoch_loss / len(dataloader)
+
+    def train_epoch_contin_signal(self, dataloader, clip_value=None):
+        self.model.train()
+        epoch_loss = 0
+
+        for batch in dataloader:
+            encoder_input, y_target = [x.to(self.device) for x in batch]
+            decoder_input = self.add_start_token(y_target)
+
+            self.optimizer.zero_grad()
+
+            # Get the sequence predictions and continuation signals from the model
+            sequence_predictions, continuation_signals = self.model(encoder_input, decoder_input)
+
+            # Calculate the custom loss
+            loss = self.criterion(sequence_predictions, y_target, continuation_signals)
+
+            loss.backward()
+
+            if clip_value:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), clip_value)
+
             self.optimizer.step()
 
             epoch_loss += loss.item()
@@ -101,6 +132,22 @@ class Trainer:
 
         return epoch_loss / len(dataloader)
 
+    def evaluate_contin_signal(self, dataloader):
+        self.model.eval()
+        epoch_loss = 0
+
+        with torch.no_grad():
+            for batch in dataloader:
+                encoder_input, y_target = [x.to(self.device) for x in batch]
+
+                start_token = torch.zeros(self.model.decoder.d_model).to(self.device)
+
+                output, continuation_signals = self.model.inference(encoder_input, start_token, self.max_length)
+                loss = self.criterion(output, y_target, continuation_signals)
+                epoch_loss += loss.item()
+
+        return epoch_loss / len(dataloader)
+
     def predict(self, encoder_input):
         self.model.eval()  # Set the model to evaluation mode
 
@@ -118,6 +165,18 @@ class Trainer:
         print(f"Last attention shape: {last_attn.shape}")
         return predictions
 
+    def predict_contin_signal(self, encoder_input):
+        self.model.eval()
+
+        with torch.no_grad():
+            start_token = torch.zeros(self.model.decoder.d_model).to(self.device)
+
+            predictions, continuation_signals = self.model.inference(encoder_input, start_token, self.max_length)
+            last_attn = self.model.decoder.layers[-1].cross_attention_output
+
+        return predictions, continuation_signals
+
+
     def fit(self, train_dataloader, val_dataloader, epochs, clip_value=None):
         for epoch in range(epochs):
             train_loss = self.train_epoch(train_dataloader, clip_value)
@@ -129,6 +188,13 @@ class Trainer:
         for epoch in range(epochs):
             train_loss = self.train_epoch_SAM(train_dataloader)
             val_loss = self.evaluate(val_dataloader)
+
+            print(f"Epoch {epoch + 1} | Train Loss: {train_loss:.3f} | Val Loss: {val_loss:.3f}")
+
+    def fit_contin_signal(self, train_dataloader, val_dataloader, epochs, clip_value=None):
+        for epoch in range(epochs):
+            train_loss = self.train_epoch_contin_signal(train_dataloader, clip_value)
+            val_loss = self.evaluate_contin_signal(val_dataloader)
 
             print(f"Epoch {epoch + 1} | Train Loss: {train_loss:.3f} | Val Loss: {val_loss:.3f}")
 
@@ -202,3 +268,42 @@ class Trainer:
             if param.grad is not None:
                 gradients_with_names.append((name, param.grad))
         return gradients_with_names
+
+
+class TrainerContinSignal(Trainer):
+
+    @override
+    def evaluate(self, dataloader):
+        self.model.eval()
+        epoch_loss = 0
+
+        with torch.no_grad():
+            for batch in dataloader:
+                encoder_input, y_target = [x.to(self.device) for x in batch]
+
+                start_token = torch.zeros(self.model.decoder.d_model).to(self.device)
+
+                # Get both the output and continuation signals from inference
+                output, continuation_signals = self.model.inference(encoder_input, start_token, self.max_length)
+
+                # Compute the loss using only the output (ignoring continuation_signals for now)
+                loss = self.criterion(output, y_target)
+                epoch_loss += loss.item()
+
+        return epoch_loss / len(dataloader)
+
+    @override
+    def predict(self, encoder_input):
+        self.model.eval()  # Set the model to evaluation mode
+
+        with torch.no_grad():
+            # encoder_input = encoder_input.to(self.device)
+
+            # Prepare the start token with the correct shape
+            start_token = torch.zeros(self.model.decoder.d_model).to(self.device)
+
+            # Perform inference to get the predicted output sequence
+            predictions, continuation_signals = self.model.inference(encoder_input, start_token, self.max_length)
+            last_attn = self.model.decoder.layers[-1].cross_attention_output
+
+        return predictions, continuation_signals

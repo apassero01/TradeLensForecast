@@ -1,10 +1,17 @@
 import torch
 import torch.nn as nn
 import unittest
-from Transformer import InputEmbedding, PositionalEncoding, MultiHeadAttention, EncoderLayer, TransformerEncoder,generate_target_mask
+
+from torch.onnx.symbolic_opset9 import tensor
+
+from Transformer import InputEmbedding, PositionalEncoding, MultiHeadAttention, EncoderLayer, TransformerEncoder, \
+    generate_target_mask, ChannelWiseMultiHeadAttention
 from Transformer import DecoderLayer, TransformerDecoder, Transformer
 from TransformerService import Trainer
 from torch import optim
+from torch.nn import functional as F
+from torch.utils.data import DataLoader
+from TransformerWithContinuation import continuous_loss
 
 class TrainerTest(unittest.TestCase):
     def setUp(self):
@@ -328,7 +335,7 @@ class TestMultiHeadAttention(unittest.TestCase):
     def test_output_shape(self):
         """Test if the MultiHeadAttention layer produces the correct output shape."""
         d_model = 16
-        num_heads = 4
+        num_heads = 2
         batch_size = 32
         sequence_length = 20
 
@@ -567,3 +574,179 @@ class TestTransformer(unittest.TestCase):
         # Check the shape of the predictions
 
         self.assertEqual(predictions.shape, torch.Size([self.batch_size, self.max_len, 1]))
+
+
+class TestContinuousLoss(unittest.TestCase):
+
+    def test_continuous_loss_full_sequence(self):
+        # Case 1: Model predicts the full sequence correctly with continuation signal > 0.5
+        y_pred = torch.tensor([[[1.0], [2.0], [3.0], [4.0]]])
+        y_true = torch.tensor([[[1.0], [2.0], [3.0], [4.0]]])
+        continuation_signals = torch.tensor([[0.9, 0.9, 0.9, 0.9]])
+
+        loss = continuous_loss(y_pred, y_true, continuation_signals, lambda_penalty=1.0)
+        expected_loss = F.mse_loss(y_pred, y_true, reduction='mean')
+        self.assertTrue(torch.isclose(loss, expected_loss), f"Expected loss {expected_loss}, but got {loss}")
+
+    def test_continuous_loss_early_stop(self):
+        # Case 2: Model stops early (only predicts the first 2 steps)
+        y_pred = torch.tensor([[[1.0], [2.0], [0.0], [0.0]]])
+        y_true = torch.tensor([[[1.0], [2.0], [3.0], [4.0]]])
+        continuation_signals = torch.tensor([[0.9, 0.4, 0.0, 0.0]])
+
+        loss = continuous_loss(y_pred, y_true, continuation_signals, lambda_penalty=1.0)
+        expected_loss = F.mse_loss(y_pred[:, :2, :], y_true[:, :2, :], reduction='mean') + 3
+        self.assertTrue(torch.isclose(loss, expected_loss), f"Expected loss {expected_loss}, but got {loss}")
+
+    def test_continuous_loss_stop_after_first(self):
+        # Case 3: Model predicts the first step and then stops immediately
+        y_pred = torch.tensor([[[1.0], [0.0], [0.0], [0.0]]])
+        y_true = torch.tensor([[[1.0], [2.0], [3.0], [4.0]]])
+        continuation_signals = torch.tensor([[0.4, 0.0, 0.0, 0.0]])
+
+        loss = continuous_loss(y_pred, y_true, continuation_signals, lambda_penalty=1.0)
+        expected_loss = torch.tensor(4.0)
+        self.assertTrue(torch.isclose(loss, expected_loss), f"Expected loss {expected_loss}, but got {loss}")
+
+    def test_continuous_loss_full_sequence_with_over_prediction(self):
+        # Case 4: Model predicts more steps than needed (all continuation signals > 0.5)
+        y_pred = torch.tensor([[[1.0], [2.0], [3.0], [5.0]]])
+        y_true = torch.tensor([[[1.0], [2.0], [3.0], [4.0]]])
+        continuation_signals = torch.tensor([[0.9, 0.9, 0.9, 0.9]])
+
+        loss = continuous_loss(y_pred, y_true, continuation_signals, lambda_penalty=1.0)
+        expected_loss = F.mse_loss(y_pred[:, :4, :], y_true[:, :4, :], reduction='mean')
+        self.assertTrue(torch.isclose(loss, expected_loss), f"Expected loss {expected_loss}, but got {loss}")
+
+
+class TestChannelWiseMultiHeadAttention(unittest.TestCase):
+
+    def test_output_shape(self):
+        """Test if the ChannelWiseMultiHeadAttention layer produces the correct output shape."""
+        d_model = 16
+        num_heads = 2
+        batch_size = 32
+        sequence_length = 20
+        num_features = d_model
+
+        model = ChannelWiseMultiHeadAttention(d_model, num_heads)
+        x = torch.rand(batch_size, sequence_length, num_features)
+
+        output = model(x, x, x)
+
+        # Check if output shape matches expected shape (batch_size, sequence_length, num_features)
+        self.assertEqual(output.shape, (batch_size, sequence_length, d_model))
+
+    class TestChannelWiseMultiHeadAttention(unittest.TestCase):
+
+        def test_output_shape(self):
+            """Test if the ChannelWiseMultiHeadAttention layer produces the correct output shape."""
+            d_model = 16
+            num_heads = 2
+            batch_size = 32
+            sequence_length = 20
+
+            model = ChannelWiseMultiHeadAttention(d_model, num_heads)
+            x = torch.rand(batch_size, sequence_length, d_model)
+
+            output = model(x, x, x)
+
+            # Check if output shape matches expected shape (batch_size, sequence_length, d_model)
+            self.assertEqual(output.shape, (batch_size, sequence_length, d_model))
+
+        def test_attention_scores(self):
+            """Test if the attention scores have the correct shape and are computed properly."""
+            d_model = 16
+            num_heads = 4
+            batch_size = 32
+            sequence_length = 20
+
+            model = ChannelWiseMultiHeadAttention(d_model, num_heads)
+            x = torch.rand(batch_size, sequence_length, d_model)
+
+            # Get query and key matrices
+            Q = model.query(x)
+            K = model.key(x)
+
+            # Permute for channel-wise attention (batch_size, d_model, seq_len)
+            Q = Q.permute(0, 2, 1)
+            K = K.permute(0, 2, 1)
+
+            # Reshape for multi-head attention
+            Q = Q.view(batch_size, num_heads, d_model // num_heads, sequence_length).transpose(1, 2)
+            K = K.view(batch_size, num_heads, d_model // num_heads, sequence_length).transpose(1, 2)
+
+            # Calculate attention scores
+            attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(
+                torch.tensor(d_model // num_heads, dtype=torch.float32))
+
+            # Check if attention scores shape matches expected shape (batch_size, num_heads, d_model // num_heads, d_model // num_heads)
+            self.assertEqual(attention_scores.shape,
+                             (batch_size, num_heads, d_model // num_heads, d_model // num_heads))
+
+        def test_different_input_sizes(self):
+            """Test if ChannelWiseMultiHeadAttention layer works with varying sequence lengths."""
+            d_model = 16
+            num_heads = 4
+
+            model = ChannelWiseMultiHeadAttention(d_model, num_heads)
+
+            for seq_len in [10, 20, 30]:
+                x = torch.rand(32, seq_len, d_model)
+                output = model(x, x, x)
+
+                # Check if output shape matches expected shape (batch_size, sequence_length, d_model)
+                self.assertEqual(output.shape, (32, seq_len, d_model))
+
+        def test_attention_masking(self):
+            """Test that the attention mechanism correctly applies the mask."""
+            d_model = 16
+            num_heads = 4
+            attention = ChannelWiseMultiHeadAttention(d_model, num_heads)
+            batch_size = 2
+            seq_len = 5
+            num_features = d_model
+
+            # Create a batch of random input sequences
+            x = torch.rand(batch_size, seq_len, num_features)
+
+            # Create a mask (for example, upper triangular to block future tokens)
+            mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+
+            # Pass the mask and input through the attention mechanism
+            attention_output = attention(x, x, x, mask)
+
+            # Manually compute attention scores
+            Q = attention.query(x).permute(0, 2, 1)
+            K = attention.key(x).permute(0, 2, 1)
+            V = attention.value(x).permute(0, 2, 1)
+
+            # Reshape for multi-head attention
+            Q = Q.view(batch_size, num_features, num_heads, attention.dk).transpose(1, 2)
+            K = K.view(batch_size, num_features, num_heads, attention.dk).transpose(1, 2)
+            V = V.view(batch_size, num_features, num_heads, attention.dk).transpose(1, 2)
+
+            # Manually compute attention scores
+            attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(
+                torch.tensor(attention.dk, dtype=torch.float32))
+
+            # Apply the mask manually
+            mask = mask.unsqueeze(0).unsqueeze(0)  # Reshape to [1, 1, seq_len, seq_len]
+            mask = mask.expand(batch_size, num_heads, -1, -1)  # Expand to [batch_size, num_heads, seq_len, seq_len]
+            attention_scores_masked = attention_scores.masked_fill(mask == True, float('-inf'))
+
+            # Apply softmax to the masked attention scores
+            attention_weights = torch.nn.functional.softmax(attention_scores_masked, dim=-1)
+
+            # Compute the manually masked attention output
+            manual_attention_output = torch.matmul(attention_weights, V)
+            manual_attention_output = manual_attention_output.transpose(1, 2).contiguous().view(batch_size,
+                                                                                                num_features,
+                                                                                                seq_len)
+            manual_attention_output = manual_attention_output.permute(0, 2, 1)
+
+            # Pass the manual masked output through the final linear layer to match the ChannelWise attention output
+            manual_attention_output = attention.out(manual_attention_output)
+
+            # Check if the attention output from the class matches the manually calculated one
+            self.assertTrue(torch.allclose(attention_output, manual_attention_output, atol=1e-6))

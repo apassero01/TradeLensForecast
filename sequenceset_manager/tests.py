@@ -1,8 +1,14 @@
+from unittest.mock import patch, MagicMock
+
 from django.test import TestCase, Client
 import json
 import pandas as pd
 import numpy as np
-from sequenceset_manager.services import SequencesetManagerService
+from zmq.backend import first
+
+from dataset_manager.models import DataSetTracker
+from dataset_manager.services import DatasetManagerService, DatasetTrackerService, FeatureTrackerService
+from sequenceset_manager.services import SequencesetManagerService, SequenceSetTrackerService
 import math
 from sequenceset_manager.models import StockSequence, FeatureDict
 from datetime import datetime
@@ -13,7 +19,7 @@ class SequencesetManagerServiceTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.ticker = 'AAPL'
-        self.start_date = '2018-01-01'
+        self.start_date = '2019-01-01'
         self.end_date = '2021-01-01'
         self.interval = '1d'
 
@@ -139,8 +145,8 @@ class SequencesetManagerServiceTest(TestCase):
         print(f"Shape of the 2D list: {rows} x {cols}")
 
         # Retrieve the sequence slice using the retrieve_sequence_slice function
-        start_date = '2018-02-01'
-        end_date = '2018-03-01'
+        start_date = self.start_date
+        end_date = self.end_date
 
         result = SequencesetManagerService.retrieve_sequence_slice(
             ticker=self.ticker,
@@ -173,6 +179,69 @@ class SequencesetManagerServiceTest(TestCase):
             # Assert that the data matches
             self.assertTrue(np.array_equal(new_arr, record['sliced_data']))
 
+    def test_add_feature_row(self):
+        sequences, feature_dict = SequencesetManagerService.create_sequence_objects(self.ticker, self.interval, 10, self.df)
+        SequencesetManagerService.save_stock_sequences(deepcopy(sequences), feature_dict)
+        sequence_set_tracker = SequenceSetTrackerService.create_sequence_set_tracker(self.ticker, self.interval, 10, self.start_date,self.end_date)
+
+
+        X_new = np.random.rand(len(sequences), 10, 10)
+
+        # add nan val to last part of sequence
+        X_new[:, -2:, :] = np.nan
+
+        SequencesetManagerService.add_feature_row(sequence_set_tracker, X_new)
+
+        sequences = []
+        for stock_sequence in StockSequence.objects.filter(ticker=self.ticker.upper(), timeframe=self.interval):
+            sequence_data_with_nan = [[np.nan if val is None else val for val in row] for row in stock_sequence.sequence_data]
+            sequences.append(SequencesetManagerService.transpose(sequence_data_with_nan))
+
+        arr_3d = np.array(sequences)
+        self.assertTrue(np.allclose(arr_3d[:,:,-10:], X_new, equal_nan=True))
+
+    @patch('sequenceset_manager.services.requests.get')
+    @patch('sequenceset_manager.services.SequencesetManagerService.get_stock_dataset')
+    def test_refresh_features(self, mock_get_stockdataset, mock_get):
+        sequences, feature_dict = SequencesetManagerService.create_sequence_objects(self.ticker, self.interval, 5, self.df)
+        SequencesetManagerService.save_stock_sequences(deepcopy(sequences), feature_dict)
+        sequence_set_tracker = SequenceSetTrackerService.create_sequence_set_tracker(self.ticker, self.interval, 5, self.start_date, self.end_date)
+
+        self.df.index = pd.to_datetime(self.df.index)
+
+        new_features = ['new_feature1', 'new_feature2', 'y', 'close-1']
+        self.df[new_features] = np.random.rand(len(self.df), 4)
+
+        mock_get_stockdataset.return_value = self.df
+        DatasetManagerService.update_existing_stock_data(self.df, self.ticker, self.interval)
+
+        FeatureTrackerService.update_feature_tracker()
+
+        true_list = FeatureTrackerService.get_feature_tracker().features
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = true_list
+        mock_get.return_value = mock_response
+
+
+        SequencesetManagerService.refresh_features()
+
+
+        feature_dict = FeatureDict.objects.first().feature_dict
+
+        self.assertTrue(sorted(list(range(len(self.df.columns)))) == sorted(list(feature_dict.values())))
+
+        self.assertTrue(all([feature in feature_dict for feature in new_features]))
+
+
+        for stock_sequence in StockSequence.objects.filter(ticker=self.ticker.upper(), timeframe=self.interval):
+            df_seq = self.df.loc[stock_sequence.start_timestamp:stock_sequence.end_timestamp]
+            for feature in new_features:
+                index = feature_dict[feature]
+                self.assertTrue(compare_lists_with_nan(stock_sequence.sequence_data[index], df_seq[feature].values.tolist()))
+
+
+
 
 def compare_lists_with_nan(list1, list2):
     if len(list1) != len(list2):
@@ -183,5 +252,6 @@ def compare_lists_with_nan(list1, list2):
         if a != b:
             return False
     return True
+
 
     

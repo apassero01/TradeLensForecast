@@ -1,6 +1,10 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+from django.utils import timezone
+
+from sympy.codegen.cnodes import static
+
 from dataset_manager.models import StockData, FeatureFactoryConfig
 from dataset_manager.factories import MovingAverageFeatureFactory
 from django.db import transaction 
@@ -9,6 +13,7 @@ import importlib
 import json
 import queue
 from django.core.cache import cache
+from dataset_manager.models import FeatureTracker, DataSetTracker
 
 MAX_LOOKBACK = 250
 
@@ -38,6 +43,13 @@ class DatasetManagerService:
         print(df.columns)
         DatasetManagerService.dataframe_to_stockdata(df, ticker, interval)
 
+        DatasetTrackerService.track_dataset(df, ticker, interval)
+
+        if not FeatureTracker.objects.first():
+            FeatureTrackerService.initialize_feature_tracker()
+        else:
+            FeatureTrackerService.update_feature_tracker()
+
         return df
 
     @staticmethod
@@ -66,17 +78,34 @@ class DatasetManagerService:
         df = FeatureFactoryService.apply_feature_factories(combined_df)
         DatasetManagerService.dataframe_to_stockdata(df.tail(len(new_data)-1), ticker, interval)
 
+        FeatureTrackerService.update_feature_tracker()
+
     @staticmethod
-    def add_new_feature(ticker: str, interval="1d"):
+    def add_new_feature(tracker):
         '''
         Add a new feature to the existing stock data
         '''
-        ticker = ticker.upper()
-        df = DatasetManagerService.stockdata_to_dataframe(ticker, interval)
+        ticker = tracker.ticker.upper()
+        df = DatasetManagerService.stockdata_to_dataframe(ticker, tracker.timeframe)
         df = FeatureFactoryService.apply_feature_factories(df)
         
-        DatasetManagerService.update_existing_stock_data(df, ticker, interval)
+        DatasetManagerService.update_existing_stock_data(df, ticker, tracker.timeframe)
+        DatasetTrackerService.update_tracker(ticker, tracker.timeframe)
 
+
+    @staticmethod
+    def add_new_feature_to_all():
+        '''
+        Add a new feature to all existing stock data
+        '''
+        dataset_trackers = DatasetTrackerService.get_all_trackers()
+
+        with transaction.atomic():
+            for tracker in dataset_trackers:
+                print(tracker.ticker)
+                DatasetManagerService.add_new_feature(tracker)
+                print("is sma12 in features?", "sma12" in DataSetTracker.objects.filter(ticker=tracker.ticker).first().features)
+        FeatureTrackerService.update_feature_tracker()
 
     @staticmethod
     def update_existing_stock_data(df : pd.DataFrame, ticker: str, interval="1d"):
@@ -87,15 +116,26 @@ class DatasetManagerService:
 
         existing_records_map = {record.timestamp: record for record in existing_records}
 
-        upddated_records = [] 
+        upddated_records = []
+
+        df.fillna(-999, inplace=True)
 
         for index, row in df.iterrows():
-            timestamp = row.name
+            # timestamp = timezone.make_aware(datetime.strptime(index, '%Y-%m-%d %H:%M:%S+00:00'))
+            timestamp = index
             stock_record = existing_records_map.get(timestamp)
 
             if stock_record:
                 stock_record.features = row.to_dict()
                 upddated_records.append(stock_record)
+
+            else:
+                StockData.objects.create(
+                    ticker=ticker.upper(),
+                    timestamp=timestamp,
+                    timeframe=interval,
+                    features=row.to_dict(),
+                )
             
         if upddated_records:
             with transaction.atomic():
@@ -106,6 +146,8 @@ class DatasetManagerService:
         '''
         Save a DataFrame to the database as StockData objects
         '''
+        # replace nans with -999
+        df.fillna(-999, inplace=True)
 
         with transaction.atomic():
             for _, row in df.iterrows():
@@ -194,12 +236,6 @@ class DatasetManagerService:
 
 class FeatureFactoryService:
 
-    def tearDown(self):
-        # Clean up tasks after each test
-        StockData.objects.all().delete()  # Clear the model's data if necessary
-        FeatureFactoryConfig.objects.all().delete()  # Clear the model's data if necessary
-        cache.clear()  # Clear the cache
-
     @staticmethod
     def apply_feature_factories(df):
         factories = FeatureFactoryService.load_factories_from_db()
@@ -214,9 +250,9 @@ class FeatureFactoryService:
 
         FeatureFactoryService.update_factory_configs()
         factories = []
-        configs = FeatureFactoryConfig.objects.all()
 
-        for config in configs:
+        for config_name in FACTORY_CONFIG_LIST:
+            config = FeatureFactoryConfig.objects.filter(name=config_name["name"]).first()
             module_name, class_name = config.class_path.rsplit(".", 1)
             module = importlib.import_module(module_name)
             factory_class = getattr(module, class_name)
@@ -273,6 +309,139 @@ class FeatureFactoryService:
                 factory = factory_class(db_config)
                 example_df = factory.add_features(example_df)
             
+
+class FeatureTrackerService:
+
+    @staticmethod
+    def initialize_feature_tracker():
+        '''
+        Initialize the feature tracker with the features from the first StockData object
+        '''
+
+        with transaction.atomic():
+            feature_tracker = FeatureTracker.objects.first()
+            if not feature_tracker:
+                feature_tracker = FeatureTracker.objects.create(features = list(StockData.objects.first().features.keys()))
+                feature_tracker.save()
+
+                try:
+                    FeatureTrackerService.ensure_synced_features()
+                    print("Feature tracker initialized")
+                    return feature_tracker
+                except ValueError as e:
+                    print(f"Error syncing features: {e}")
+                    feature_tracker.delete()
+                    return
+            return feature_tracker
+
+
+    @staticmethod
+    def ensure_synced_features():
+        '''
+        Ensure that the features in the database are synced with the features in the StockData objects
+        '''
+        print("ensuring synced features")
+
+        DatasetTrackerService.update_all_trackers()
+
+        dataset_trackers = DatasetTrackerService.get_all_trackers()
+        feature_tracker = FeatureTracker.objects.first()
+        ground_truth_features = feature_tracker.features
+
+
+        for tracker in dataset_trackers:
+            tracker_features = tracker.features
+            if tracker_features != ground_truth_features:
+                raise ValueError(f"Features for {tracker.ticker} are not synced")
+        print("Features are synced")
+
+    @staticmethod
+    def update_feature_tracker():
+        '''
+        Update the feature tracker with the latest features
+        '''
+        print("Updating feature tracker")
+        feature_tracker = FeatureTracker.objects.first()
+
+        print("updating all trackers")
+        DatasetTrackerService.update_all_trackers()
+        print("all trackers updated")
+
+        print("getting all trackers")
+        all_dataset_trackers = DatasetTrackerService.get_all_trackers()
+        print("all trackers gotten")
+
+        feature_tracker.features = all_dataset_trackers[0].features
+        feature_tracker.save()
+
+        print("Feature tracker updated")
+
+    @staticmethod
+    def get_feature_tracker():
+        '''
+        Get the feature tracker
+        '''
+        return FeatureTracker.objects.first()
+
+
+
+
+class DatasetTrackerService:
+
+    @staticmethod
+    def track_dataset(df, ticker, interval):
+        '''
+        Track a dataset in the database
+        '''
+        dataset_tracker = DataSetTracker.objects.create(
+            ticker=ticker,
+            timeframe=interval,
+            start_date=df.index[0],
+            end_date=df.index[-1],
+            features=df.columns.tolist()
+        )
+        dataset_tracker.save()
+
+    @staticmethod
+    def update_all_trackers():
+        '''
+        Update all dataset trackers with the latest data
+        '''
+        dataset_trackers = DataSetTracker.objects.all()
+        print(len(dataset_trackers))
+        for tracker in dataset_trackers:
+            DatasetTrackerService.update_tracker(tracker.ticker, tracker.timeframe)
+
+    @staticmethod
+    def update_tracker(ticker, interval):
+        '''
+        Update the dataset tracker with the latest data
+        '''
+
+        current_tracker = DataSetTracker.objects.filter(ticker=ticker, timeframe=interval).first()
+        if not current_tracker:
+            raise ValueError("No tracker found for the given ticker and interval")
+
+        print("converting to df")
+        row_first = StockData.objects.filter(ticker=ticker, timeframe=interval).first()
+        row_last = StockData.objects.filter(ticker=ticker, timeframe=interval).last()
+        print(ticker)
+        print("df converted")
+
+        current_tracker.features = list(row_first.features.keys())
+        current_tracker.start_date = row_first.timestamp
+        current_tracker.end_date = row_last.timestamp
+        current_tracker.save()
+
+    @staticmethod
+    def get_all_trackers():
+        '''
+        Get all dataset trackers
+        '''
+        return DataSetTracker.objects.all()
+
+
+
 
 
 

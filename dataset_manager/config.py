@@ -47,7 +47,7 @@ TARGET_FACTORY_CONFIG = {
     "parameters": {
         "output_steps": 15,
     },
-    "version": "0.0.2",
+    "version": "0.0.5",
     "class_path": "dataset_manager.factories.TargetFeatureFactory",
 }
 

@@ -1,6 +1,7 @@
 from django.test import TestCase
-from dataset_manager.models import StockData, FeatureFactoryConfig
-from dataset_manager.services import FeatureFactoryService, DatasetManagerService
+from dataset_manager.models import StockData, FeatureFactoryConfig, DataSetTracker
+from dataset_manager.services import FeatureFactoryService, DatasetManagerService, DatasetTrackerService, \
+    FeatureTrackerService
 from dataset_manager.config import FACTORY_CONFIG_LIST
 from dataset_manager.factories import MovingAverageFeatureFactory, OHLCVFeatureFactory, BandFeatureFactory, MomentumFeatureFactory,TargetFeatureFactory
 
@@ -32,6 +33,9 @@ class DatasetManagerServiceTest(TestCase):
         print(StockData.objects.first().features.keys())
         self.assertEqual(sorted(list(StockData.objects.first().features.keys())), self.all_columns)
 
+        self.assertTrue(DataSetTracker.objects.get(ticker="SPY", timeframe="1d") is not None)
+        FeatureTrackerService.ensure_synced_features()
+
     def test_stockdata_to_dataframe(self):
         df_api,_ = DatasetManagerService.fetch_stock_data("SPY", "2020-01-01", "2021-01-10")
         DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
@@ -60,8 +64,25 @@ class DatasetManagerServiceTest(TestCase):
         ma_factory_config["parameters"]["windows"].append(12)
         ma_factory_config["version"] = "0.0.2"
 
-        DatasetManagerService.add_new_feature("SPY", "1d")
+        dataset_tracker = DataSetTracker.objects.first()
+
+
+        DatasetManagerService.add_new_feature(dataset_tracker)
         self.assertTrue("sma12" in StockData.objects.first().features.keys())
+
+    def test_add_new_feature_to_all(self):
+        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
+        DatasetManagerService.create_new_stock("AAPL", "2020-01-01", "2021-01-10")
+
+        # update the ma factory config adding a new average
+        ma_factory_config = FACTORY_CONFIG_LIST[0]
+
+        ma_factory_config["parameters"]["windows"].append(12)
+        ma_factory_config["version"] = "0.0.2"
+
+        DatasetManagerService.add_new_feature_to_all()
+        self.assertTrue("sma12" in StockData.objects.first().features.keys())
+        self.assertTrue("sma12" in StockData.objects.last().features.keys())
 
     def test_update_recent_stock_data(self):
         DatasetManagerService.create_new_stock("SPY", "2023-08-01", "2024-08-9")
@@ -70,8 +91,14 @@ class DatasetManagerServiceTest(TestCase):
 
         all_timestamps = list(StockData.objects.all().values_list("timestamp", flat=True))
 
+        last_timestamp = all_timestamps[-1]
+
         self.assertEqual(len(all_timestamps), len(set(all_timestamps)) )
 
+        datasettracker = DataSetTracker.objects.first()
+        self.assertEqual(datasettracker.end_date, last_timestamp)
+
+        FeatureTrackerService.ensure_synced_features()
 
 
 class FeatureFactoryServiceTest(TestCase):
@@ -439,8 +466,6 @@ class TestTargetFeatureFactory(TestCase):
         for col in target_cols:
             self.assertTrue(col in target_df.columns)
 
-        expected_columns = len(self.df.columns) + len(target_cols)
-        self.assertEqual(len(target_df.columns), expected_columns)
 
         # Verify that a specific computed value matches expectations
         example_row = 20 
@@ -451,8 +476,126 @@ class TestTargetFeatureFactory(TestCase):
                 self.df['pctChgclose'].iloc[example_row+i]
             )
 
+    def test_create_rolling_sum_vars(self):
+        # Generate percentage change features first
+        self.df = self.pctChg_factory.createPctChg(self.df.copy())
 
-        
+        # Generate cumulative sum variables
+        self.df = self.target_factory.create_rolling_sum_vars(self.df.copy())
+
+        # Verify that the new columns have been added correctly
+        for roll in range(1,self.output_steps+1):
+            shifted_col_name = f'cumPctChg+{roll}'
+
+
+            # Ensure the shifted column is present
+            self.assertTrue(shifted_col_name in self.df.columns)
+
+        # Verify that the cumulative sums and shifted values are correct
+        for roll in range(1,self.output_steps+1):
+            shifted_col_name = f'cumPctChg+{roll}'
+            for i in range(0, len(self.df) - roll):
+                # Calculate the expected cumulative sum from i+1 to i+roll
+                expected_value = self.df['pctChgclose'].iloc[i + 1: i + 1 + roll].sum()
+
+                # Compare the value at the current row with the expected value
+                self.assertAlmostEqual(
+                    self.df[shifted_col_name].iloc[i],
+                    expected_value,
+                    msg=f"Mismatch in {shifted_col_name} at index {i}"
+                )
+
+    def test_create_raw_target(self):
+        # Generate target variable features
+        self.df = self.pctChg_factory.createPctChg(self.df.copy())
+        target_df = self.target_factory.add_features(self.df.copy())
+
+        # Check if target variable columns are present
+        target_cols = ["close+" + str(i) for i in range(1,self.output_steps+1)]
+
+        # Ensure the number of columns matches the expected target variable columns
+        for col in target_cols:
+            self.assertTrue(col in target_df.columns)
+
+        # Verify that a specific computed value matches expectations
+        example_row = 20
+
+        for i in range(1,self.output_steps+1):
+            self.assertAlmostEqual(
+                target_df['close+' + str(i)].iloc[example_row],
+                self.df['close'].iloc[example_row+i]
+            )
+
+
+
+class TestFeatureTrackerService(TestCase):
+
+    def setUp(self):
+        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
+        self.df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
+        DatasetTrackerService.track_dataset(self.df, "SPY", "1d")
+
+    def tearDown(self) -> None:
+        StockData.objects.all().delete()
+        FeatureFactoryConfig.objects.all().delete()
+        DataSetTracker.objects.all().delete()
+        return super().tearDown()
+
+    def test_initialize_feature_tracker(self):
+        tracker = FeatureTrackerService.initialize_feature_tracker()
+        self.assertEqual(tracker.features, self.df.columns.tolist())
+
+    def test_ensure_synced_features(self):
+        feature_set_tracker = FeatureTrackerService.initialize_feature_tracker()
+
+        FeatureTrackerService.ensure_synced_features()
+
+        self.df["new_column"] = 1
+
+        DatasetManagerService.update_existing_stock_data(self.df, "SPY", "1d")
+
+        with self.assertRaises(Exception):
+            FeatureTrackerService.ensure_synced_features()
+
+
+class TestDatasetTrackerService(TestCase):
+
+        def setUp(self):
+            DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
+            self.df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
+            DatasetTrackerService.track_dataset(self.df, "SPY", "1d")
+
+        def tearDown(self) -> None:
+            StockData.objects.all().delete()
+            FeatureFactoryConfig.objects.all().delete()
+            DataSetTracker.objects.all().delete()
+            return super().tearDown()
+
+        def test_track_dataset(self):
+            tracker = DataSetTracker.objects.first()
+            self.assertEqual(tracker.ticker, "SPY")
+            self.assertEqual(tracker.timeframe, "1d")
+            self.assertEqual(tracker.features, self.df.columns.tolist())
+            self.assertEqual(tracker.start_date, self.df.index.min())
+            self.assertEqual(tracker.end_date, self.df.index.max())
+
+        def test_update_dataset_tracker(self):
+            DatasetManagerService.update_recent_stock_data("SPY", "1d")
+            df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
+
+            df["new_column"] = 1
+            DatasetManagerService.update_existing_stock_data(df, "SPY", "1d")
+            DatasetTrackerService.update_tracker("SPY", "1d")
+            tracker = DataSetTracker.objects.first()
+            self.assertEqual(tracker.start_date, df.index.min())
+            self.assertEqual(tracker.end_date, df.index.max())
+            self.assertEqual(sorted(tracker.features), sorted(df.columns.tolist()))
+
+
+
+
+
+
         
 
     

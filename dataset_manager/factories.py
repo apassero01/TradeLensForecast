@@ -539,6 +539,10 @@ class TargetFeatureFactory(FeatureFactory):
         df = self.create_pct_chg_target(df)
         if not df.index.is_unique:
             print("Warning: Duplicate indices detected before processing.")
+        df = self.create_rolling_sum_vars(df)
+        if not df.index.is_unique:
+            print("Warning: Duplicate indices detected before processing.")
+        df = self.create_raw_target(df)
         
         df = df.replace([np.inf, -np.inf], np.nan)
         df = df.bfill()
@@ -569,6 +573,60 @@ class TargetFeatureFactory(FeatureFactory):
         df = pd.concat([df, new_columns], axis=1)
         
         return df
+
+    def create_rolling_sum_vars(self, df, col = 'pctChgclose'):
+        cum_df = pd.DataFrame(index = df.index)
+        target_df = pd.DataFrame(index = df.index)
+
+        for roll in range(1,self.output_steps+1):
+            name = 'cumPctChg_' + str(roll)
+            cum_df[name] = df[col].rolling(roll).sum()
+            cum_df[name] = cum_df[name].astype('float64')
+            cum_df[name] = cum_df[name].fillna(-999)
+
+        for col in cum_df.columns:
+            num_rows_ahead = int(col.split('_')[1])
+            new_name = 'cumPctChg+' + str(num_rows_ahead)
+
+            shifted_col = cum_df[col].shift(-num_rows_ahead)
+            target_df[new_name] = shifted_col
+            target_df[new_name] = target_df[new_name].astype('float64')
+            target_df[new_name] = target_df[new_name].fillna(-999)
+
+        df = pd.concat([df, target_df], axis=1)
+        return df
+
+    def create_raw_target(self, df):
+        '''
+        Method to create percent change target for a stock.
+        '''
+        target_df = pd.DataFrame(index=df.index)
+
+        for lag in range(1, self.output_steps + 1):
+            target_name = 'close+' + str(lag)
+            shifted_series = df['close'].shift(-lag)
+            # print length of index in shifted_series and df
+
+            target_df[target_name] = shifted_series
+            target_df[target_name] = target_df[target_name].astype('float64')
+            target_df[target_name] = target_df[target_name].fillna(-999)
+
+        cols = list(target_df.columns)
+        cols.reverse()
+        target_df = target_df[cols]
+
+        df.update(target_df)
+        new_columns = target_df.loc[:, ~target_df.columns.isin(df.columns)]
+        df = pd.concat([df, new_columns], axis=1)
+
+        return df
+
+
+
+
+
+
+
     
 
     

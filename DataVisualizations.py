@@ -45,7 +45,7 @@ def plot_attention_output_multi(component_dict, idx):
     plt.show()
 
 
-def visualize_future_predictions_combined(true_steps, pred_steps):
+def visualize_future_predictions_combined(true_steps, pred_steps, alreadyCum=False):
     plt.figure(figsize=(14, 6))
 
     # First subplot: original values
@@ -54,15 +54,19 @@ def visualize_future_predictions_combined(true_steps, pred_steps):
     plt.plot(pred_steps, label='Predicted', color='orange')
     plt.title('Future Predictions')
     plt.legend()
-    plt.ylim(-12, 12)
+    plt.ylim(-6, 6)
 
     # Second subplot: cumulative sum
     plt.subplot(1, 2, 2)  # 1 row, 2 columns, 2nd subplot
-    plt.plot(np.cumsum(true_steps), label='True (Cumulative)', color='blue')
-    plt.plot(np.cumsum(pred_steps), label='Predicted (Cumulative)', color='orange')
+    if not alreadyCum:
+        plt.plot(np.cumsum(true_steps), label='True (Cumulative)', color='blue')
+        plt.plot(np.cumsum(pred_steps), label='Predicted (Cumulative)', color='orange')
+    else :
+        plt.plot(true_steps, label='True (Cumulative)', color='blue')
+        plt.plot(pred_steps, label='Predicted (Cumulative)', color='orange')
     plt.title('Cumulative Future Predictions')
     plt.legend()
-    plt.ylim(-12, 12)
+    plt.ylim(-6,6)
 
     plt.tight_layout()
     plt.show()
@@ -111,4 +115,92 @@ def visualize_step_distribution(y_pred, y):
 
     # Display the plot
     plt.tight_layout()
+    plt.show()
+
+
+def plot_feature_histograms(data, features, feature_dict):
+    """
+    Plots histograms for each feature specified in feature_dict from a 3D NumPy array.
+
+    Parameters:
+    - data (np.ndarray): A 3D NumPy array of shape (batch_size, seq_length, num_features).
+    - feature_dict (dict): A dictionary where keys are feature names and values are indices in the 3rd dimension of the data array.
+    """
+    num_features = len(features)
+
+    # Determine the grid size for subplots
+    nrows = 4
+    ncols = (num_features + 1) // nrows
+
+    # Create a grid of subplots
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 8))
+
+    # Flatten the axes array for easy iteration
+    axes = axes.flatten()
+
+    # Iterate over the feature dictionary
+    for i, feature_name in enumerate(features):
+        # Flatten the data for the given feature index across all batches and sequences
+        feature_index = feature_dict[feature_name]
+        feature_data = data[:, :, feature_index].flatten()
+
+        # Plot the histogram on the corresponding subplot
+        axes[i].hist(feature_data, bins=30, edgecolor='black')
+        axes[i].set_title(feature_name)
+        axes[i].set_xlabel('Value')
+        axes[i].set_ylabel('Frequency')
+        axes[i].grid(True)
+
+    # Turn off any empty subplots (if num_features is not a perfect multiple of nrows * ncols)
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
+
+    # Adjust the layout to make sure everything fits without overlapping
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
+
+
+def plot_y_feature_histograms(data, features):
+    """
+    Plots histograms for each feature specified in feature_dict from a 3D NumPy array.
+
+    Parameters:
+    - data (np.ndarray): A 3D NumPy array of shape (batch_size, seq_length, num_features).
+    - feature_dict (dict): A dictionary where keys are feature names and values are indices in the 3rd dimension of the data array.
+    """
+    num_features = len(features)
+
+    # Determine the grid size for subplots
+    nrows = 4
+    ncols = (num_features + 1) // nrows
+
+    # Create a grid of subplots
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 8))
+
+    # Flatten the axes array for easy iteration
+    axes = axes.flatten()
+
+    # Iterate over the feature dictionary
+    for i, feature_name in enumerate(features):
+        # Flatten the data for the given feature index across all batches and sequences
+        feature_index = i
+        feature_data = data[:, feature_index, : ].flatten()
+
+        # Plot the histogram on the corresponding subplot
+        axes[i].hist(feature_data, bins=30, edgecolor='black')
+        axes[i].set_title(feature_name)
+        axes[i].set_xlabel('Value')
+        axes[i].set_ylabel('Frequency')
+        axes[i].grid(True)
+
+    # Turn off any empty subplots (if num_features is not a perfect multiple of nrows * ncols)
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
+
+    # Adjust the layout to make sure everything fits without overlapping
+    plt.tight_layout()
+
+    # Show the plot
     plt.show()
