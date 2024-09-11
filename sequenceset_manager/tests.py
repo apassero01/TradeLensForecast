@@ -8,9 +8,9 @@ from zmq.backend import first
 
 from dataset_manager.models import DataSetTracker
 from dataset_manager.services import DatasetManagerService, DatasetTrackerService, FeatureTrackerService
-from sequenceset_manager.services import SequencesetManagerService, SequenceSetTrackerService
+from sequenceset_manager.services import SequenceSetService
 import math
-from sequenceset_manager.models import StockSequence, FeatureDict
+from sequenceset_manager.models import SequenceSet, Sequence, FeatureSequence
 from datetime import datetime
 import random
 from copy import deepcopy
@@ -252,6 +252,149 @@ def compare_lists_with_nan(list1, list2):
         if a != b:
             return False
     return True
+
+
+class SequencesetServiceTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.ticker = 'AAPL'
+        self.start_date = '2019-01-01'
+        self.end_date = '2021-01-01'
+        self.interval = '1d'
+
+        response = self.client.post('/dataset_manager/create_stock_data/',
+                                    data=json.dumps({
+                                        'ticker': self.ticker,
+                                        'start_date': self.start_date,
+                                        'end_date': self.end_date,
+                                        'interval': self.interval
+                                    }),
+                                    content_type='application/json')
+        data = response.json()
+        self.df = pd.DataFrame(data).T
+
+
+    def test_create_sequences(self):
+        sequence_length = 10
+
+        sequence_set = SequenceSet.objects.create(dataset_type='stock', sequence_length=sequence_length, start_timestamp=self.start_date, end_timestamp=self.end_date, metadata={}, feature_names=self.df.columns.tolist())
+
+        SequenceSetService.create_sequences(self.df, sequence_set)
+
+        sequences = Sequence.objects.all()
+
+        self.assertEqual(len(sequences), len(self.df) - sequence_length + 1)
+
+        self.df.index = pd.to_datetime(self.df.index)
+
+        for seq in sequences:
+            df_seq = self.df.loc[seq.start_timestamp:seq.end_timestamp]
+            for feature in seq.feature_names:
+                df_vals = df_seq[feature].values.tolist()
+
+                featureSequences = FeatureSequence.objects.filter(sequence=seq, feature_name=feature)
+
+                self.assertEqual(1, len(featureSequences))
+
+                sequence = featureSequences[0]
+
+                self.assertTrue(compare_lists_with_nan(df_vals, sequence.values))
+
+    @patch('sequenceset_manager.services.SequenceSetService.get_df_data')
+    def test_create_sequence_set(self, mock_get_df_data):
+
+        mock_get_df_data.return_value = self.df
+
+
+        sequence_length = 10
+
+        SequenceSetService.create_sequence_set(sequence_length, dataset_type='stock')
+
+        sequence_set = SequenceSet.objects.first()
+
+
+
+        self.assertEqual(sequence_set.dataset_type, 'stock')
+        self.assertEqual(sequence_set.sequence_length, sequence_length)
+        self.assertEqual(sequence_set.metadata, {'dataset_type': 'stock'})
+        self.assertEqual(sequence_set.feature_names, self.df.columns.tolist())
+
+    @patch('sequenceset_manager.services.SequenceSetService.get_df_data')
+    def test_get_feature_slice(self, mock_get_df_data):
+        sequence_length = 10
+
+        self.df.index = pd.to_datetime(self.df.index)
+
+        mock_get_df_data.return_value = self.df
+
+        SequenceSetService.create_sequence_set(sequence_length, dataset_type='stock')
+
+        feature_list = ['close', 'open', 'high', 'low']
+
+        filled_sequences = SequenceSetService.get_feature_slice(dataset_type='stock', sequence_length=sequence_length, feature_list= feature_list, start_date=self.start_date, end_date=self.end_date)
+
+        self.assertEqual(len(filled_sequences), len(self.df) - sequence_length + 1)
+
+        for seq in filled_sequences:
+            arr_2d = seq.feature_data
+            self.assertEqual(arr_2d.shape, (sequence_length, len(feature_list)))
+            df_seq = self.df.loc[seq.start_timestamp:seq.end_timestamp]
+            for i, feature in enumerate(feature_list):
+                self.assertTrue(compare_lists_with_nan(arr_2d[:, i], df_seq[feature].values.tolist()))
+
+
+
+    @patch('sequenceset_manager.services.SequenceSetService.get_df_data')
+    def test_update_features(self, mock_get_df_data):
+        sequence_length = 10
+
+        self.df.index = pd.to_datetime(self.df.index)
+
+        mock_get_df_data.return_value = self.df
+
+        SequenceSetService.create_sequence_set(sequence_length, dataset_type='stock')
+
+        feature_list = ['close', 'open', 'high', 'low']
+
+        filled_sequences = SequenceSetService.get_feature_slice(dataset_type='stock', sequence_length=sequence_length, feature_list= feature_list, start_date=self.start_date, end_date=self.end_date)
+
+        self.assertEqual(len(filled_sequences), len(self.df) - sequence_length + 1)
+
+        for seq in filled_sequences:
+            arr_2d = seq.feature_data
+            self.assertEqual(arr_2d.shape, (sequence_length, len(feature_list)))
+            df_seq = self.df.loc[seq.start_timestamp:seq.end_timestamp]
+            for i, feature in enumerate(feature_list):
+                self.assertTrue(compare_lists_with_nan(arr_2d[:, i], df_seq[feature].values.tolist()))
+
+        new_features = ['new_feature1', 'new_feature2', 'y', 'close-1']
+        self.df[new_features] = np.random.rand(len(self.df), 4)
+
+        mock_get_df_data.return_value = self.df
+
+        SequenceSetService.update_features(SequenceSet.objects.first())
+
+        feature_list.extend(new_features)
+
+        filled_sequences = SequenceSetService.get_feature_slice(dataset_type='stock', sequence_length=sequence_length, feature_list= feature_list, start_date=self.start_date, end_date=self.end_date)
+
+        self.assertEqual(len(filled_sequences), len(self.df) - sequence_length + 1)
+
+        for seq in filled_sequences:
+            arr_2d = seq.feature_data
+            self.assertEqual(arr_2d.shape, (sequence_length, len(feature_list)))
+            df_seq = self.df.loc[seq.start_timestamp:seq.end_timestamp]
+            for i, feature in enumerate(feature_list):
+                self.assertTrue(compare_lists_with_nan(arr_2d[:, i], df_seq[feature].values.tolist()))
+
+
+
+
+
+
+
+
+
 
 
     

@@ -1,8 +1,8 @@
 from django.contrib import admin
-from .models import StockSequence, FeatureDict, SequenceSetTracker
+from .models import SequenceSet, Sequence, FeatureSequence
 
 # Register your models here.
 
-admin.site.register(StockSequence)
-admin.site.register(FeatureDict)
-admin.site.register(SequenceSetTracker)
+admin.site.register(SequenceSet)
+admin.site.register(Sequence)
+admin.site.register(FeatureSequence)

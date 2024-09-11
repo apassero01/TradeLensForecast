@@ -1,12 +1,14 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
-from sequenceset_manager.services import SequencesetManagerService
+# from sequenceset_manager.services import SequencesetManagerService
 from datetime import datetime
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.http import require_http_methods
+
+from sequenceset_manager.services import SequenceSetService
 
 
 @require_http_methods(["GET"])
@@ -18,13 +20,20 @@ def get_sequence_data(request):
     start_date = request.GET.get('start_date', None)
     end_date = request.GET.get('end_date', None)
     interval = request.GET.get('interval', None)
-    sequence_length = request.GET.get('sequence_length', None)
+    sequence_length = int(request.GET.get('sequence_length', None))
 
     # Convert start_date and end_date to Python date objects, if provided
     if start_date:
         start_date = parse_date(start_date)
     if end_date:
         end_date = parse_date(end_date)
+
+    print(f"ticker: {ticker}")
+    print(f"features: {features}")
+    print(f"start_date: {start_date}")
+    print(f"end_date: {end_date}")
+    print(f"interval: {interval}")
+    print(f"sequence_length: {type(sequence_length)}")
 
     # Ensure 'tickers' and 'features' are provided, as they are mandatory
     if not ticker or not features:
@@ -36,15 +45,15 @@ def get_sequence_data(request):
         )
 
     try:
-        # Assuming you want to retrieve data for multiple tickers
         results = []
-        result = SequencesetManagerService.retrieve_sequence_slice(
+        result = SequenceSetService.get_feature_slice(
+            sequence_length=sequence_length,  # Can be None
+            feature_list=features,
             ticker=ticker.upper(),  # Convert to uppercase
-            features=features,
             interval=interval,  # Can be None
             start_date=start_date,  # Can be None
             end_date=end_date,  # Can be None
-            sequence_length=sequence_length  # Can be None
+            dataset_type="stock"
         )
         results.extend(result)  # Aggregate results from multiple tickers
 
