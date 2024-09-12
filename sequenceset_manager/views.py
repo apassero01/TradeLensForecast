@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
-from sequenceset_manager.services import SequencesetManagerService
+from sequenceset_manager.models import SequenceSet
+from sequenceset_manager.services import SequenceSetService
 from datetime import datetime
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
@@ -38,13 +39,14 @@ def get_sequence_data(request):
     try:
         # Assuming you want to retrieve data for multiple tickers
         results = []
-        result = SequencesetManagerService.retrieve_sequence_slice(
-            ticker=ticker.upper(),  # Convert to uppercase
-            features=features,
-            interval=interval,  # Can be None
-            start_date=start_date,  # Can be None
-            end_date=end_date,  # Can be None
-            sequence_length=sequence_length  # Can be None
+        result = SequenceSetService.retrieve_sequence_slice(
+            sequence_length = sequence_length,
+            feature_list = features,
+            start_date = start_date,
+            end_date = end_date,
+            ticker = ticker,
+            interval = interval,
+            dataset_type = "stock"
         )
         results.extend(result)  # Aggregate results from multiple tickers
 

@@ -8,14 +8,14 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'TradeLens.settings')
 django.setup()
 
 from dataset_manager.services import DatasetManagerService
-from sequenceset_manager.services import SequencesetManagerService
+from sequenceset_manager.services import StockSequenceSetService
 
-tickers = ["AAPL", "SPY", "QQQ", "XOM", "MSFT", "AMZN", "BB"]
-sequences_lengths = [10, 20, 50, 75]
-# tickers = ["AAPL", 'MSFT']
-# sequences_lengths = [10, 20]
+# tickers = ["AAPL", "SPY", "QQQ", "XOM", "MSFT", "AMZN", "BB"]
+# sequences_lengths = [10, 20, 50, 75]
+tickers = ["AAPL", 'MSFT']
+sequences_lengths = [10]
 
 for ticker in tickers:
     for sequence_length in sequences_lengths:
         DatasetManagerService.create_new_stock(ticker)
-        SequencesetManagerService.create_new_sequence_set(ticker, "1d", sequence_length)
+        StockSequenceSetService.create_sequence_set(sequence_length, dataset_type='stock', ticker=ticker, interval='1d')
