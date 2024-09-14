@@ -6,6 +6,5 @@ urlpatterns = [
     # path('', views.index, name='index'),
     path('get_stock_data/<str:ticker>/', views.get_stock_data, name='get_stock_data'),
     path('create_stock_data/', views.create_stock_data, name='create_stock_data'),
-    path('get_stock_features/', views.get_stock_features, name='get_stock_features'),
-    
+
 ]

@@ -45,12 +45,12 @@ class Transformer(nn.Module):
         # Apply Xavier Initialization to all linear layers
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                # nn.init.xavier_uniform_(module.weight)
-                # if module.bias is not None:
-                #     nn.init.zeros_(module.bias)
-                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+                # nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
 
 class TransformerEncoder(nn.Module):
     def __init__(self, num_layers, d_model, num_heads, d_ff, max_length=200, dropout=.1, name = "transformer_encoder"):
@@ -105,12 +105,12 @@ class EncoderLayer(nn.Module):
     def _init_weights(self):
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                # nn.init.xavier_uniform_(module.weight)
-                # if module.bias is not None:
-                #     nn.init.zeros_(module.bias)
-                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+                # nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
 
     def forward(self, x):
         ## pre norm
@@ -165,12 +165,12 @@ class MultiHeadAttention(nn.Module):
     def _init_weights(self):
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                # nn.init.xavier_uniform_(module.weight)
-                # if module.bias is not None:
-                #     nn.init.zeros_(module.bias)
-                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+                # nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
 
     def forward(self, Q, K, V, mask=None):
         batch_size = Q.size(0)
@@ -285,12 +285,12 @@ class TransformerDecoder(nn.Module):
     def _init_weights(self):
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                # nn.init.xavier_uniform_(module.weight)
-                # if module.bias is not None:
-                #     nn.init.zeros_(module.bias)
-                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+                # nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
 
 
 
@@ -370,12 +370,12 @@ class DecoderLayer(nn.Module):
     def _init_weights(self):
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                # nn.init.xavier_uniform_(module.weight)
-                # if module.bias is not None:
-                # nn.init.zeros_(module.bias)
-                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+                # nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
 
     def forward(self, x, encoder_output, target_mask):
         # self_attn_output = self.self_attention(x, x, x, mask=target_mask)
@@ -410,6 +410,80 @@ class DecoderLayer(nn.Module):
 
     def get_attention(self):
         return self.cross_attention_output
+
+class ChannelWiseMultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads, name="multi_head_attention"):
+        super(ChannelWiseMultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.dk = d_model // num_heads
+        self.name = name
+
+        if self.dk * num_heads != d_model:
+            raise ValueError(f"d_model ({d_model}) must be divisible by num_heads ({num_heads})")
+
+        # Define linear layers for query, key, value, and output
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+        self.out = nn.Linear(d_model, d_model)
+
+        self.traversable_layers = []
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+                # nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+
+    def forward(self, Q, K, V, mask=None):
+        batch_size = Q.size(0)
+        seq_len = Q.size(1)
+        num_features = Q.size(2)
+
+        # Apply linear transformations to Q, K, V without permuting yet
+        Q = self.query(Q)  # (batch_size, seq_len, d_model)
+        K = self.key(K)    # (batch_size, seq_len, d_model)
+        V = self.value(V)  # (batch_size, seq_len, d_model)
+
+        # Permute to move features to the second dimension for channel-wise attention
+        Q = Q.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+        K = K.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+        V = V.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+
+        # Reshape for multi-head attention: (batch_size, num_heads, feature_head_size, seq_len)
+        Q = Q.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+        K = K.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+        V = V.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+
+        # Compute attention scores across features (channels)
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.dk, dtype=torch.float32))
+
+        # Apply mask if provided
+        if mask is not None:
+            attention_scores = attention_scores.masked_fill(mask == True, float('-inf'))
+
+        # Compute attention weights and apply them to values
+        attention_weights = torch.nn.functional.softmax(attention_scores, dim=-1)
+        attention_output = torch.matmul(attention_weights, V)
+
+        # Reshape back to (batch_size, num_features, seq_len)
+        attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, num_features, seq_len)
+
+        # Permute back to original shape (batch_size, seq_len, num_features)
+        attention_output = attention_output.permute(0, 2, 1)
+
+        # Apply final linear transformation and return output
+        self.output = self.out(attention_output)
+        return self.output
+
+    def get_attention(self):
+        return self.output
 
 
 
@@ -474,91 +548,18 @@ class SAM(torch.optim.Optimizer):
         return norm
 
 
-def custom_loss_with_zero_penalty(y_true, y_pred, penalty_weight=50.0, zero_threshold=0.1):
+def custom_loss_with_zero_penalty(y_true, y_pred, penalty_weight=1.0):
     # Calculate the standard MSE loss
     mse_loss = nn.functional.mse_loss(y_pred, y_true)
 
     # Apply a penalty to predictions close to zero
-    zero_penalty = torch.mean(torch.exp(-torch.abs(y_pred) / zero_threshold))
+    zero_penalty = torch.mean(torch.exp(-torch.abs(y_pred)))
 
     # Combine the MSE loss with the zero-penalty term
     total_loss = mse_loss + penalty_weight * zero_penalty
 
     return total_loss
 
-class ChannelWiseMultiHeadAttention(nn.Module):
-    def __init__(self, d_model, num_heads, name="multi_head_attention"):
-        super(ChannelWiseMultiHeadAttention, self).__init__()
-        self.num_heads = num_heads
-        self.d_model = d_model
-        self.dk = d_model // num_heads
-        self.name = name
-
-        if self.dk * num_heads != d_model:
-            raise ValueError(f"d_model ({d_model}) must be divisible by num_heads ({num_heads})")
-
-        # Define linear layers for query, key, value, and output
-        self.query = nn.Linear(d_model, d_model)
-        self.key = nn.Linear(d_model, d_model)
-        self.value = nn.Linear(d_model, d_model)
-        self.out = nn.Linear(d_model, d_model)
-
-        self.traversable_layers = []
-        self._init_weights()
-
-    def _init_weights(self):
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                # nn.init.xavier_uniform_(module.weight)
-                # if module.bias is not None:
-                #     nn.init.zeros_(module.bias)
-                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
-
-    def forward(self, Q, K, V, mask=None):
-        batch_size = Q.size(0)
-        seq_len = Q.size(1)
-        num_features = Q.size(2)
-
-        # Apply linear transformations to Q, K, V without permuting yet
-        Q = self.query(Q)  # (batch_size, seq_len, d_model)
-        K = self.key(K)    # (batch_size, seq_len, d_model)
-        V = self.value(V)  # (batch_size, seq_len, d_model)
-
-        # Permute to move features to the second dimension for channel-wise attention
-        Q = Q.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
-        K = K.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
-        V = V.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
-
-        # Reshape for multi-head attention: (batch_size, num_heads, feature_head_size, seq_len)
-        Q = Q.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
-        K = K.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
-        V = V.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
-
-        # Compute attention scores across features (channels)
-        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.dk, dtype=torch.float32))
-
-        # Apply mask if provided
-        if mask is not None:
-            attention_scores = attention_scores.masked_fill(mask == True, float('-inf'))
-
-        # Compute attention weights and apply them to values
-        attention_weights = torch.nn.functional.softmax(attention_scores, dim=-1)
-        attention_output = torch.matmul(attention_weights, V)
-
-        # Reshape back to (batch_size, num_features, seq_len)
-        attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, num_features, seq_len)
-
-        # Permute back to original shape (batch_size, seq_len, num_features)
-        attention_output = attention_output.permute(0, 2, 1)
-
-        # Apply final linear transformation and return output
-        self.output = self.out(attention_output)
-        return self.output
-
-    def get_attention(self):
-        return self.output
 
 
 

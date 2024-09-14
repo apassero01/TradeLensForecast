@@ -45,8 +45,10 @@ class Trainer:
             # Get the sequence predictions and continuation signals from the model
             sequence_predictions = self.model(encoder_input, decoder_input)
 
+            loss = self.criterion(torch.cumsum(sequence_predictions.squeeze(-1), dim=1), torch.cumsum(y_target.squeeze(-1), dim=1))
+
             # Calculate the custom loss
-            loss = self.criterion(sequence_predictions, y_target)
+            # loss = self.criterion(sequence_predictions, y_target)
 
             loss.backward()
 

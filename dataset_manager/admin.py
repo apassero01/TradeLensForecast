@@ -1,8 +1,7 @@
 from django.contrib import admin
-from .models import StockData, FeatureFactoryConfig, FeatureTracker, DataSetTracker
+from .models import FeatureFactoryConfig, DataSet, DataRow
 
 # Register your models here.
-admin.site.register(StockData)
 admin.site.register(FeatureFactoryConfig)
-admin.site.register(FeatureTracker)
-admin.site.register(DataSetTracker)
+admin.site.register(DataSet)
+admin.site.register(DataRow)

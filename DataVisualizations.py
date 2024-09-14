@@ -17,13 +17,13 @@ def plot_attention_output_multi(component_dict, idx):
 
     plt.figure(figsize=(15, 5 * num_rows))
 
-    vmin = -1
-    vmax = 1
+    vmin = -2
+    vmax = 2
 
     for i, (component_name, attention_weights) in enumerate(component_dict.items()):
         # Extracting a single set of attention weights for visualization
         attention_weights_single = attention_weights[idx] if len(attention_weights.shape) > 2 else attention_weights
-        attention_weights_single = attention_weights_single.cpu().detach().numpy()
+        attention_weights_single = attention_weights_single.cpu().detach().numpy().T
 
         ax = plt.subplot(num_rows, num_cols, i + 1)
         norm = None  # You can set the norm if you want to standardize color scales
@@ -130,7 +130,7 @@ def plot_feature_histograms(data, features, feature_dict):
 
     # Determine the grid size for subplots
     nrows = 4
-    ncols = (num_features + 1) // nrows
+    ncols = (num_features + nrows - 1) // nrows
 
     # Create a grid of subplots
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 8))
@@ -174,8 +174,7 @@ def plot_y_feature_histograms(data, features):
 
     # Determine the grid size for subplots
     nrows = 4
-    ncols = (num_features + 1) // nrows
-
+    ncols = (num_features + nrows - 1) // nrows
     # Create a grid of subplots
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 8))
 

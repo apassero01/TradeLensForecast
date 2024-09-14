@@ -1,157 +1,75 @@
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
 from django.test import TestCase
-from dataset_manager.models import StockData, FeatureFactoryConfig, DataSetTracker
-from dataset_manager.services import FeatureFactoryService, DatasetManagerService, DatasetTrackerService, \
-    FeatureTrackerService
-from dataset_manager.config import FACTORY_CONFIG_LIST
+from keras.src.legacy.backend import update
+import pandas.testing as pdt
+
+from dataset_manager.models import FeatureFactoryConfig, DataSet, DataRow
+from dataset_manager.services import FeatureFactoryService, StockDataSetService, StockFeatureFactoryService, \
+    DataSetService
 from dataset_manager.factories import MovingAverageFeatureFactory, OHLCVFeatureFactory, BandFeatureFactory, MomentumFeatureFactory,TargetFeatureFactory
 
-class DatasetManagerServiceTest(TestCase):
-    def setUp(self) -> None:
-        FeatureFactoryService.update_factory_configs()
-        initial_columns = ["open", "high", "low", "close", "volume"]
-        self.factory_added_columns = [config.feature_names for config in FeatureFactoryConfig.objects.all()]
-        self.all_columns = initial_columns
-        for factory_columns in self.factory_added_columns:
-            self.all_columns += factory_columns
-        
-        self.all_columns = sorted(self.all_columns)
-        return super().setUp()
 
-    def tearDown(self) -> None:
-        StockData.objects.all().delete()
-        FeatureFactoryConfig.objects.all().delete()
-        return super().tearDown()
-    
-    def test_fetch_stock_data(self):
-        df, columns = DatasetManagerService.fetch_stock_data("SPY", "2020-01-01", "2021-01-10")
-        self.assertEqual(columns, ["open", "high", "low", "close", "volume"])
-
-    def test_create_new_stock(self):
-        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-        self.assertEqual(StockData.objects.first().ticker, "SPY")
-        self.assertEqual(StockData.objects.first().timeframe, "1d")
-        print(StockData.objects.first().features.keys())
-        self.assertEqual(sorted(list(StockData.objects.first().features.keys())), self.all_columns)
-
-        self.assertTrue(DataSetTracker.objects.get(ticker="SPY", timeframe="1d") is not None)
-        FeatureTrackerService.ensure_synced_features()
-
-    def test_stockdata_to_dataframe(self):
-        df_api,_ = DatasetManagerService.fetch_stock_data("SPY", "2020-01-01", "2021-01-10")
-        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-        df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
-
-        self.assertEqual(sorted(list(df.columns)), self.all_columns)
-        # test timestamps are the same 
-        self.assertEqual(df.index.tolist(), df_api.index.tolist())
-
-    def test_update_existing_stock_data(self):
-        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-        initial_count = StockData.objects.count()
-        df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
-        df["new_column"] = 1
-        DatasetManagerService.update_existing_stock_data(df, "SPY", "1d")
-
-        self.assertEqual(sorted(list(StockData.objects.first().features.keys())), sorted(self.all_columns + ["new_column"]))
-        self.assertEqual(StockData.objects.count(), initial_count)
-
-    def test_add_new_feature(self):
-        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-
-        # update the ma factory config adding a new average 
-        ma_factory_config = FACTORY_CONFIG_LIST[0]
-
-        ma_factory_config["parameters"]["windows"].append(12)
-        ma_factory_config["version"] = "0.0.2"
-
-        dataset_tracker = DataSetTracker.objects.first()
-
-
-        DatasetManagerService.add_new_feature(dataset_tracker)
-        self.assertTrue("sma12" in StockData.objects.first().features.keys())
-
-    def test_add_new_feature_to_all(self):
-        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-        DatasetManagerService.create_new_stock("AAPL", "2020-01-01", "2021-01-10")
-
-        # update the ma factory config adding a new average
-        ma_factory_config = FACTORY_CONFIG_LIST[0]
-
-        ma_factory_config["parameters"]["windows"].append(12)
-        ma_factory_config["version"] = "0.0.2"
-
-        DatasetManagerService.add_new_feature_to_all()
-        self.assertTrue("sma12" in StockData.objects.first().features.keys())
-        self.assertTrue("sma12" in StockData.objects.last().features.keys())
-
-    def test_update_recent_stock_data(self):
-        DatasetManagerService.create_new_stock("SPY", "2023-08-01", "2024-08-9")
-
-        DatasetManagerService.update_recent_stock_data("SPY", "1d")
-
-        all_timestamps = list(StockData.objects.all().values_list("timestamp", flat=True))
-
-        last_timestamp = all_timestamps[-1]
-
-        self.assertEqual(len(all_timestamps), len(set(all_timestamps)) )
-
-        datasettracker = DataSetTracker.objects.first()
-        self.assertEqual(datasettracker.end_date, last_timestamp)
-
-        FeatureTrackerService.ensure_synced_features()
-
-
-class FeatureFactoryServiceTest(TestCase):
+class StockFeatureFactoryServiceTest(TestCase):
 
     def setUp(self) -> None:
-        FeatureFactoryService.update_factory_configs()
-        return super().setUp()
+        self.stock_feature_factory_service = StockFeatureFactoryService()
+        self.stock_feature_factory_service.update_factory_configs()
+        self.FACTORY_CONFIG_LIST = self.stock_feature_factory_service.get_config_list()
+        super().setUp()
+
     def tearDown(self) -> None:
         FeatureFactoryConfig.objects.all().delete()
-        return super().tearDown
+        super().tearDown()
 
     def test_update_factory_configs(self):
-        ma_factory_config = FACTORY_CONFIG_LIST[0]
+        ma_factory_config = self.FACTORY_CONFIG_LIST[0]
         ma_factory_config["parameters"]["windows"].append(12)
         ma_factory_config["version"] = "0.0.2"
 
-        FeatureFactoryService.update_factory_configs()
+        self.stock_feature_factory_service.update_factory_configs()
 
         updated_config = FeatureFactoryConfig.objects.get(name="MovingAverageFeatureFactory")
 
-        # assert that version is correctly updated and 12 is in the windows list
+        # Assert that version is correctly updated and 12 is in the windows list
         self.assertEqual(updated_config.version, "0.0.2")
         self.assertIn(12, updated_config.parameters["windows"])
 
     def test_load_factories_from_db(self):
-        factories = FeatureFactoryService.load_factories_from_db()
-        self.assertEqual(len(factories), len(FACTORY_CONFIG_LIST))
-        
+        factories = self.stock_feature_factory_service.load_factories_from_db()
+        self.assertEqual(len(factories), len(self.FACTORY_CONFIG_LIST))
         self.assertEqual(factories[0].config.name, "MovingAverageFeatureFactory")
 
-    
     def test_apply_feature_factories(self):
-        df, _ = DatasetManagerService.fetch_stock_data("AAPL", "2020-01-01", "2021-01-10")
-        df = FeatureFactoryService.apply_feature_factories(df)
+        df = StockDataSetService.retreive_external_df(
+            ticker="SPY",
+            start_date="2020-01-01",
+            end_date="2021-01-10",
+            interval="1d"
+        )
+        df = self.stock_feature_factory_service.apply_feature_factories(df)
 
         initial_columns = ["open", "high", "low", "close", "volume"]
-        self.factory_added_columns = [config.feature_names for config in FeatureFactoryConfig.objects.all()]
-        self.all_columns = initial_columns
-        for factory_columns in self.factory_added_columns:
-            self.all_columns += factory_columns
+        factory_added_columns = [
+            config.feature_names for config in FeatureFactoryConfig.objects.all()
+        ]
+        all_columns = initial_columns.copy()
+        for factory_columns in factory_added_columns:
+            all_columns += factory_columns
 
-
-        self.assertEqual(list(df.columns), self.all_columns)
-
+        self.assertEqual(list(df.columns), all_columns)
 
 class MovingAverageFeatureFactoryTest(TestCase):
     def setUp(self):
-        self.df, _ = DatasetManagerService.fetch_stock_data("AAPL", "2020-01-01", "2021-01-10")
+        self.df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
         config = FeatureFactoryConfig(name="MovingAverageFeatureFactory", parameters={"windows": [5, 10, 20, 50, 100, 200]})
         self.factory = MovingAverageFeatureFactory(config)
     
     def tearDown(self) -> None:
-        StockData.objects.all().delete()
+        DataSet.objects.all().delete()
+        DataRow.objects.all().delete()
         FeatureFactoryConfig.objects.all().delete()
         return super().tearDown()
 
@@ -171,7 +89,10 @@ class MovingAverageFeatureFactoryTest(TestCase):
             self.assertTrue(f'ema{period}' in self.df.columns)
         self.assertTrue(len(self.df.columns) >= len(periods))
         self.assertFalse(self.df.isnull().values.any())  # Check for NaNs
-        self.assertAlmostEqual(self.df['ema5'].iloc[20], self.df['close'].iloc[16:21].ewm(span=5, adjust=True).mean().iloc[-1], places=1)  # Check computed value
+        self.assertAlmostEqual(
+            self.df['ema5'].iloc[30],
+            self.df['close'].iloc[:31].ewm(span=5, adjust=False).mean().iloc[-1], places=3
+        ) # Check computed value
 
     def test_createSMAVolume(self):
         self.df = self.factory.create_SMA_Volume(self.df)
@@ -247,14 +168,13 @@ class TestOHLCVFeatureFactory(TestCase):
 
     def setUp(self):
         # Download historical data for AAPL
-        self.df = DatasetManagerService.fetch_stock_data("AAPL", "2020-01-01", "2021-01-10")[0]
-        
+        self.df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
         config = FeatureFactoryConfig(name="OHLCVFeatureFactory", parameters={})
-
         self.factory = OHLCVFeatureFactory(config)
     
     def tearDown(self) -> None:
-        StockData.objects.all().delete()
+        DataSet.objects.all().delete()
+        DataRow.objects.all().delete()
         FeatureFactoryConfig.objects.all().delete()
         return super().tearDown()
 
@@ -303,7 +223,7 @@ class TestOHLCVFeatureFactory(TestCase):
 class TestBandFeatureFactory(TestCase):
     def setUp(self):
         # Download historical data for AAPL
-        self.df = DatasetManagerService.fetch_stock_data("AAPL", "2020-01-01", "2021-01-10")[0]
+        self.df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
         
         # Set up the configuration with the desired windows
         config = FeatureFactoryConfig(name="BandFeatureFactory", parameters={"windows": [5, 10, 20, 50, 100, 200]})
@@ -312,7 +232,8 @@ class TestBandFeatureFactory(TestCase):
         self.factory = BandFeatureFactory(config)
 
     def tearDown(self) -> None:
-        StockData.objects.all().delete()
+        DataSet.objects.all().delete()
+        DataRow.objects.all().delete()
         FeatureFactoryConfig.objects.all().delete()
         return super().tearDown()
 
@@ -360,7 +281,7 @@ class TestBandFeatureFactory(TestCase):
 class TestMomentumFeatureFactory(TestCase):
     def setUp(self):
         # Download historical data for AAPL
-        self.df = DatasetManagerService.fetch_stock_data("AAPL", "2020-01-01", "2021-01-10")[0]
+        self.df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
         
         # Set up the configuration with the desired RSI periods
         config = FeatureFactoryConfig(name="MomentumFeatureFactory", parameters={"rsi_periods": [5, 10, 20, 50, 100]})
@@ -369,9 +290,10 @@ class TestMomentumFeatureFactory(TestCase):
         self.factory = MomentumFeatureFactory(config)
     
     def tearDown(self) -> None:
-        StockData.objects.all().delete()
+        DataSet.objects.all().delete()
+        DataRow.objects.all().delete()
         FeatureFactoryConfig.objects.all().delete()
-        return super().tearDown()
+        return super
 
     def test_createRSI(self):
         # Generate RSI features
@@ -436,7 +358,7 @@ class TestMomentumFeatureFactory(TestCase):
 class TestTargetFeatureFactory(TestCase):
     def setUp(self):
         # Download historical data for AAPL
-        self.df = DatasetManagerService.fetch_stock_data("AAPL", "2020-01-01", "2021-01-10")[0]
+        self.df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
         
         # Set up the configuration with the desired output steps
         self.output_steps = 15   
@@ -448,7 +370,8 @@ class TestTargetFeatureFactory(TestCase):
         self.pctChg_factory = OHLCVFeatureFactory(pctChg_config)
     
     def tearDown(self) -> None:
-        StockData.objects.all().delete()
+        DataSet.objects.all().delete()
+        DataRow.objects.all().delete()
         FeatureFactoryConfig.objects.all().delete()
         return super().tearDown()
         
@@ -526,70 +449,129 @@ class TestTargetFeatureFactory(TestCase):
                 self.df['close'].iloc[example_row+i]
             )
 
-
-
-class TestFeatureTrackerService(TestCase):
-
+class TestStockDataSetService(TestCase):
     def setUp(self):
-        DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-        self.df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
-        DatasetTrackerService.track_dataset(self.df, "SPY", "1d")
+        self.feature_factory = StockFeatureFactoryService()
+        self.feature_factory.update_factory_configs()
+        initial_columns = ["open", "high", "low", "close", "volume"]
+        self.factory_added_columns = [config.feature_names for config in FeatureFactoryConfig.objects.all()]
+        self.all_columns = initial_columns
+        for factory_columns in self.factory_added_columns:
+            self.all_columns += factory_columns
+
+        self.all_columns = sorted(self.all_columns)
+        return super().setUp()
 
     def tearDown(self) -> None:
-        StockData.objects.all().delete()
+        DataSet.objects.all().delete()
+        DataRow.objects.all().delete()
         FeatureFactoryConfig.objects.all().delete()
-        DataSetTracker.objects.all().delete()
         return super().tearDown()
 
-    def test_initialize_feature_tracker(self):
-        tracker = FeatureTrackerService.initialize_feature_tracker()
-        self.assertEqual(tracker.features, self.df.columns.tolist())
+    def test_retreive_external_df(self):
+        df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
+        self.assertEqual(df.columns.tolist(), ["open", "high", "low", "close", "volume"])
 
-    def test_ensure_synced_features(self):
-        feature_set_tracker = FeatureTrackerService.initialize_feature_tracker()
+        df = StockDataSetService.retreive_external_df(ticker = "AAPL", start_date = "2020-01-01", interval = "1d")
+        self.assertEqual(df.columns.tolist(), ["open", "high", "low", "close", "volume"])
 
-        FeatureTrackerService.ensure_synced_features()
+    def test_dataframe_to_datarows(self):
+        df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
+        dataset = DataSet.objects.create(dataset_type="stock", start_timestamp="2020-01-01", end_timestamp="2021-01-10", features = self.all_columns, metadata = {"ticker": "SPY", "timeframe": "1d"})
+        StockDataSetService.dataframe_to_datarows(df, dataset)
 
-        self.df["new_column"] = 1
+        self.assertEqual(DataRow.objects.count(), len(df))
 
-        DatasetManagerService.update_existing_stock_data(self.df, "SPY", "1d")
+        df.index = pd.DatetimeIndex(df.index)
 
-        with self.assertRaises(Exception):
-            FeatureTrackerService.ensure_synced_features()
+        datarows = DataRow.objects.all()
+        for datarow in datarows:
+            # assert that the data is the same
+            self.assertEqual(datarow.features, df.loc[datarow.timestamp].to_dict())
+
+    def test_create_new_dataset(self):
+        StockDataSetService.create_new_dataset(dataset_type="stock", start_date="2020-01-01", end_date="2021-01-10", ticker="SPY", interval="1d")
+        df = StockDataSetService.retreive_external_df(ticker="SPY", start_date="2020-01-01", end_date="2021-01-10",
+                                                      interval="1d")
+        df = self.feature_factory.apply_feature_factories(df)
+
+        dataset = DataSet.objects.first()
+        self.assertEqual(dataset.dataset_type, "stock")
+        self.assertEqual(dataset.start_timestamp, df.iloc[0].name)
+        self.assertEqual(dataset.end_timestamp, df.iloc[-1].name)
+        self.assertEqual(sorted(dataset.features), sorted(self.all_columns))
+
+        datarows = DataRow.objects.filter(dataset=dataset)
+        self.assertEqual(len(datarows), len(df))
+        for datarow in datarows:
+            self.assertEqual(sorted(datarow.features.items()), sorted(df.loc[datarow.timestamp].to_dict().items()))
 
 
-class TestDatasetTrackerService(TestCase):
+    def test_update_existing_dataset(self):
+        StockDataSetService.create_new_dataset(dataset_type="stock", start_date="2020-01-01", end_date="2021-01-10", ticker="SPY", interval="1d")
+        df = StockDataSetService.retreive_external_df(ticker="SPY", start_date="2020-01-01", end_date="2021-01-10",
+                                                      interval="1d")
+        df = self.feature_factory.apply_feature_factories(df)
+        dataset = DataSet.objects.first()
 
-        def setUp(self):
-            DatasetManagerService.create_new_stock("SPY", "2020-01-01", "2021-01-10")
-            self.df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
-            DatasetTrackerService.track_dataset(self.df, "SPY", "1d")
+        new_cols = [["new_column", "new_column2"]]
+        df[new_cols] = 1
+        StockDataSetService.update_existing_dataset(df, dataset)
 
-        def tearDown(self) -> None:
-            StockData.objects.all().delete()
-            FeatureFactoryConfig.objects.all().delete()
-            DataSetTracker.objects.all().delete()
-            return super().tearDown()
+        datarows = DataRow.objects.filter(dataset=dataset)
+        self.assertEqual(len(datarows), len(df))
+        for datarow in datarows:
+            self.assertEqual(sorted(datarow.features.items()), sorted(df.loc[datarow.timestamp].to_dict().items()))
 
-        def test_track_dataset(self):
-            tracker = DataSetTracker.objects.first()
-            self.assertEqual(tracker.ticker, "SPY")
-            self.assertEqual(tracker.timeframe, "1d")
-            self.assertEqual(tracker.features, self.df.columns.tolist())
-            self.assertEqual(tracker.start_date, self.df.index.min())
-            self.assertEqual(tracker.end_date, self.df.index.max())
+    def test_update_recent_data(self):
 
-        def test_update_dataset_tracker(self):
-            DatasetManagerService.update_recent_stock_data("SPY", "1d")
-            df = DatasetManagerService.stockdata_to_dataframe("SPY", "1d")
+        StockDataSetService.create_new_dataset(dataset_type="stock", start_date="2020-01-01", end_date="2021-01-10", ticker="SPY", interval="1d")
 
-            df["new_column"] = 1
-            DatasetManagerService.update_existing_stock_data(df, "SPY", "1d")
-            DatasetTrackerService.update_tracker("SPY", "1d")
-            tracker = DataSetTracker.objects.first()
-            self.assertEqual(tracker.start_date, df.index.min())
-            self.assertEqual(tracker.end_date, df.index.max())
-            self.assertEqual(sorted(tracker.features), sorted(df.columns.tolist()))
+        df = StockDataSetService.retreive_external_df(ticker="SPY", start_date="2020-01-01",
+                                                      interval="1d")
+
+        df = self.feature_factory.apply_feature_factories(df)
+
+        dataset = DataSet.objects.first()
+        StockDataSetService.update_recent_data(dataset)
+
+        updated_dataset = DataSet.objects.first()
+
+        self.assertEqual(updated_dataset.start_timestamp, df.index.min())
+        self.assertEqual(updated_dataset.end_timestamp, df.index.max())
+        self.assertEqual(sorted(updated_dataset.features), sorted(self.all_columns))
+
+        df_db = StockDataSetService.datarows_to_dataframe(dataset)
+        df_db = df_db[sorted(df_db.columns)]
+        df = df[sorted(df.columns)]
+        df.replace({-999: np.nan}, inplace=True)
+        df = df.astype(np.float64)
+
+        self.assertEqual(len(df_db), len(df))
+        self.assertEqual(sorted(df_db.columns), sorted(df.columns))
+        self.assertEqual(df_db.index.tolist(), df.index.tolist())
+        self.assertTrue(np.allclose(df_db.values, df.values, equal_nan=True))
+
+
+    def test_datarows_to_dataframe(self):
+        StockDataSetService.create_new_dataset(dataset_type="stock", start_date="2020-01-01", end_date="2021-01-10", ticker="SPY", interval="1d")
+        truth_df = StockDataSetService.retreive_external_df(ticker="SPY", start_date="2020-01-01", end_date="2021-01-10", interval="1d")
+        truth_df = self.feature_factory.apply_feature_factories(truth_df)
+        truth_df.replace({-999: np.nan}, inplace=True)
+        dataset = DataSet.objects.first()
+        df = StockDataSetService.datarows_to_dataframe(dataset)
+
+        df = df[sorted(df.columns)]
+        truth_df = truth_df[sorted(truth_df.columns)]
+
+        self.assertEqual((df.columns.tolist()), (truth_df.columns.tolist()))
+        self.assertEqual(df.index.tolist(), truth_df.index.tolist())
+        self.assertTrue(np.array_equal(df.values, truth_df.values, equal_nan=True))
+
+
+
+
+
 
 
 

@@ -38,7 +38,6 @@ def get_sequence_data(request):
 
     try:
         # Assuming you want to retrieve data for multiple tickers
-        results = []
         result = SequenceSetService.retrieve_sequence_slice(
             sequence_length = sequence_length,
             feature_list = features,
@@ -48,7 +47,7 @@ def get_sequence_data(request):
             interval = interval,
             dataset_type = "stock"
         )
-        results.extend(result)  # Aggregate results from multiple tickers
+        # Aggregate results from multiple tickers
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -57,4 +56,4 @@ def get_sequence_data(request):
             status=500
         )
 
-    return JsonResponse(results, safe=False)
+    return JsonResponse(result, safe=False)

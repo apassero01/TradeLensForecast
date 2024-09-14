@@ -4,7 +4,9 @@ from django.test import TestCase, Client
 import json
 import pandas as pd
 import numpy as np
-from dataset_manager.services import DatasetManagerService, DatasetTrackerService, FeatureTrackerService
+
+from dataset_manager.models import DataSet
+from dataset_manager.services import DataSetService
 from sequenceset_manager.services import SequenceSetService, StockSequenceSetService, SequenceService
 import math
 from sequenceset_manager.models import SequenceSet, Sequence
@@ -172,8 +174,8 @@ class StockSequenceSetServiceTest(TestCase):
         new_features = ['new_feature1', 'new_feature2', 'y', 'close-1']
         self.df[new_features] = np.random.rand(len(self.df), 4)
 
-        DatasetManagerService.update_existing_stock_data(deepcopy(self.df), self.ticker, self.interval)
-        FeatureTrackerService.update_feature_tracker()
+        dataset = DataSet.objects.first()
+        DataSetService.update_existing_dataset(deepcopy(self.df), dataset)
 
         mock_get_df_data.return_value = self.df
         StockSequenceSetService.add_new_features(sequence_set = SequenceSet.objects.first(), ticker = self.ticker, interval = self.interval, dataset_type = "stock")

@@ -11,35 +11,14 @@ class FeatureFactoryConfig(models.Model):
     def __str__(self):
         return self.name    
 
-class StockData(models.Model):
-    TIMEFRAME_CHOICES = [
-        ('5m', '5m'),
-        ('15m', '15m'),
-        ('30m', '30m'),
-        ('1h', '1h'),
-        ('4h', '4h'),
-        ('1d', '1d'),
-        ('1w', '1w'),
-        ('1M', '1M'),
-    ]
-    ticker = models.CharField(max_length=10)
+class DataSet(models.Model):
+    dataset_type = models.CharField(max_length=50)
+    start_timestamp = models.DateTimeField()
+    end_timestamp = models.DateTimeField()
+    features = models.JSONField()
+    metadata = models.JSONField()
+
+class DataRow(models.Model):
+    dataset = models.ForeignKey(DataSet, on_delete=models.CASCADE)
     timestamp = models.DateTimeField()
-    timeframe = models.CharField(max_length=3, choices=TIMEFRAME_CHOICES)
     features = models.JSONField()
-
-
-class FeatureTracker(models.Model):
-
-    features = models.JSONField()
-
-class DataSetTracker(models.Model):
-    ticker = models.CharField(max_length=10)
-    timeframe = models.CharField(max_length=3)
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField()
-    features = models.JSONField()
-
-
-
-
-

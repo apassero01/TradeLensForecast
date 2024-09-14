@@ -1,12 +1,12 @@
+from turtledemo.penrose import start
+
 from django.shortcuts import render
-from dataset_manager.services import DatasetManagerService, FeatureTrackerService
+from dataset_manager.services import DataSetService, StockDataSetService
 
 import json
 from django.http import JsonResponse
-from dataset_manager.models import StockData
+from dataset_manager.models import DataSet, DataRow
 from django.views.decorators.http import require_http_methods
-from dataset_manager.models import FeatureTracker
-
 
 # Create your views here.
 
@@ -23,8 +23,8 @@ def get_stock_data(request, ticker):
     end_date = request.GET.get('end_date')
 
     # Fetch the stock data using the DatasetManagerService
-    df = DatasetManagerService.stockdata_to_dataframe(ticker, interval, start_date, end_date)
-
+    dataset = DataSetService.get_data_set(dataset_type = "stock", ticker = ticker, interval =  interval)
+    df = DataSetService.get_df_range(dataset,start_timestamp = start_date, end_timestamp = end_date)
     # Convert the index to string for JSON serialization
     df.index = df.index.astype(str)
     # Return the DataFrame as a JSON response
@@ -41,12 +41,14 @@ def create_stock_data(request):
         start_date = data['start_date']
         end_date = data.get('end_date', None)
 
-        # check for ticker in database 
-        all_tickers = StockData.objects.values_list('ticker', flat=True)
+        # check for ticker in database
+        all_meta_data = DataSet.objects.values_list('metadata', flat=True)
+
+        all_tickers = [json.loads(meta_data)['ticker'] for meta_data in all_meta_data]
         if ticker in all_tickers:
             return JsonResponse({'message': 'Data already exists for this ticker'}, status=400)
 
-        df = DatasetManagerService.create_new_stock(ticker, start_date, end_date, interval)
+        df = StockDataSetService.create_new_dataset(dataset_type='stock', ticker=ticker, interval=interval, start_date=start_date, end_date=end_date)
         df.replace({-999: None}, inplace=True)
 
         df.index = df.index.astype(str)
@@ -55,21 +57,5 @@ def create_stock_data(request):
 
 
 
-
-def get_stock_features(request):
-    '''
-    Retrieve stock features from the database and return it as a JSON response
-    '''
-
-    FeatureTrackerService.update_feature_tracker()
-
-    try:
-        FeatureTrackerService.ensure_synced_features()
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-    features = FeatureTrackerService.get_feature_tracker()
-
-    return JsonResponse(features.features, safe=False)
 
 

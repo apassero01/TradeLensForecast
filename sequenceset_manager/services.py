@@ -68,6 +68,11 @@ class SequenceSetService(ABC):
         '''
         Create a new sequence set
         '''
+        query = SequenceSet.objects.filter(dataset_type=kwargs.get('dataset_type'), metadata__contains=kwargs, sequence_length=sequence_length)
+        if query.exists():
+            print("Sequence set already exists")
+            return
+
         df = cls.get_df_data(**kwargs)
 
         if df is None:
