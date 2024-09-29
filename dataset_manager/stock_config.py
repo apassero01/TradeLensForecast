@@ -43,7 +43,7 @@ MOMENTUM_FACTORY_CONFIG = {
 
 TARGET_FACTORY_CONFIG = {
     "name": "TargetFeatureFactory",
-    "description": "Calculates the target variable for the model",
+    "description": "Calculates the target variable for the models",
     "parameters": {
         "output_steps": 15,
     },

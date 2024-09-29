@@ -287,6 +287,9 @@ class StockDataSetService(DataSetService):
 
         df = df.drop(columns="Adj Close")
         print(df.head())
+        if df.index.tzinfo is None:
+            df.index = pd.to_datetime(df.index).tz_localize('UTC')
+
         df.index = pd.to_datetime(df.index).tz_convert('UTC')
 
         print(df.head())

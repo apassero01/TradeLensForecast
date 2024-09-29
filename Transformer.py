@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import torch
 import torch.nn as nn
 import math
@@ -36,10 +38,11 @@ class Transformer(nn.Module):
         return decoder_output
 
     def inference(self, encoder_input, start_token, max_len):
+        start_token = self.decoder_input_projection(encoder_input[:, -1, :].clone())
         encoder_input = self.input_projection(encoder_input)
 
         encoder_output = self.encoder(encoder_input)
-        return self.decoder.inference(encoder_output, start_token, max_len)
+        return self.decoder.inference(encoder_output, max_len, start_token)
 
     def _init_weights(self):
         # Apply Xavier Initialization to all linear layers
@@ -85,7 +88,7 @@ class EncoderLayer(nn.Module):
         super(EncoderLayer, self).__init__()
 
         self.name = name
-        self.multi_head_attention = ChannelWiseMultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
+        self.multi_head_attention = MultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
 
         self.feed_forward = nn.Sequential(
             nn.Linear(d_model, d_ff),
@@ -125,6 +128,7 @@ class EncoderLayer(nn.Module):
         # print(f"EncoderLayer {self.name} input shape: {x.shape}")
         x_norm = self.norm1(x)  # Pre-Norm before attention
         # print(f"EncoderLayer {self.name} norm1 shape: {x_norm.shape}")
+        self.orig_output = x_norm.clone()
         self.attn_output = self.multi_head_attention(x_norm, x_norm, x_norm)
         # print(f"EncoderLayer {self.name} attn_output shape: {self.attn_output.shape}")
         x = x + self.dropout(self.attn_output)  # Residual connection
@@ -133,11 +137,15 @@ class EncoderLayer(nn.Module):
         x_norm = self.norm2(x)  # Pre-Norm before feed-forward
         ff_output = self.feed_forward(x_norm)
         output = x + self.dropout(ff_output)
+        self.output = output
 
         return output
 
     def get_attention(self):
         return self.attn_output
+
+    def get_output(self):
+        return self.orig_output
 
 
 
@@ -158,6 +166,7 @@ class MultiHeadAttention(nn.Module):
         self.value = nn.Linear(d_model, d_model)
 
         self.out = nn.Linear(d_model, d_model)
+        self.layer_norm = nn.LayerNorm(d_model)
 
         self.traversable_layers = []
         self._init_weights()
@@ -209,6 +218,7 @@ class MultiHeadAttention(nn.Module):
 
         self.output = self.out(attention_output)
 
+        self.output = self.layer_norm(self.output)
 
         return self.output
 
@@ -242,7 +252,7 @@ class PositionalEncoding(nn.Module):
         print(f"PositionalEncoding initialized with shape: {self.pe.shape}")
 
     def forward(self, x):
-        # Add positional encoding to the input tensor x
+        # Add positional encoding to the input tensor x  # Check the first few positional encodings
         return x + self.pe[:, :x.size(1), :]
 
 
@@ -265,6 +275,7 @@ class TransformerDecoder(nn.Module):
         super(TransformerDecoder, self).__init__()
 
         self.name = name
+        self.decoder_input_projection = nn.Linear(d_model, d_model)
         self.layers = nn.ModuleList([
             DecoderLayer(d_model, num_heads, d_ff, dropout,
                          name = self.name + ":decoder_layer"+str(i)) for i in range(num_layers)
@@ -272,7 +283,9 @@ class TransformerDecoder(nn.Module):
 
         self.norm = nn.LayerNorm(d_model)
 
-        self.fc_out = nn.Linear(d_model, 1)
+        self.fc_out = nn.Linear(d_model, 2)
+
+        self.output_projection = nn.Linear(1, d_model)
 
         self.positional_encoding = PositionalEncoding(d_model, max_length=200)
 
@@ -296,7 +309,6 @@ class TransformerDecoder(nn.Module):
 
     def forward(self, x, encoder_output, target_mask=None):
         x = self.positional_encoding(x)
-
         target_mask = generate_target_mask(x.size(1)).to(x.device)
 
         for layer in self.layers:
@@ -310,37 +322,35 @@ class TransformerDecoder(nn.Module):
         device = encoder_output.device
 
         # Initialize the input sequence with the start token
-        y_input = start_token.unsqueeze(0).repeat(batch_size, 1, 1)  # Shape: (batch_size, 1, d_model)
+        y_input = start_token
         generated_sequence = []
 
         for _ in range(max_len):
             # Apply positional encoding
-            y_input = self.positional_encoding(y_input)
+            y_input_pe = self.positional_encoding(y_input)
 
             # Create target mask
-            tgt_mask = generate_target_mask(y_input.size(1)).to(device)
+            tgt_mask = generate_target_mask(y_input_pe.size(1)).to(device)
 
-            # Pass through decoder layers
+            x = y_input_pe
             for layer in self.layers:
-                y_input = layer(y_input, encoder_output, tgt_mask)
+                x = layer(x, encoder_output, tgt_mask)
+            x = self.norm(x)
 
-            y_input = self.norm(y_input)
+            output = self.fc_out(x[:, -1, :])
 
-            # Predict the next value
-            next_value = self.fc_out(y_input[:, -1, :])  # Shape: (batch_size, 1)
+            mu = output[:, 0].unsqueeze(1)  # Shape: (batch_size, 1)
+            log_var = output[:, 1].unsqueeze(1) # Shape: (batch_size, 1)
 
-            # Collect the predicted value
-            generated_sequence.append(next_value.unsqueeze(1))  # Shape: (batch_size, 1, 1)
+            generated_sequence.append(torch.cat([mu, log_var], dim=1).unsqueeze(1))  # Shape: (batch_size, 1, 2)
 
-            # Prepare the next input
-            next_value_expanded = next_value.unsqueeze(1)  # Shape: (batch_size, 1, 1)
-            next_value_expanded = next_value_expanded.expand(batch_size, 1,
-                                                             self.d_model)  # Expand to (batch_size, 1, d_model)
-            y_input = torch.cat([y_input, next_value_expanded], dim=1)  # Append the new token
+            mu_projected = self.output_projection(mu)
+            mu_projected = mu_projected.unsqueeze(1)
 
-        # Concatenate along the sequence dimension and return as a tensor
-        return torch.cat(generated_sequence, dim=1)
+            y_input = torch.cat([y_input, mu_projected], dim=1)
 
+        predictions = torch.cat(generated_sequence, dim=1)  # Shape: (batch_size, max_len, 2)
+        return predictions
 
 class DecoderLayer(nn.Module):
     def __init__(self, d_model, num_heads, d_ff, dropout=.1, name = "decoder_layer"):
@@ -381,9 +391,9 @@ class DecoderLayer(nn.Module):
         # self_attn_output = self.self_attention(x, x, x, mask=target_mask)
         # x = self.norm1(x + self.dropout(self_attn_output))
 
-
         # cross_attn_output = self.cross_attention(x, encoder_output, encoder_output)
         # x = self.norm2(x + self.dropout(cross_attn_output))
+        self.orig_output = x.clone()
 
         self_attn_output = self.self_attention(Q=self.norm1(x),
                                                   K=self.norm1(x),
@@ -391,7 +401,8 @@ class DecoderLayer(nn.Module):
                                                   mask=target_mask)
         x = x + self.dropout(self_attn_output)
 
-        cross_attn_output = self.cross_attention(Q=self.norm2(self_attn_output),
+        # todo ensure this is correct with norm2(x) and not norm2(self_attn_output)
+        cross_attn_output = self.cross_attention(Q=self.norm2(x),
                                                     K=encoder_output,
                                                     V=encoder_output,
                                                     mask=None)
@@ -404,12 +415,15 @@ class DecoderLayer(nn.Module):
         # Feed-Forward Network
         ff_output = self.feed_forward(self.norm3(x))
         output = x + self.dropout(ff_output)  # Residual connection
-
+        self.output = output
         self.cross_attention_output = cross_attn_output
         return output
 
     def get_attention(self):
         return self.cross_attention_output
+
+    def get_output(self):
+        return self.orig_output
 
 class ChannelWiseMultiHeadAttention(nn.Module):
     def __init__(self, d_model, num_heads, name="multi_head_attention"):
@@ -427,6 +441,8 @@ class ChannelWiseMultiHeadAttention(nn.Module):
         self.key = nn.Linear(d_model, d_model)
         self.value = nn.Linear(d_model, d_model)
         self.out = nn.Linear(d_model, d_model)
+
+        self.layer_norm = nn.LayerNorm(d_model)
 
         self.traversable_layers = []
         self._init_weights()
@@ -480,6 +496,7 @@ class ChannelWiseMultiHeadAttention(nn.Module):
 
         # Apply final linear transformation and return output
         self.output = self.out(attention_output)
+        self.output = self.layer_norm(self.output)
         return self.output
 
     def get_attention(self):
@@ -562,7 +579,43 @@ def custom_loss_with_zero_penalty(y_true, y_pred, penalty_weight=1.0):
 
 
 
+def gaussian_nll_loss(outputs, y_true, threshold = .1, penalty_factor = 0):
+    """
+    Computes the Gaussian negative log-likelihood loss.
 
+    Args:
+        outputs (torch.Tensor): Model outputs of shape (batch_size, output_steps, 2).
+                                outputs[:, :, 0] contains the predicted means (mu).
+                                outputs[:, :, 1] contains the predicted log variances (log_var).
+        y_true (torch.Tensor): True target values of shape (batch_size, output_steps, 1).
+
+    Returns:
+        torch.Tensor: Scalar loss value.
+    """
+    # Step 1: Extract mu and log_var
+    mu = outputs[:, :, 0]        # Shape: (batch_size, output_steps)
+    log_var = outputs[:, :, 1]   # Shape: (batch_size, output_steps)
+
+    # Step 2: Ensure y_true matches the shape of mu
+    y_true = y_true.squeeze(-1)  # Shape: (batch_size, output_steps)
+
+    # Step 3: Compute variance (sigma^2) from log variance
+    sigma_sq = torch.exp(log_var)  # Shape: (batch_size, output_steps)
+
+    # Optional: Add a small epsilon for numerical stability
+    epsilon = 1e-6
+    sigma_sq = sigma_sq + epsilon
+
+    # Step 4: Compute the negative log-likelihood
+    nll = 0.5 * torch.log(2 * math.pi * sigma_sq) + ((y_true - mu) ** 2) / (2 * sigma_sq)
+
+    # Step 5: Compute the mean loss over all elements
+    loss = torch.mean(nll)
+
+    # if mu is close to zero, add a penalty term
+    penalty = torch.where(mu.abs() < threshold, penalty_factor, torch.zeros_like(mu))
+
+    return loss + penalty.mean()
 
 
 

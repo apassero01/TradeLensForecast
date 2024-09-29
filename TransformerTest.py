@@ -15,7 +15,7 @@ from TransformerWithContinuation import continuous_loss
 
 class TrainerTest(unittest.TestCase):
     def setUp(self):
-        # Setting up a dummy model, optimizer, and criterion for testing
+        # Setting up a dummy models, optimizer, and criterion for testing
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = Transformer(num_layers=2, d_model=16, num_heads=4, d_ff=64, encoder_input_dim=10, decoder_input_dim=1)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
@@ -107,7 +107,7 @@ class TrainerTest(unittest.TestCase):
         train_dataloader = [(encoder_input, y_target)]
         val_dataloader = [(encoder_input, y_target)]
 
-        # Train the model for a few epochs
+        # Train the models for a few epochs
         self.trainer.fit(train_dataloader, val_dataloader, epochs=2)
 
 class TestTransformerEncoder(unittest.TestCase):
@@ -531,7 +531,7 @@ class TestTransformerDecoder(unittest.TestCase):
 
 class TestTransformer(unittest.TestCase):
     def setUp(self):
-        # Set up model parameters
+        # Set up models parameters
         self.num_layers = 2
         self.d_model = 16
         self.num_heads = 4
@@ -540,7 +540,7 @@ class TestTransformer(unittest.TestCase):
         self.output_dim = 1
         self.max_len = 5
 
-        # Initialize the Transformer model
+        # Initialize the Transformer models
         self.model = Transformer(
             num_layers=self.num_layers,
             d_model=self.d_model,
@@ -558,7 +558,7 @@ class TestTransformer(unittest.TestCase):
         self.start_token = torch.zeros(self.d_model)
 
     def test_forward(self):
-        """Test the forward pass of the Transformer model."""
+        """Test the forward pass of the Transformer models."""
         tgt_mask = generate_target_mask(self.decoder_input.size(1))
 
         # Forward pass
@@ -568,7 +568,7 @@ class TestTransformer(unittest.TestCase):
         self.assertEqual(output.shape, (self.batch_size, self.max_len, self.output_dim))
 
     def test_inference(self):
-        """Test the inference method of the Transformer model."""
+        """Test the inference method of the Transformer models."""
         predictions = self.model.inference(self.encoder_input, self.start_token, self.max_len)
 
         # Check the shape of the predictions

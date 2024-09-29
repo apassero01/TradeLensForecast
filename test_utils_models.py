@@ -371,10 +371,10 @@ def create_seq2seq(predict_sequence_length, input_steps, input_features):
         encoder_output=encoder_output,  # Pass the encoder output for attention
     )
     
-    # Create the model
+    # Create the models
     model = Model(inputs=encoder_input, outputs=decoder_output)
     
-    # Compile the model
+    # Compile the models
     # You can change the optimizer and loss function based on your specific requirements
     model.compile(optimizer='adam', loss='mean_squared_error')
     
@@ -812,7 +812,7 @@ def custom_loss(y_true, y_pred_full, financial_penalty = .5):
     print("Decision", decision) 
 
     # Calculate cumulative sums
-    # In real trading, we'd consider each day's change as an independent event where the model decides to 'buy' (predict positive) or 'sell' (predict negative).
+    # In real trading, we'd consider each day's change as an independent event where the models decides to 'buy' (predict positive) or 'sell' (predict negative).
     y_true_cum = tf.cumsum(y_true, axis=1)
     y_pred_cum = tf.cumsum(y_pred, axis=1)
     print("Y_TRUE_CUM", y_true_cum)
@@ -833,7 +833,7 @@ def custom_loss(y_true, y_pred_full, financial_penalty = .5):
     abstain_penalty = financial_penalty * (1 - decision) * y_true_reverse_cum  # Apply penalty based on reverse cumulative movements missed
     print("ABSTAIN_PENALTY", abstain_penalty)
 
-    prediction_error = tf.square(y_true_cum - y_pred_cum) * decision  # Penalize the model for incorrect predictions
+    prediction_error = tf.square(y_true_cum - y_pred_cum) * decision  # Penalize the models for incorrect predictions
 
     # Combine into a total loss
     total_loss = tf.reduce_mean(regulated_loss + abstain_penalty + prediction_error)
@@ -848,7 +848,7 @@ def custom_loss2(y_true, y_pred_full, profit_multiplier = 4, financial_penalty =
     print("Decision", decision) 
 
     # Calculate cumulative sums
-    # In real trading, we'd consider each day's change as an independent event where the model decides to 'buy' (predict positive) or 'sell' (predict negative).
+    # In real trading, we'd consider each day's change as an independent event where the models decides to 'buy' (predict positive) or 'sell' (predict negative).
     y_true_cum = tf.cumsum(y_true, axis=1)
     y_pred_cum = tf.cumsum(y_pred, axis=1)
     print("Y_TRUE_CUM", y_true_cum)
@@ -902,7 +902,7 @@ def custom_loss2(y_true, y_pred_full, profit_multiplier = 4, financial_penalty =
     # add small constant to decision so we evaluate the error a little bit 
     decision = decision + 1e-1
 
-    prediction_error = error_weight *tf.abs(y_true_cum - y_pred_cum) * decision   # Penalize the model for incorrect predictions
+    prediction_error = error_weight *tf.abs(y_true_cum - y_pred_cum) * decision   # Penalize the models for incorrect predictions
 
     # Combine into a total loss
     total_loss = tf.reduce_mean(regulated_loss + abstain_penalty + prediction_error)
@@ -976,7 +976,7 @@ def custom_loss_updated(y_true, y_pred_full, profit_multiplier=1, financial_pena
     print("ABSTAIN_PENALTY", abstain_penalty)
 
     # Compute prediction error
-    prediction_error = error_weight * tf.abs(y_true - y_pred)  # Penalize the model for incorrect predictions
+    prediction_error = error_weight * tf.abs(y_true - y_pred)  # Penalize the models for incorrect predictions
     print("PREDICTION_ERROR", prediction_error)
 
     # Combine into a total loss

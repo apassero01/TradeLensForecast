@@ -1,0 +1,672 @@
+from copy import deepcopy
+
+import torch
+import torch.nn as nn
+import math
+
+from numpy import dtype
+from tensorflow.python.layers.core import dropout
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+# https://www.kaggle.com/datasets/aryankhatana/sam-optimizer-pytorch/data?select=sam.py
+
+class Transformer(nn.Module):
+    def __init__(self, num_layers, d_model, num_heads, d_ff, encoder_input_dim, decoder_input_dim, dropout=.1):
+        super(Transformer, self).__init__()
+
+        self.encoder = TransformerEncoder(num_layers, d_model, num_heads, d_ff, dropout=dropout, name = "transformer_encoder")
+
+        self.input_projection = nn.Linear(encoder_input_dim, d_model)
+
+        self.output_mechanism = EncoderToRNNWithMultiHeadAttention(d_model, d_ff, num_heads, decoder_input_dim)
+
+        self.traversable_layers = [self.encoder]
+
+        self._init_weights()
+
+        print(f"Transformer initialized with {len(self.traversable_layers)} layers")
+
+    def forward(self, encoder_input, decoder_input, target_mask=None):
+        encoder_input = self.input_projection(encoder_input)
+
+        encoder_output = self.encoder(encoder_input)
+
+        output = self.output_mechanism(encoder_output)
+
+        return output
+
+    def _init_weights(self):
+        # Apply Xavier Initialization to all linear layers
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+
+class EncoderToRNNWithMultiHeadAttention(nn.Module):
+    def __init__(self, d_model, dff, num_heads, output_seq_length):
+        super(EncoderToRNNWithMultiHeadAttention, self).__init__()
+
+        self.num_heads = num_heads
+        self.output_seq_length = output_seq_length
+        # RNN layer (LSTM or GRU)
+        self.rnn = nn.LSTM(input_size=d_model, hidden_size=d_model, num_layers=1, batch_first=True)
+
+        # Multi-head attention mechanism (your implementation)
+        self.multi_head_attention = MultiHeadAttention(d_model=d_model, num_heads=num_heads)
+
+        self.output_sequence_length = output_seq_length
+
+        # Linear layer to project the concatenated (rnn_hidden + attention_output) to the final output
+        self.fc_out = nn.Linear(d_model*2, 2)  # Output shape will be (batch_size, output_seq_length, 2)
+
+    def forward(self, encoder_output):
+        # encoder_output shape: (batch_size, input_seq_length, d_model)
+        batch_size, input_seq_length, d_model = encoder_output.size()
+
+        # Initialize the hidden state and cell state for the RNN (LSTM)
+        h_0 = torch.zeros(1, batch_size, d_model).to(encoder_output.device)
+        c_0 = torch.zeros(1, batch_size, d_model).to(encoder_output.device)
+
+        # Pass the encoder output through the RNN to get the hidden states
+        rnn_output, (h_n, c_n) = self.rnn(encoder_output,
+                                          (h_0, c_0))  # rnn_output: (batch_size, input_seq_length, dff)
+
+        # Initialize an empty list to store the outputs
+        outputs = []
+
+        for t in range(self.output_seq_length):
+            # At each step, use the last hidden state from the RNN (rnn_output[:, -1, :]) as the query
+            rnn_hidden = rnn_output[:, t, :]  # (batch_size, dff)
+
+            # Use multi-head attention with RNN hidden state as the query, and encoder output as key and value
+            attention_output = self.multi_head_attention(Q=rnn_hidden.unsqueeze(1), K=encoder_output,
+                                                         V=encoder_output)  # (batch_size, 1, d_model)
+
+            attention_output = attention_output.squeeze(1)  # Remove the singleton dimension (batch_size, d_model)
+
+            # Concatenate the RNN hidden state with the attention output
+            combined_vector = torch.cat([rnn_hidden, attention_output], dim=-1)  # (batch_size, dff + d_model)
+
+            # Pass the combined vector through the fully connected layer to get the output (mu and log_var)
+            output = self.fc_out(combined_vector)  # (batch_size, 2)
+            outputs.append(output.unsqueeze(1))  # (batch_size, 1, 2)
+
+        # Concatenate all outputs along the sequence dimension
+        outputs = torch.cat(outputs, dim=1)  # (batch_size, output_seq_length, 2)
+
+        return outputs
+
+class TransformerEncoder(nn.Module):
+    def __init__(self, num_layers, d_model, num_heads, d_ff, max_length=200, dropout=.1, name = "transformer_encoder"):
+        super(TransformerEncoder, self).__init__()
+
+        self.name = name
+
+        print(f"Initializing TransformerEncoder with {num_layers} layers")
+        self.pos_encoding = PositionalEncoding(d_model, max_length)
+
+        self.encoder_layers = nn.ModuleList([
+            EncoderLayer(d_model, num_heads, d_ff, dropout,
+                         name = self.name +":encoder_layer"+str(i)) for i in range(num_layers)
+        ])
+
+        self.dropout = nn.Dropout(dropout)
+        print(f"TransformerEncoder initialized with {num_layers} layers")
+
+        self.traversable_layers = nn.ModuleList(self.encoder_layers)
+
+    def forward(self, x):
+        x = self.pos_encoding(x)
+        x = self.dropout(x)
+
+        for layer in self.encoder_layers:
+            x = layer(x)
+
+        return x
+
+class EncoderLayer(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff, dropout=.1, name = "encoder_layer"):
+        super(EncoderLayer, self).__init__()
+
+        self.name = name
+        self.multi_head_attention = MultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
+
+        self.feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.LeakyReLU(),
+            nn.Linear(d_ff, d_model)
+        )
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+
+        self.dropout = nn.Dropout(dropout)
+
+        self.traversable_layers = nn.ModuleList([self.multi_head_attention])
+
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, x):
+        ## pre norm
+        # self.attn_output = self.multi_head_attention(x,x,x)
+        # x = self.norm1(x + self.dropout(self.attn_output))
+        #
+        # ff_output = self.feed_forward(x)
+        #
+        # output = self.norm2(x + self.dropout(ff_output))
+
+        ## post norm
+        # print(f"EncoderLayer {self.name} input shape: {x.shape}")
+        x_norm = self.norm1(x)  # Pre-Norm before attention
+        # print(f"EncoderLayer {self.name} norm1 shape: {x_norm.shape}")
+        self.orig_output = x_norm.clone()
+        self.attn_output = self.multi_head_attention(x_norm, x_norm, x_norm)
+        # print(f"EncoderLayer {self.name} attn_output shape: {self.attn_output.shape}")
+        x = x + self.dropout(self.attn_output)  # Residual connection
+
+        # Feed-Forward with Pre-Norm
+        x_norm = self.norm2(x)  # Pre-Norm before feed-forward
+        ff_output = self.feed_forward(x_norm)
+        output = x + self.dropout(ff_output)
+        self.output = output
+
+        return output
+
+    def get_attention(self):
+        return self.attn_output
+
+    def get_output(self):
+        return self.orig_output
+
+
+
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads, name = "multi_head_attention"):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.dk = d_model // num_heads
+        self.name = name
+
+        if self.dk * num_heads != d_model:
+            raise ValueError(f"d_model ({d_model}) must be divisible by num_heads ({num_heads})")
+
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+
+        self.out = nn.Linear(d_model, d_model)
+        self.layer_norm = nn.LayerNorm(d_model)
+
+        self.traversable_layers = []
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, Q, K, V, mask=None):
+        batch_size = Q.size(0)
+        seq_len = Q.size(1)
+        num_features = Q.size(2)
+
+        Q = self.query(Q)
+        K = self.key(K)
+        V = self.value(V)
+
+        Q = Q.view(batch_size, -1, self.num_heads, self.dk).transpose(1, 2)
+        K = K.view(batch_size, -1, self.num_heads, self.dk).transpose(1, 2)
+        V = V.view(batch_size, -1, self.num_heads, self.dk).transpose(1, 2)
+
+        # Q = self.query(Q).permute(0, 2, 1)  # shape: (batch_size, num_features, seq_len)
+        # K = self.key(K).permute(0, 2, 1)
+        # V = self.value(V).permute(0, 2, 1)
+        #
+        # Q = Q.view(batch_size, num_features, self.num_heads, self.dk).transpose(1, 2)
+        # K = K.view(batch_size, num_features, self.num_heads, self.dk).transpose(1, 2)
+        # V = V.view(batch_size, num_features, self.num_heads, self.dk).transpose(1, 2)
+
+
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(
+            torch.tensor(self.dk, dtype=torch.float32))
+        if mask is not None:
+
+            attention_scores = attention_scores.masked_fill(mask == True, float('-inf'))
+
+
+        attention_weights = torch.nn.functional.softmax(attention_scores, dim=-1)
+
+        attention_output = torch.matmul(attention_weights, V)
+
+        attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
+
+        self.output = self.out(attention_output)
+
+        self.output = self.layer_norm(self.output)
+
+        return self.output
+
+    def get_attention(self):
+        return self.output
+
+class InputEmbedding(nn.Module):
+    def __init__(self, num_inputs, d_model):
+        super(InputEmbedding, self).__init__()
+
+        self.linear = nn.Linear(num_inputs, d_model)
+
+    def forward(self, x):
+        return self.linear(x)
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_length = 200):
+        super(PositionalEncoding, self).__init__()
+
+        # matrix to hold the positional encodings
+        pe = torch.zeros(max_length, d_model)
+
+        position = torch.arange(0, max_length, dtype=torch.float).unsqueeze(1)
+
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        self.pe = pe.unsqueeze(0)
+        print(f"PositionalEncoding initialized with shape: {self.pe.shape}")
+
+    def forward(self, x):
+        # Add positional encoding to the input tensor x  # Check the first few positional encodings
+        return x + self.pe[:, :x.size(1), :]
+
+
+def generate_target_mask(size):
+    """
+    Generates a target mask (look-ahead mask) to prevent attending to future tokens.
+
+    Args:
+    - size: The size of the target sequence (length of `y` values).
+
+    Returns:
+    - A target mask tensor with shape (size, size).
+    """
+    mask = torch.triu(torch.ones(size, size), diagonal=1).bool()
+    return mask
+
+
+class TransformerDecoder(nn.Module):
+    def __init__(self, num_layers, d_model, num_heads, d_ff, dropout=.1, name = "transformer_decoder"):
+        super(TransformerDecoder, self).__init__()
+
+        self.name = name
+        self.decoder_input_projection = nn.Linear(d_model, d_model)
+        self.layers = nn.ModuleList([
+            DecoderLayer(d_model, num_heads, d_ff, dropout,
+                         name = self.name + ":decoder_layer"+str(i)) for i in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+
+        self.fc_out = nn.Linear(d_model, 2)
+
+        self.output_projection = nn.Linear(1, d_model)
+
+        self.positional_encoding = PositionalEncoding(d_model, max_length=200)
+
+        self.d_model = d_model
+
+        self.traversable_layers = nn.ModuleList(self.layers)
+        self._init_weights()
+
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+
+
+    def forward(self, x, encoder_output, target_mask=None):
+        x = self.positional_encoding(x)
+        target_mask = generate_target_mask(x.size(1)).to(x.device)
+
+        for layer in self.layers:
+            x = layer(x, encoder_output, target_mask)
+
+        x = self.norm(x)
+        return self.fc_out(x)
+
+    def inference(self, encoder_output, start_token, max_len):
+        batch_size = encoder_output.size(0)
+        device = encoder_output.device
+
+        # Initialize the input sequence with the start token
+        # y_input = start_token.unsqueeze(0).unsqueeze(1).repeat(batch_size, 1, 1)
+        y_input = start_token[:,-1:,:]
+        generated_sequence = []
+
+        for _ in range(max_len):
+            # Apply positional encoding
+            y_input_pe = self.positional_encoding(y_input)
+
+            # Create target mask
+            tgt_mask = generate_target_mask(y_input_pe.size(1)).to(device)
+
+            x = y_input_pe
+            for layer in self.layers:
+                x = layer(x, encoder_output, tgt_mask)
+            x = self.norm(x)
+
+            # output = self.fc_out(x[:, -1, :])
+            output = self.fc_out(x)
+
+            mu = output[:,-1:, 0] # Shape: (batch_size, 1)
+            log_var = output[:,-1:, 1]# Shape: (batch_size, 1)
+
+            generated_sequence.append(torch.cat([mu, log_var], dim=1).unsqueeze(1))  # Shape: (batch_size, 1, 2)
+
+            mu_projected = self.output_projection(mu)
+            mu_projected = mu_projected.unsqueeze(1)
+
+            y_input = torch.cat([y_input, mu_projected], dim=1)
+
+        predictions = torch.cat(generated_sequence, dim=1)  # Shape: (batch_size, max_len, 2)
+        return predictions
+
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff, dropout=.1, name = "decoder_layer"):
+        super(DecoderLayer, self).__init__()
+
+        self.name = name
+        self.self_attention = MultiHeadAttention(d_model, num_heads, name = name + ":self_attention")
+
+        self.cross_attention = MultiHeadAttention(d_model, num_heads, name = name + ":cross_attention")
+
+        self.feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.LeakyReLU(),
+            nn.Linear(d_ff, d_model)
+        )
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+
+        self.dropout = nn.Dropout(dropout)
+        self.traversable_layers =  nn.ModuleList([self.self_attention, self.cross_attention])
+
+        self._init_weights()
+
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, x, encoder_output, target_mask):
+        # self_attn_output = self.self_attention(x, x, x, mask=target_mask)
+        # x = self.norm1(x + self.dropout(self_attn_output))
+
+        # cross_attn_output = self.cross_attention(x, encoder_output, encoder_output)
+        # x = self.norm2(x + self.dropout(cross_attn_output))
+        self.orig_output = x.clone()
+
+        self_attn_output = self.self_attention(Q=self.norm1(x),
+                                                  K=self.norm1(x),
+                                                  V=self.norm1(x),
+                                                  mask=target_mask)
+        x = x + self.dropout(self_attn_output)
+
+        # todo ensure this is correct with norm2(x) and not norm2(self_attn_output)
+        cross_attn_output = self.cross_attention(Q=self.norm2(x),
+                                                    K=encoder_output,
+                                                    V=encoder_output,
+                                                    mask=None)
+
+        x = x + self.dropout(cross_attn_output)
+
+        # ff_output = self.feed_forward(x)
+        # output = self.norm3(x + self.dropout(ff_output))
+
+        # Feed-Forward Network
+        ff_output = self.feed_forward(self.norm3(x))
+        output = x + self.dropout(ff_output)  # Residual connection
+        self.output = output
+        self.cross_attention_output = cross_attn_output
+        return output
+
+    def get_attention(self):
+        return self.cross_attention_output
+
+    def get_output(self):
+        return self.orig_output
+
+class ChannelWiseMultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads, name="multi_head_attention"):
+        super(ChannelWiseMultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.dk = d_model // num_heads
+        self.name = name
+
+        if self.dk * num_heads != d_model:
+            raise ValueError(f"d_model ({d_model}) must be divisible by num_heads ({num_heads})")
+
+        # Define linear layers for query, key, value, and output
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+        self.out = nn.Linear(d_model, d_model)
+
+        self.layer_norm = nn.LayerNorm(d_model)
+
+        self.traversable_layers = []
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                # nn.init.xavier_uniform_(module.weight, gain=nn.init.calculate_gain('tanh'))
+                # if module.bias is not None:
+                #     nn.init.zeros_(module.bias)
+                nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, Q, K, V, mask=None):
+        batch_size = Q.size(0)
+        seq_len = Q.size(1)
+        num_features = Q.size(2)
+
+        # Apply linear transformations to Q, K, V without permuting yet
+        Q = self.query(Q)  # (batch_size, seq_len, d_model)
+        K = self.key(K)    # (batch_size, seq_len, d_model)
+        V = self.value(V)  # (batch_size, seq_len, d_model)
+
+        # Permute to move features to the second dimension for channel-wise attention
+        Q = Q.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+        K = K.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+        V = V.permute(0, 2, 1)  # (batch_size, num_features (d_model), seq_len)
+
+        # Reshape for multi-head attention: (batch_size, num_heads, feature_head_size, seq_len)
+        Q = Q.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+        K = K.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+        V = V.view(batch_size, self.num_heads, self.dk, seq_len).transpose(1, 2)
+
+        # Compute attention scores across features (channels)
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.dk, dtype=torch.float32))
+
+        # Apply mask if provided
+        if mask is not None:
+            attention_scores = attention_scores.masked_fill(mask == True, float('-inf'))
+
+        # Compute attention weights and apply them to values
+        attention_weights = torch.nn.functional.softmax(attention_scores, dim=-1)
+        attention_output = torch.matmul(attention_weights, V)
+
+        # Reshape back to (batch_size, num_features, seq_len)
+        attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, num_features, seq_len)
+
+        # Permute back to original shape (batch_size, seq_len, num_features)
+        attention_output = attention_output.permute(0, 2, 1)
+
+        # Apply final linear transformation and return output
+        self.output = self.out(attention_output)
+        self.output = self.layer_norm(self.output)
+        return self.output
+
+    def get_attention(self):
+        return self.output
+
+
+
+class SAM(torch.optim.Optimizer):
+    def __init__(self, params, base_optimizer, rho=0.05, **kwargs):
+        assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
+
+        # Initialize the base optimizer (e.g., SGD, Adam)
+        defaults = dict(rho=rho, **kwargs)
+        super(SAM, self).__init__(params, defaults)
+        self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
+        self.param_groups = self.base_optimizer.param_groups
+
+    @torch.no_grad()
+    def first_step(self, zero_grad=False):
+        # Compute the norm of the gradients
+        grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = group["rho"] / (grad_norm + 1e-12)  # Scaling factor for perturbation
+
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                # Perturbation applied to parameters
+                e_w = p.grad * scale.to(p.device)
+                p.add_(e_w)  # Climb to the local maximum "w + e(w)"
+                self.state[p]["e_w"] = e_w
+
+        if zero_grad:
+            self.zero_grad()
+
+    @torch.no_grad()
+    def second_step(self, zero_grad=False):
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                # Revert the perturbation to get back to original parameters
+                p.sub_(self.state[p]["e_w"])
+
+        self.base_optimizer.step()  # Do the actual sharpness-aware update
+
+        if zero_grad:
+            self.zero_grad()
+
+    def step(self, closure=None):
+        # This method is not used in SAM and intentionally left unimplemented
+        raise NotImplementedError("SAM doesn't work like the other optimizers, "
+                                  "you should call `first_step` and `second_step` instead.")
+
+    def _grad_norm(self):
+        # Compute the gradient norm for scaling the perturbation
+        shared_device = self.param_groups[0]["params"][0].device
+        norm = torch.norm(
+            torch.stack([
+                p.grad.norm(p=2).to(shared_device)
+                for group in self.param_groups for p in group["params"]
+                if p.grad is not None
+            ]),
+            p=2
+        )
+        return norm
+
+
+def custom_loss_with_zero_penalty(y_true, y_pred, penalty_weight=1.0):
+    # Calculate the standard MSE loss
+    mse_loss = nn.functional.mse_loss(y_pred, y_true)
+
+    # Apply a penalty to predictions close to zero
+    zero_penalty = torch.mean(torch.exp(-torch.abs(y_pred)))
+
+    # Combine the MSE loss with the zero-penalty term
+    total_loss = mse_loss + penalty_weight * zero_penalty
+
+    return total_loss
+
+
+
+def gaussian_nll_loss(outputs, y_true, threshold = .5, penalty_factor = 1000):
+    """
+    Computes the Gaussian negative log-likelihood loss.
+
+    Args:
+        outputs (torch.Tensor): Model outputs of shape (batch_size, output_steps, 2).
+                                outputs[:, :, 0] contains the predicted means (mu).
+                                outputs[:, :, 1] contains the predicted log variances (log_var).
+        y_true (torch.Tensor): True target values of shape (batch_size, output_steps, 1).
+
+    Returns:
+        torch.Tensor: Scalar loss value.
+    """
+    # Step 1: Extract mu and log_var
+    mu = outputs[:, :, 0]        # Shape: (batch_size, output_steps)
+    log_var = outputs[:, :, 1]   # Shape: (batch_size, output_steps)
+
+    # Step 2: Ensure y_true matches the shape of mu
+    y_true = y_true.squeeze(-1)  # Shape: (batch_size, output_steps)
+
+    # Step 3: Compute variance (sigma^2) from log variance
+    sigma_sq = torch.exp(log_var)  # Shape: (batch_size, output_steps)
+
+    # Optional: Add a small epsilon for numerical stability
+    epsilon = 1e-6
+    sigma_sq = sigma_sq + epsilon
+
+    # Step 4: Compute the negative log-likelihood
+    nll = 0.5 * torch.log(2 * math.pi * sigma_sq) + ((y_true - mu) ** 2) / (2 * sigma_sq)
+
+    # Step 5: Compute the mean loss over all elements
+    loss = torch.mean(nll)
+
+    # if mu is close to zero, add a penalty term
+    penalty = torch.where(mu.abs() < threshold, penalty_factor, torch.zeros_like(mu))
+
+    return loss + penalty.mean()
+
+
+
+

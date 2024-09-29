@@ -145,10 +145,10 @@ def create_regular_model(input_shape, latent_dim=6):
         decoder_dropout2
     )
 
-    # Create the model
+    # Create the models
     model_lstm = Model(inputs=input_layer, outputs=time_distributed_output)
 
-    # Compile the model
+    # Compile the models
     optimizer = Adam(learning_rate=0.001)
     model_lstm.compile(optimizer=optimizer, loss="mae")
 
@@ -304,7 +304,7 @@ def create_attention_model(input_steps, output_steps, features):
 
     main_output = TimeDistributed(Dense(1))(decoder_combined_context2)
 
-    # Create and compile the model
+    # Create and compile the models
     training_model = Model(inputs=encoder_inputs, outputs=main_output)
     training_model.compile(optimizer="adam", loss="mse")  # Use appropriate loss
 
@@ -321,7 +321,7 @@ def custom_loss_function(y_true, y_pred, past_steps, future_weight):
 
     Parameters:
     y_true (tensor): The true values.
-    y_pred (tensor): The predicted values from the model.
+    y_pred (tensor): The predicted values from the models.
     past_steps (int): The number of steps in the sequence corresponding to past values.
     future_steps (int): The number of steps in the sequence corresponding to future values.
     future_weight (float): The weight to assign to the errors in the future values.
@@ -518,6 +518,7 @@ def visualize_future_distribution(results):
         xaxis_title='Steps in future',
         yaxis_title='Cumulative Percent Change'
     )
+    fig.update_layout(yaxis=dict(range=[-25, 25]))
 
     return fig
 

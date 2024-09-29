@@ -15,7 +15,7 @@ class Trainer:
         self.max_length = max_length
 
     def to_device(self):
-        """Move the model to the specified device."""
+        """Move the models to the specified device."""
         self.model.to(self.device)
 
     def add_start_token(self, y_target):
@@ -23,6 +23,8 @@ class Trainer:
         batch_size = y_target.size(0)
         seq_len = y_target.size(1)
         start_token = torch.zeros((batch_size, 1, 1)).to(y_target.device)
+        # makethe token -999
+        # start_token.fill_(-999)
 
         # Ensure y_target has three dimensions before slicing
         if y_target.dim() == 2:  # If y_target is (batch_size, seq_len)
@@ -42,13 +44,13 @@ class Trainer:
 
             self.optimizer.zero_grad()
 
-            # Get the sequence predictions and continuation signals from the model
-            sequence_predictions = self.model(encoder_input, decoder_input)
+            # Get the sequence predictions and continuation signals from the models
+            self.sequence_predictions = self.model(encoder_input, decoder_input)
 
-            loss = self.criterion(torch.cumsum(sequence_predictions.squeeze(-1), dim=1), torch.cumsum(y_target.squeeze(-1), dim=1))
+            # loss = self.criterion(torch.cumsum(sequence_predictions.squeeze(-1), dim=1), torch.cumsum(y_target.squeeze(-1), dim=1))
 
             # Calculate the custom loss
-            # loss = self.criterion(sequence_predictions, y_target)
+            loss = self.criterion(self.sequence_predictions, y_target)
 
             loss.backward()
 
@@ -71,7 +73,7 @@ class Trainer:
 
             self.optimizer.zero_grad()
 
-            # Get the sequence predictions and continuation signals from the model
+            # Get the sequence predictions and continuation signals from the models
             sequence_predictions, continuation_signals = self.model(encoder_input, decoder_input)
 
             # Calculate the custom loss
@@ -89,7 +91,7 @@ class Trainer:
         return epoch_loss / len(dataloader)
 
     def train_epoch_SAM(self, dataloader):
-        self.model.train()  # Set the model to training mode
+        self.model.train()  # Set the models to training mode
         epoch_loss = 0  # Initialize the epoch loss
 
         for batch in dataloader:
@@ -99,7 +101,7 @@ class Trainer:
 
             # First forward-backward pass
             self.optimizer.zero_grad()  # Clear gradients from the previous iteration
-            output = self.model(encoder_input, decoder_input)  # Forward pass through the model
+            output = self.model(encoder_input, decoder_input)  # Forward pass through the models
             loss = self.criterion(output, y_target)  # Compute the loss
             loss.backward()  # Compute gradients for the first step
             self.optimizer.first_step(zero_grad=True)  # SAM's first step with gradient ascent
@@ -151,7 +153,7 @@ class Trainer:
         return epoch_loss / len(dataloader)
 
     def predict(self, encoder_input):
-        self.model.eval()  # Set the model to evaluation mode
+        self.model.eval()  # Set the models to evaluation mode
 
         with torch.no_grad():
             # encoder_input = encoder_input.to(self.device)
@@ -203,7 +205,7 @@ class Trainer:
 
 
     def log_gradients_with_names(self, inputs, targets, criterion=nn.MSELoss()):
-        # Set the model to training mode
+        # Set the models to training mode
         self.model.train()
 
         # Zero the gradients before running the backward pass
@@ -215,7 +217,7 @@ class Trainer:
         outputs = self.model(inputs, decoder_input)
 
         # Calculate the loss
-        loss = criterion(outputs, targets)
+        loss = self.criterion(outputs, targets)
 
         # Perform a backward pass to compute the gradients
         loss.backward()
@@ -226,7 +228,7 @@ class Trainer:
         return gradients_with_names
 
     def generate_model_architecture(self):
-        """Print the model architecture."""
+        """Print the models architecture."""
 
         layer_names = []
         next_layers = self.model.traversable_layers
@@ -263,6 +265,21 @@ class Trainer:
 
         return output_dict
 
+    def retrieve_output(self, retrieval_list):
+
+            output_dict = {}
+            next_layers = self.model.traversable_layers
+            queue = deque(next_layers)
+
+            while len(queue) > 0:
+                layer = queue.popleft()
+
+                if layer.name in retrieval_list:
+                    output_dict[layer.name] = layer.get_output()
+                queue.extend(layer.traversable_layers)
+
+            return output_dict
+
 
     def get_gradients_with_names(self):
         gradients_with_names = []
@@ -296,7 +313,7 @@ class TrainerContinSignal(Trainer):
 
     @override
     def predict(self, encoder_input):
-        self.model.eval()  # Set the model to evaluation mode
+        self.model.eval()  # Set the models to evaluation mode
 
         with torch.no_grad():
             # encoder_input = encoder_input.to(self.device)
