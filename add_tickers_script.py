@@ -11,7 +11,8 @@ from dataset_manager.services import StockDataSetService
 from sequenceset_manager.services import StockSequenceSetService
 
 tickers = ["AAPL", "SPY", "QQQ", "XOM", "MSFT", "AMZN", "BB", 'F', 'TSLA', 'GE',
-           "JPM", "BAC", "LLY", "NKE", "WMT", "PEP"]
+           "JPM", "BAC", "LLY", "NKE", "WMT", "PEP", 'M', 'KODK',
+           'BA', 'DIS']
 sequences_lengths = [10, 20, 50, 75]
 # tickers = ["AAPL"]
 # sequences_lengths = [50]

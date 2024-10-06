@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'dataset_manager',
     'sequenceset_manager',
+    'training_manager',
 ]
 
 MIDDLEWARE = [

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from models.BaseModel import BaseLayer
-from models.attention import MultiHeadAttention
+from models.attention import MultiHeadAttention, ChannelWiseMultiHeadAttention
 from models.utils import PositionalEncoding
 
 
@@ -16,10 +16,20 @@ class TransformerEncoder(BaseLayer):
         print(f"Initializing TransformerEncoder with {num_layers} layers")
         self.pos_encoding = PositionalEncoding(d_model, max_length)
 
-        self.encoder_layers = nn.ModuleList([
-            EncoderLayer(d_model, num_heads, d_ff, dropout,
-                         name = self.name +":encoder_layer"+str(i)) for i in range(num_layers)
-        ])
+        # self.encoder_layers = nn.ModuleList([
+        #     EncoderLayer(d_model, num_heads, d_ff, dropout,
+        #                  name = self.name +":encoder_layer"+str(i)) for i in range(num_layers)
+        # ])
+        self.encoder_layers = nn.ModuleList()
+        for i in range(num_layers):
+            if i % 2 == 0:
+                attention_type = "temporal"
+            else:
+                attention_type = "channel"
+            self.encoder_layers.append(EncoderLayer(d_model, num_heads, d_ff, dropout,
+                                                     name = self.name +":encoder_layer"+str(i),
+                                                     attention_type = attention_type))
+
 
         self.dropout = nn.Dropout(dropout)
         print(f"TransformerEncoder initialized with {num_layers} layers")
@@ -36,11 +46,15 @@ class TransformerEncoder(BaseLayer):
         return x
 
 class EncoderLayer(BaseLayer):
-    def __init__(self, d_model, num_heads, d_ff, dropout=.1, name = "encoder_layer"):
+    def __init__(self, d_model, num_heads, d_ff, dropout=.1, name = "encoder_layer", attention_type = "temporal"):
         super(EncoderLayer, self).__init__()
 
         self.name = name
-        self.multi_head_attention = MultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
+        # self.multi_head_attention = MultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
+        if attention_type == "temporal":
+            self.multi_head_attention = MultiHeadAttention(d_model, num_heads, name = name + ":multi_head_attention")
+        else:
+            self.multi_head_attention = ChannelWiseMultiHeadAttention(d_model, num_heads, name = name + ":channel_multi_head_attention")
 
         self.feed_forward = nn.Sequential(
             nn.Linear(d_model, d_ff),
