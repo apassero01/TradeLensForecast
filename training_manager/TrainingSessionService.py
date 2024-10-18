@@ -1,11 +1,19 @@
+import json
 from abc import ABC
+from enum import Enum
 
 import numpy as np
+import requests
 
 from dataset_manager.services import FeatureFactoryService
+from sequenceset_manager.models import SequenceSet, Sequence
 from training_manager.FeatureSetService import FeatureSetService
 from training_manager.PreprocessingService import PreprocessingService
 from training_manager.models import FeatureSet, TrainingSession
+
+class TrainingSessionStatus(Enum):
+    ACTIVE = 1
+    INACTIVE = 2
 
 
 class TrainingSessionService(ABC):
@@ -20,10 +28,10 @@ class TrainingSessionService(ABC):
                                                            sequence_params=sequence_params)
         training_session.feature_dict = self.create_feature_dict(X_features, y_features)
         training_session.X_feature_dict, training_session.y_feature_dict = self.create_xy_feature_dict(X_features, y_features)
-
+        training_session.status = TrainingSessionStatus.ACTIVE.value
         return training_session
 
-    def retrieve_sequence_sets(self, training_session):
+    def retrieve_sequence_sets(self, training_session, config):
         pass
 
     def create_3d_array(self, training_session):
@@ -44,8 +52,9 @@ class TrainingSessionService(ABC):
                     sequence_set.X_feature_sets.append(feature_set)
                 else:
                     sequence_set.y_feature_sets.append(feature_set)
+        training_session.feature_set_configs = feature_set_configs
 
-    def train_test_split(self, training_session, split_date ):
+    def train_test_split(self, training_session, split_date):
         for sequence_set in training_session.sequence_sets:
             dates = [sequence.end_timestamp for sequence in sequence_set.sequences]
             sequence_set.X_train, sequence_set.X_test, sequence_set.y_train, sequence_set.y_test, sequence_set.train_seq_ids, sequence_set.test_seq_ids = self.preprocessing_service.train_test_split(X = sequence_set.X, y = sequence_set.y,
@@ -77,3 +86,58 @@ class TrainingSessionService(ABC):
         y_feature_dict = {col : index for col, index in zip(y_features, y_indices_seq)}
 
         return X_feature_dict, y_feature_dict
+
+class StockTrainingSessionService(TrainingSessionService):
+    def __init__(self):
+        super().__init__()
+
+    def retrieve_sequence_sets(self, training_session, sequence_params):
+        url = 'http://localhost:8000/sequenceset_manager/get_sequence_data'
+
+        features = training_session.X_features + training_session.y_features
+
+        sequence_sets = []
+
+        for param in sequence_params:
+            sequence_set = SequenceSet() # create sequence set object
+            sequence_set.dataset_type = 'stock'
+            sequence_set.sequence_length = param['sequence_length']
+            sequence_set.start_timestamp = param['start_timestamp']
+            sequence_set.sequences = []
+            sequence_set.metadata = {'ticker': param['ticker'], 'interval': param['interval']}
+
+            params = ({
+                'ticker': param['ticker'],
+                'features': features,
+                'interval': param['interval'],
+                'start_timestamp': param['start_timestamp'],
+                'sequence_length': param['sequence_length']
+            })
+            response = requests.get(url, params=params)
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    for obj in data:
+                        sequence_objects = Sequence(
+                            sequence_set=sequence_set,
+                            id = obj['id'],
+                            start_timestamp=obj['start_timestamp'],
+                            end_timestamp=obj['end_timestamp'],
+                            sequence_length=param['sequence_length'],
+                            sequence_data=obj['sliced_data']
+                        )
+                        sequence_set.sequences.append(sequence_objects)
+                    sequence_sets.append(sequence_set)
+
+                except json.JSONDecodeError as e:
+                    print(f"Failed to decode JSON: {e}")
+                    print("Response text:", response.text)
+            else:
+                print(f"Request failed with status code {response.status_code}")
+
+        training_session.sequence_sets = sequence_sets
+
+
+
+
+

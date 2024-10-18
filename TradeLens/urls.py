@@ -21,4 +21,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('dataset_manager/', include('dataset_manager.urls')),
     path('sequenceset_manager/', include('sequenceset_manager.urls')),
+
+    path('training_manager/', include('training_manager.urls')),
 ]

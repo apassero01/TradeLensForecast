@@ -2,10 +2,11 @@ import numpy as np
 import pandas as pd
 from django.test import TestCase
 
+from dataset_manager.services import StockDataSetService
 from sequenceset_manager.models import SequenceSet
-from sequenceset_manager.services import SequenceSetService
+from sequenceset_manager.services import SequenceSetService, StockSequenceSetService
 from training_manager.FeatureSetService import MeanVarianceScaler3D
-from training_manager.TrainingSessionService import TrainingSessionService
+from training_manager.TrainingSessionService import TrainingSessionService, StockTrainingSessionService
 
 
 class TrainingSessionServiceTestCase(TestCase):
@@ -211,6 +212,41 @@ class TrainingSessionServiceTestCase(TestCase):
         X_feature_dict, y_feature_dict = self.training_session_service.create_xy_feature_dict(X_features, y_features)
         self.assertEqual(X_feature_dict, {'open': 0, 'high': 1})
         self.assertEqual(y_feature_dict, {'close+1': 0})
+
+
+
+class StockTrainingSessionServiceTestCase(TestCase):
+    def setUp(self):
+        # StockDataSetService.create_new_dataset(dataset_type="stock", start_date='2023-01-01', end_date=None,
+        #                                        ticker='AAPL', interval="1d")
+        # StockSequenceSetService.create_sequence_set(5, dataset_type='stock', ticker="AAPL", interval='1d')
+
+        self.training_session_service = StockTrainingSessionService()
+
+    def test_retrieve_sequence_sets(self):
+        training_session = self.training_session_service.create_training_session(['open', 'high'], ['close+1'], {'sequence_length': 2})
+        params = [
+            {
+                'ticker': 'AAPL',
+                'interval': '1d',
+                'sequence_length': 10,
+                'start_timestamp': '2023-01-10'
+
+            }
+        ]
+        self.training_session_service.retrieve_sequence_sets(training_session, params)
+
+        self.assertEqual(len(training_session.sequence_sets), 1)
+        self.assertEqual(training_session.sequence_sets[0].sequence_length, 10)
+        self.assertTrue(len(training_session.sequence_sets[0].sequences) > 0 )
+        self.assertTrue(training_session.sequence_sets[0].metadata['ticker'], 'AAPL')
+
+        first_sequence = training_session.sequence_sets[0].sequences[0]
+        self.assertEqual(first_sequence.sequence_length, 10)
+        print(first_sequence.start_timestamp)
+        self.assertTrue(first_sequence.start_timestamp > '2023-01-09')
+        self.assertTrue(first_sequence.end_timestamp > '2023-01-10')
+
 
 
 

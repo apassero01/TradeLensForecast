@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
 from sequenceset_manager.models import SequenceSet
-from sequenceset_manager.services import SequenceSetService
+from sequenceset_manager.services import SequenceSetService, StockSequenceSetService
 from datetime import datetime
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
@@ -16,7 +16,7 @@ def get_sequence_data(request):
     features = request.GET.getlist('features')
 
     # Get optional parameters with default values
-    start_date = request.GET.get('start_date', None)
+    start_date = request.GET.get('start_timestamp', None)
     end_date = request.GET.get('end_date', None)
     interval = request.GET.get('interval', None)
     sequence_length = request.GET.get('sequence_length', None)
@@ -57,3 +57,8 @@ def get_sequence_data(request):
         )
 
     return JsonResponse(result, safe=False)
+
+@require_http_methods(["GET"])
+def get_sequence_metadata(request):
+    response = StockSequenceSetService.get_all_sequence_set_metadata()
+    return JsonResponse(response, safe=False)

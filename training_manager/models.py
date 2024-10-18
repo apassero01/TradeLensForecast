@@ -11,6 +11,8 @@ class TrainingSession(models.Model):
     sequence_ids = ArrayField(models.IntegerField(), default=None, null=True)
     feature_dict = models.JSONField(default=None, null=True)
     feature_set_configs = models.JSONField(default=None, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.IntegerField(default=1)
 
 
 

@@ -1,7 +1,8 @@
 from turtledemo.penrose import start
 
 from django.shortcuts import render
-from dataset_manager.services import DataSetService, StockDataSetService
+from dataset_manager.services import DataSetService, StockDataSetService, FeatureFactoryService, \
+    StockFeatureFactoryService
 
 import json
 from django.http import JsonResponse
@@ -54,6 +55,23 @@ def create_stock_data(request):
         df.index = df.index.astype(str)
 
         return JsonResponse(df.to_dict(orient='index'))
+
+
+def get_all_x_features(request):
+    '''
+    Get all X features from the database
+    '''
+    factory = StockFeatureFactoryService()
+    all_x_features = factory.get_all_x_features()
+    return JsonResponse(all_x_features, safe=False)
+
+def get_all_y_features(request):
+    '''
+    Get all y features from the database
+    '''
+    factory = StockFeatureFactoryService()
+    all_y_features = factory.get_all_y_features()
+    return JsonResponse(all_y_features, safe=False)
 
 
 

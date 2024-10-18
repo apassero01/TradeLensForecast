@@ -89,12 +89,41 @@ class FeatureFactoryService(ABC):
                 factory = factory_class(db_config)
                 example_df = factory.add_features(example_df)
 
+
 class StockFeatureFactoryService(FeatureFactoryService):
     def get_config_list(self):
         return STOCK_FACTORY_CONFIG_LIST
 
     def get_example_df(self):
         return StockDataSetService.retreive_external_df(ticker="AAPL", start_date="2020-01-01", interval="1d")
+
+    def get_all_x_features(self):
+        all_configs = FeatureFactoryConfig.objects.all()
+        x_features = []
+
+        id = 0
+        for config in all_configs:
+            if config.name == "TargetFeatureFactory":
+                pass
+            for feature in config.feature_names:
+                x_features.append({"id": id, "name": feature})
+                id += 1
+
+        return x_features
+
+
+    def get_all_y_features(self):
+        all_configs = FeatureFactoryConfig.objects.all()
+        y_features = []
+
+        id = 0
+        for config in all_configs:
+            if config.name == "TargetFeatureFactory":
+                for feature in config.feature_names:
+                    y_features.append({"id": id, "name": feature})
+                    id += 1
+
+        return y_features
 
 
 class DataSetService(ABC):

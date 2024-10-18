@@ -236,6 +236,22 @@ class SequenceSetService(ABC):
         feature_dict = {col: index for col, index in zip(df_cols, indices_seq)}
         return feature_dict
 
+    @staticmethod
+    def get_all_sequence_set_metadata():
+        '''
+        Get all sequence set metadata
+        '''
+        metadata = []
+        for sequence_set in SequenceSet.objects.all():
+            curmeta_data = sequence_set.metadata
+            curmeta_data['sequence_length'] = sequence_set.sequence_length
+            curmeta_data['id'] = sequence_set.id
+            metadata.append(sequence_set.metadata)
+
+        return metadata
+
+
+
 class SequenceService(ABC):
 
     @staticmethod
