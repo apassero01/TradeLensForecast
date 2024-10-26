@@ -99,16 +99,16 @@ class TrainingSessionServiceTestCase(TestCase):
         feature_set_configs = [
             {
             'type': 'X',
-                'scaler_config': {
-                    'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
-                },
+            'scaler_config': {
+                'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
+            },
             'feature_list': ['open', 'high']
             },
             {
             'type': 'y',
-                'scaler_config': {
-                    'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
-                    },
+            'scaler_config': {
+                'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
+                },
             'feature_list': ['close+1']
             }
         ]

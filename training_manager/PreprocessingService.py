@@ -70,7 +70,7 @@ class PreprocessingService:
 
         for feature_set in feature_sets:
             scaler = feature_set.scaler
-            feature_indices = [feature_dict[feature] for feature in feature_set.feature_list]
+            feature_indices = [feature_dict[feature] for feature in feature_set.X_feature_list]
             arr1_scaled[:, :, feature_indices] = scaler.fit_transform(arr1[:, :, feature_indices])
             if arr2 is not None:
                 arr2_scaled[:, :, feature_indices] = scaler.transform(arr2[:, :, feature_indices])

@@ -101,6 +101,7 @@ class SequenceSetService(ABC):
         '''
         feature_dict = sequence_set.feature_dict
         cols = list(feature_dict.keys())
+        cols = sorted(cols, key=lambda x: feature_dict[x])
 
         df = df[cols]
         df_values = df.values
