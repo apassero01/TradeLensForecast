@@ -15,6 +15,9 @@ class TrainingSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField()
     ordered_model_set_strategies = models.JSONField()
+    model_set_configs = models.JSONField(default=list)
+    start_date = models.DateField(null=True)
+    end_date = models.DateField(null=True)
 
 
 class ModelSet():
@@ -30,5 +33,9 @@ class ModelSet():
     X_test = None
     y_train = None
     y_test = None
+    X_train_scaled = None
+    X_test_scaled = None
+    y_train_scaled = None
+    y_test_scaled = None
     train_row_ids = None
     test_row_ids = None

@@ -31,3 +31,42 @@ export const fetchAllyFeatures = async () => {
   }
 };
 
+export const saveSession = async (sessionState) => {
+    try {
+        const response = await axios.post('http://localhost:8000/training_session/save_session/', sessionState);
+        return response.data;
+    } catch (err) {
+        console.error('Error saving session:', err);
+        throw err;
+    }
+}
+
+export const removeSession = async (sessionState) => {
+    try {
+        const response = await axios.post('http://localhost:8000/training_session/remove_session/', sessionState);
+        return response.data;
+    } catch (err) {
+        console.error('Error removing session:', err);
+        throw err;
+    }
+}
+
+export const getSessions = async () => {
+    try {
+        const response = await axios.get('http://localhost:8000/training_session/get_sessions/');
+        return response.data;  // Assuming response data is an array of sessions
+    } catch (err) {
+        console.error('Error fetching sessions:', err);
+        throw err;
+    }
+};
+
+export const getSessionById = async (sessionId) => {
+    try {
+        const response = await axios.get(`http://localhost:8000/training_session/get_session/${sessionId}/`);
+        return response.data;
+    } catch (err) {
+        console.error('Error fetching session:', err);
+        throw err;
+    }
+};

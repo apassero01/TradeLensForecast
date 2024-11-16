@@ -276,6 +276,26 @@ class SequenceService(ABC):
         '''
         return [list(row) for row in zip(*matrix_list)]
 
+    @staticmethod
+    def get_sequence_metadata_by_ids(sequence_ids):
+        '''
+        Get sequence metadata by ids
+        '''
+        print(sequence_ids)
+        sequences = Sequence.objects.filter(id__in=sequence_ids)
+        sequence_set = sequences.first().sequence_set
+        metadata = []
+        for sequence in sequences:
+            meta_data = {}
+            meta_data['id'] = sequence.id
+            meta_data['start_timestamp'] = sequence.start_timestamp
+            meta_data['end_timestamp'] = sequence.end_timestamp
+            meta_data['sequence_length'] = sequence.sequence_length
+            meta_data['metadata'] = sequence_set.metadata
+            metadata.append(meta_data)
+
+        return metadata
+
 
 class StockSequenceSetService(SequenceSetService):
     @staticmethod

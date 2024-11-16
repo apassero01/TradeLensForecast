@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import Tabs from './Tabs';
-import TrainingConfiguration from './TrainingConfiguration';
+import ConfigurationInputBox from './ConfigurationInputBox';
+import { saveSession, removeSession, getSessionById } from './api';
+import SessionDetails from "./SessionDetails";
+import PageLayout from "./containers/PageLayout";
+import PreprocessingScreen from "./screens/PreprocessingScreen";
 
 function TrainingSession() {
-  // Centralized state for the training session
   const [sessionState, setSessionState] = useState({
-    allSequenceSets: [],
-    selectedSets: [],
+    allModelSets: [],
+    selectedModelSets: [],
     allXFeatures: [],
     selectedXFeatures: [],
     allYFeatures: [],
@@ -18,56 +21,117 @@ function TrainingSession() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('training');
 
-  // Generalized function to update session state
   const updateSessionState = (key, value) => {
     setSessionState(prevState => ({
-      ...prevState,  // Keep the previous state
-      [key]: value   // Update only the specific key
+      ...prevState,
+      [key]: value
     }));
   };
 
+  const handleLoadSession = async (sessionId) => {
+    setLoading(true);
+    setError('');
+    try {
+      const sessionData = await getSessionById(sessionId);
+      updateSessionState('sessionData', sessionData);
+      updateSessionState('selectedModelSets', sessionData.model_set_configs);
+      updateSessionState('selectedXFeatures', sessionData.X_features.map(value => ({ name: value })));
+      updateSessionState('selectedYFeatures', sessionData.y_features.map(value => ({ name: value })));
+      updateSessionState('start_timestamp', sessionData.start_date);
+    }
+    catch (error) {
+      setError('Failed to load session ' + error);
+    }
+    finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveSession = async (sessionState) => {
+    setLoading(true);
+    setError('');
+    try {
+      await saveSession(sessionState);
+    }
+    catch (error) {
+      setError('Failed to save session ' + error);
+    }
+    finally {
+      setLoading(false);
+    }
+  }
+
+  const handleRemoveSession = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await removeSession(sessionState);
+      updateSessionState('sessionData', null);
+    }
+    catch (error) {
+      setError('Failed to remove session ' + error);
+    }
+    finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="container mx-auto p-2 px-0">
-      {/* Tabs at the top */}
+    <div className="flex flex-col min-w-screen min-h-screen overflow-hidden">
+      {/* Tabs for navigation */}
       <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Session Data Display */}
-      {sessionState.sessionData && (
-        <div className="mt-6 bg-white shadow-lg rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Session Created</h2>
-          <p className="text-gray-700">
-            <strong>Session ID:</strong> {sessionState.sessionData.session_id}
-          </p>
-          <p className="text-gray-700">
-            <strong>Created At:</strong> {sessionState.sessionData.created_at}
-          </p>
-          <p className="text-gray-700">
-            <strong>Status:</strong> {sessionState.sessionData.status}
-          </p>
-        </div>
-      )}
-
-      {/* Tab Content */}
-      <div className="bg-gray-100 p-6 rounded-lg shadow-md mt-4"> {/* Single Column for Tab Content */}
+      {/* Full-height container for tab content */}
+      <div className="flex-grow flex w-full h-full">
         {activeTab === 'configuration' && (
-          <TrainingConfiguration
+          <PageLayout
+            layout={[
+              {
+                columnWidths: [100],
+                components: [
+                  {
+                    component: (
+                      <SessionDetails
+                        sessionState={sessionState}
+                        updateSessionState={updateSessionState}
+                        onSave={handleSaveSession}
+                        onRemove={handleRemoveSession}
+                        onLoad={handleLoadSession}
+                        setError={setError}
+                        setLoading={setLoading}
+                      />
+                    ),
+                  },
+                ],
+              },
+              {
+                columnWidths: [100],
+                components: [
+                  {
+                    component: (
+                      <ConfigurationInputBox
+                        sessionState={sessionState}
+                        updateSessionState={updateSessionState}
+                        setError={setError}
+                        setLoading={setLoading}
+                      />
+                    ),
+                  },
+                ],
+              },
+            ]}
+          />
+        )}
+
+        {activeTab === 'preprocessing' && (
+          <PreprocessingScreen
             sessionState={sessionState}
             updateSessionState={updateSessionState}
             setError={setError}
             setLoading={setLoading}
           />
         )}
-        {activeTab === 'preprocessing' && (
-          <div className="text-gray-600">
-            {/* Preprocessing content placeholder */}
-            <p>Preprocessing steps will go here.</p>
-          </div>
-        )}
       </div>
-
-      {/* Error and Loading Indicators */}
-      {error && <p className="text-red-500 mt-4">{error}</p>}
-      {loading && <p className="mt-4">Loading...</p>}
     </div>
   );
 }

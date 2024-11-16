@@ -3,6 +3,7 @@ import React from 'react';
 
 function DateInput({label, onDateChange, selectedDate}) {
     const handleChange = (event) => {
+        console.log('Selected Date:', event.target.value);
         onDateChange(event.target.value);  // Call the onDateChange function passed from parent
     };
 

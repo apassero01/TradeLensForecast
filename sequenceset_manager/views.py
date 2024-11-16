@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
 from sequenceset_manager.models import SequenceSet
-from sequenceset_manager.services import SequenceSetService, StockSequenceSetService
+from sequenceset_manager.services import SequenceSetService, StockSequenceSetService, SequenceService
 from datetime import datetime
 from django.utils.dateparse import parse_date
 from rest_framework.response import Response
@@ -14,7 +14,6 @@ from django.views.decorators.http import require_http_methods
 def get_sequence_data(request):
     ticker = request.GET.get('ticker')  # Use getlist to handle multiple tickers
     features = request.GET.getlist('features')
-
     # Get optional parameters with default values
     start_date = request.GET.get('start_timestamp', None)
     end_date = request.GET.get('end_date', None)
@@ -62,3 +61,10 @@ def get_sequence_data(request):
 def get_sequence_metadata(request):
     response = StockSequenceSetService.get_all_sequence_set_metadata()
     return JsonResponse(response, safe=False)
+
+@require_http_methods(["GET"])
+def get_sequence_metadata_by_ids(request):
+    sequence_ids = request.GET.getlist('ids')
+    response = SequenceService.get_sequence_metadata_by_ids(sequence_ids)
+    return JsonResponse(response, safe=False)
+

@@ -13,11 +13,14 @@ class RetrieveSequenceSetsStrategyTestCase(TestCase):
         self.dataset_type = 'stock'
 
         self.config = {
+            'parent_strategy': 'ModelSetsStrategy',
+            'm_service': 'training_session',
+            'type': RetrieveSequenceSetsStrategy.__name__,
             'step_number': 1,
             'X_features': self.X_features,
             'y_features': self.y_features,
             'dataset_type': self.dataset_type,
-            'sequence_params': [
+            'model_set_configs': [
                 {
                     'sequence_length': 10,
                     'start_timestamp': '2023-01-01',
@@ -56,21 +59,26 @@ class RetrieveSequenceSetsStrategyTestCase(TestCase):
 class CreateFeatureSetsStrategyTestCase(TestCase):
     def setUp(self):
         self.config = {
+            'parent_strategy': 'ModelSetsStrategy',
+            'm_service': 'training_session',
+            'type': CreateFeatureSetsStrategy.__name__,
             'step_number': 1,
             'feature_set_configs': [
             {
-                'type': 'X',
+                'feature_set_type': 'X',
                 'scaler_config': {
                     'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
                 },
-                'feature_list': ['open', 'high']
+                'feature_list': ['open', 'high'],
+                'do_fit_test': False
             },
             {
-                'type': 'y',
+                'feature_set_type': 'y',
                 'scaler_config': {
                     'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
                 },
-                'feature_list': ['close+1']
+                'feature_list': ['close+1'],
+                'do_fit_test': False
             }
             ]
         }
@@ -86,8 +94,8 @@ class CreateFeatureSetsStrategyTestCase(TestCase):
 
         self.assertEqual(len(X_feature_sets), 1)
         self.assertEqual(len(y_feature_sets), 1)
-        self.assertEqual(X_feature_sets[0].X_feature_list, ['open', 'high'])
-        self.assertEqual(y_feature_sets[0].X_feature_list, ['close+1'])
+        self.assertEqual(X_feature_sets[0].feature_list, ['open', 'high'])
+        self.assertEqual(y_feature_sets[0].feature_list, ['close+1'])
 
 
 
