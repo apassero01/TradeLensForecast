@@ -101,13 +101,19 @@ class StockFeatureFactoryService(FeatureFactoryService):
         all_configs = FeatureFactoryConfig.objects.all()
         x_features = []
 
+        feature_names = [
+            feature_name
+            for config in all_configs
+            if config.name != "TargetFeatureFactory"
+            for feature_name in config.feature_names
+        ]
+        feature_names += ['open', 'high', 'low', 'close', 'volume']
+
+        print(feature_names)
         id = 0
-        for config in all_configs:
-            if config.name == "TargetFeatureFactory":
-                pass
-            for feature in config.feature_names:
-                x_features.append({"id": id, "name": feature})
-                id += 1
+        for feature in feature_names:
+            x_features.append({"id": id, "name": feature})
+            id += 1
 
         return x_features
 

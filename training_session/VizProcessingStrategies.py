@@ -341,7 +341,6 @@ class SequenceVizProcessingStrategy(VizProcessingStrategy):
                 seq_data = seq_data[np.newaxis, :]
                 single_seq[feature] = {'data': seq_data.tolist(), 'metadata': self.data_set_metadata[i]}
             ret_data.append(single_seq)
-        print(ret_data)
         return ret_data
 
 

@@ -2,7 +2,7 @@ from abc import ABC
 
 import numpy as np
 
-from training_manager.models import Evaluation
+from train_eval_manager.models import Evaluation
 
 
 class EvaluationService(ABC):

@@ -320,13 +320,14 @@ class MinMaxSeqBySeqScaler2DTestCase(TestCase):
     def test_serialize(self):
         scaler = MinMaxSeqBySeqScaler2D()
         config = scaler.serialize()
-        self.assertEqual(config, {'min': [], 'max': []})
+        self.assertEqual(config, {'min': [], 'max': [], 'range': []})
 
         X = np.random.rand(10, 5)
         scaler.fit(X)
         config = scaler.serialize()
         self.assertEqual(len(config['min']), 10)
         self.assertEqual(len(config['max']), 10)
+        self.assertEqual(len(config['range']), 10)
 
         try:
             json.dumps(config)

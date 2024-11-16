@@ -26,7 +26,7 @@ class Create3dArraySequenceSetStrategyTestCase(TestCase):
         self.df = pd.DataFrame({'high': [2, 1.5, 2.5, 4, 5],'open': [1, 2, 3, 4, 5], 'close+1': [2, 3, 4, 5, 6]})
         self.sequence_set_2 = SequenceSet.objects.create(dataset_type='stock', sequence_length=2,
                                                        start_timestamp='2020-01-01', end_timestamp='2020-01-05',
-                                                       feature_dict={'open': 1, 'high': 0, 'close+1': 2},
+                                                       feature_dict={'open': 0, 'high': 1, 'close+1': 2},
                                                        metadata={'ticker': 'AAPL'})
         self.stock_sequences = SequenceSetService.create_sequence_objects(self.sequence_set_2, self.df)
         self.stock_sequences = sorted(self.stock_sequences, key=lambda x: x.start_timestamp)
@@ -34,6 +34,10 @@ class Create3dArraySequenceSetStrategyTestCase(TestCase):
 
         config = {
             'step_number': 1,
+            'm_service': 'preprocessing_manager',
+            'parent_strategy': 'ModelSetsStrategy',
+            'type': 'Create3dArraySequenceSetStrategy',
+
         }
         self.strategy = Create3dArraySequenceSetStrategy(config)
 
@@ -82,6 +86,9 @@ class TrainTestSplitDateStrategyTestCase(TestCase):
         self.sequence_set_2.sequences = self.stock_sequences
 
         config = {
+            'parent_strategy': 'ModelSetsStrategy',
+            'm_service': 'preprocessing_manager',
+            'type': 'TrainTestSplitDateStrategy',
             'step_number': 1,
             'split_date': '2020-01-04',
         }
@@ -154,6 +161,7 @@ class ScaleByFeaturesStrategyTestCase(TestCase):
         feature_set_strategy_config = {
             'm_service': 'training_session',
             'type': 'FeatureSetStrategy',
+            'parent_strategy': 'ModelSetsStrategy',
             'step_number': 1,
             'feature_set_configs' : [feature_set_config],
         }
@@ -164,6 +172,7 @@ class ScaleByFeaturesStrategyTestCase(TestCase):
         config = {
             'step_number': 1,
             'm_service': 'preprocessing_manager',
+            'parent_strategy': 'ModelSetsStrategy',
             'type': 'ScaleByFeaturesStrategy',
             'X_feature_dict': {'open': 0, 'high': 1},
             'y_feature_dict': {'close': 0}
@@ -197,6 +206,7 @@ class ScaleByFeaturesStrategyTestCase(TestCase):
         feature_set_strategy_config = {
             'm_service': 'training_session',
             'type': 'FeatureSetStrategy',
+            'parent_strategy': 'ModelSetsStrategy',
             'step_number': 1,
             'feature_set_configs' : [feature_set_config]
         }
@@ -249,6 +259,7 @@ class ScaleByFeaturesStrategyTestCase(TestCase):
 
         feature_set_strategy_config = {
             'm_service': 'training_session',
+            'parent_strategy': 'ModelSetsStrategy',
             'type': 'FeatureSetStrategy',
             'step_number': 1,
             'feature_set_configs' : [feauture_set_config1, feauture_set_config2]
@@ -260,6 +271,7 @@ class ScaleByFeaturesStrategyTestCase(TestCase):
         config = {
             'step_number': 1,
             'm_service': 'preprocessing_manager',
+            'parent_strategy': 'ModelSetsStrategy',
             'type': 'ScaleByFeaturesStrategy',
             'X_feature_dict': {'open': 0, 'high': 1},
             'y_feature_dict': {'close+1': 0}
@@ -287,99 +299,91 @@ class ScaleByFeaturesStrategyTestCase(TestCase):
         np.testing.assert_almost_equal(model_set.X_test_scaled[:, :, 1:2], X_test_scaled2)
 
 
+    def test_applyXyFeatureType1FeatureSet(self):
+        # Prepare feature set configuration
+        feature_set_config = {
+            'scaler_config': {
+                'scaler_name': 'MIN_MAX_SEQ_BY_SEQ_2D'
+            },
+            'feature_list': ['open', 'high', 'close+1'],
+            'secondary_feature_list': ['close+1'],
+            'do_fit_test': False,
+            'feature_set_type': 'Xy',
+        }
 
-    #TODO BROKEN
+        # Prepare feature set strategy configuration
+        feature_set_strategy_config = {
+            'm_service': 'training_session',
+            'type': 'FeatureSetStrategy',
+            'parent_strategy': 'ModelSetsStrategy',
+            'step_number': 1,
+            'feature_set_configs': [feature_set_config]
+        }
 
-    # def test_applyXyFeatureType1FeatureSet(self):
-    #     # Prepare feature set configuration
-    #     feature_set_config = {
-    #         'scaler_config': {
-    #             'scaler_name': 'MIN_MAX_SEQ_BY_SEQ_2D'
-    #         },
-    #         'feature_list': ['open', 'high', 'close+1'],
-    #         'secondary_feature_list': ['close+1'],
-    #         'do_fit_test': False,
-    #         'feature_set_type': 'Xy',
-    #     }
-    #
-    #     # Prepare feature set strategy configuration
-    #     feature_set_strategy_config = {
-    #         'm_service': 'training_session',
-    #         'type': 'FeatureSetStrategy',
-    #         'parent_strategy': 'ModelSetsStrategy',
-    #         'step_number': 1,
-    #         'feature_set_configs': [feature_set_config]
-    #     }
-    #
-    #     # Create feature sets strategy and apply it to the model sets
-    #     feature_set_strategy = CreateFeatureSetsStrategy(feature_set_strategy_config)
-    #     model_sets = feature_set_strategy.apply(self.model_sets)
-    #
-    #     # Prepare the configuration for ScaleByFeaturesStrategy
-    #     config = {
-    #         'step_number': 1,
-    #         'parent_strategy': 'ModelSetsStrategy',
-    #         'm_service': 'preprocessing_manager',
-    #         'type': 'ScaleByFeaturesStrategy',
-    #         'X_feature_dict': {'open': 0, 'high': 1},
-    #         'y_feature_dict': {'close+1': 0}
-    #     }
-    #
-    #     # Create the scaling strategy
-    #     strategy = ScaleByFeaturesStrategy(config)
-    #
-    #     # Deep copy the original data for comparison
-    #     X_train_orig = deepcopy(model_sets[0].X_train)
-    #
-    #     # Apply the scaling strategy to the model sets
-    #     model_sets = strategy.apply(model_sets)
-    #
-    #     # Retrieve the scaled data
-    #     model_set = model_sets[0]
-    #     X_train_scaled = model_set.X_train_scaled
-    #
-    #     # Retrieve the scaler
-    #     scaler = model_set.Xy_feature_sets[0].scaler
-    #
-    #     # Verify that the shape is unchanged
-    #     self.assertEqual(X_train_scaled.shape, X_train_orig.shape)
-    #
-    #     # Prepare feature indices
-    #     arr1_feature_dict = config['X_feature_dict']
-    #     feature_set = model_set.Xy_feature_sets[0]
-    #     arr1_feature_indices = [
-    #         arr1_feature_dict[feature]
-    #         for feature in feature_set.feature_list
-    #         if feature in arr1_feature_dict
-    #     ]
-    #
-    #     # Extract features
-    #     arr1_features = X_train_orig[:, :, arr1_feature_indices]  # Shape: (samples, time_steps, features)
-    #     arr1_scaled_features = X_train_scaled[:, :, arr1_feature_indices]
-    #
-    #     # Reshape arr1_features to (samples, -1)
-    #     arr1_features_reshaped = arr1_features.reshape(arr1_features.shape[0], -1)
-    #     arr1_scaled_features_reshaped = arr1_scaled_features.reshape(arr1_scaled_features.shape[0], -1)
-    #
-    #     # Check inverse transformation for arr1
-    #     arr1_inverse_flat = scaler.inverse_transform(arr1_scaled_features_reshaped)
-    #     arr1_inverse = arr1_inverse_flat.reshape(arr1_features.shape)
-    #
-    #     # Verify that the inverse transformed data matches the original
-    #     np.testing.assert_array_almost_equal(arr1_features, arr1_inverse, decimal=6)
+        # Create feature sets strategy and apply it to the model sets
+        feature_set_strategy = CreateFeatureSetsStrategy(feature_set_strategy_config)
+        model_sets = feature_set_strategy.apply(self.model_sets)
+
+        # Prepare the configuration for ScaleByFeaturesStrategy
+        config = {
+            'step_number': 1,
+            'parent_strategy': 'ModelSetsStrategy',
+            'm_service': 'preprocessing_manager',
+            'type': 'ScaleByFeaturesStrategy',
+            'X_feature_dict': {'open': 0, 'high': 1},
+            'y_feature_dict': {'close+1': 0}
+        }
+
+        # Create the scaling strategy
+        strategy = ScaleByFeaturesStrategy(config)
+
+        # Deep copy the original data for comparison
+        X_test_orig = deepcopy(model_sets[0].X_test)
+
+        # Apply the scaling strategy to the model sets
+        model_sets = strategy.apply(model_sets)
+
+        # Retrieve the scaled data
+        model_set = model_sets[0]
+        X_test_scaled = model_set.X_test_scaled
+
+        # Retrieve the scaler
+        scaler = model_set.Xy_feature_sets[0].scaler
+
+        # Verify that the shape is unchanged
+        self.assertEqual(X_test_scaled.shape, X_test_orig.shape)
+
+        # Prepare feature indices
+        arr1_feature_dict = config['X_feature_dict']
+        feature_set = model_set.Xy_feature_sets[0]
+        arr1_feature_indices = [
+            arr1_feature_dict[feature]
+            for feature in feature_set.feature_list
+            if feature in arr1_feature_dict
+        ]
+
+        # Extract features
+        arr1_features = X_test_orig[:, :, arr1_feature_indices]  # Shape: (samples, time_steps, features)
+        arr1_scaled_features = X_test_scaled[:, :, arr1_feature_indices]
+
+        arr1_scaled_features_reshaped = arr1_scaled_features.reshape(arr1_scaled_features.shape[0], -1)
+
+        # Check inverse transformation for arr1
+        arr1_inverse_flat = scaler.inverse_transform(arr1_scaled_features_reshaped)
+        arr1_inverse = arr1_inverse_flat.reshape(arr1_features.shape)
+
+        # Verify that the inverse transformed data matches the original
+        np.testing.assert_array_almost_equal(arr1_features, arr1_inverse, decimal=6)
 
 
 class CombineDataSetsStrategyTestCase(TestCase):
     def setUp(self):
         model_set1 = ModelSet()
-        model_set1.X_train = np.array([[[1, 2], [2, 1.5]], [[2, 1.5], [3, 2.5]], [[3, 2.5], [4, 4]], [[4, 4], [5, 5]]])
-        model_set1.X_test = np.array([[[4, 4], [5, 5]]])
+        model_set1.X_train_scaled = np.array([[[1, 2], [2, 1.5]], [[2, 1.5], [3, 2.5]], [[3, 2.5], [4, 4]], [[4, 4], [5, 5]]])
+        model_set1.X_test_scaled = np.array([[[4, 4], [5, 5]]])
 
-        model_set1.y_train = np.array([[[3],[4]], [[4],[5]], [[5],[6]],[[6],[7]]])
-        model_set1.y_test = np.array([[[6],[7]]])
-
-        print(model_set1.X_train.shape, model_set1.y_train.shape)
-        print(model_set1.X_test.shape, model_set1.y_test.shape)
+        model_set1.y_train_scaled = np.array([[[3],[4]], [[4],[5]], [[5],[6]],[[6],[7]]])
+        model_set1.y_test_scaled = np.array([[[6],[7]]])
 
         model_set1.train_row_ids = [1, 2, 3, 4]
         model_set1.test_row_ids = [9]
@@ -387,11 +391,11 @@ class CombineDataSetsStrategyTestCase(TestCase):
         self.model_sets = [model_set1]
 
         model_set2 = ModelSet()
-        model_set2.X_train = np.array([[[1, 2], [2, 1.5]], [[2, 1.5], [3, 2.5]], [[3, 2.5], [4, 4]], [[4, 4], [5, 5]]])
-        model_set2.X_test = np.array([[[4, 4], [5, 5]]])
+        model_set2.X_train_scaled = np.array([[[1, 2], [2, 1.5]], [[2, 1.5], [3, 2.5]], [[3, 2.5], [4, 4]], [[4, 4], [5, 5]]])
+        model_set2.X_test_scaled = np.array([[[4, 4], [5, 5]]])
 
-        model_set2.y_train = np.array([[[3],[4]], [[4],[5]], [[5],[6]],[[6],[7]]])
-        model_set2.y_test = np.array([[[6],[7]]])
+        model_set2.y_train_scaled = np.array([[[3],[4]], [[4],[5]], [[5],[6]],[[6],[7]]])
+        model_set2.y_test_scaled = np.array([[[6],[7]]])
 
         model_set2.train_row_ids = [5, 6, 7, 8]
         model_set2.test_row_ids = [10]

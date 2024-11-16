@@ -276,18 +276,16 @@ class MaxSeqBySeqScaler3D(Scaler):
 
 
 class MinMaxSeqBySeqScaler2D(Scaler):
-    #TODO BROKEN
     def __init__(self):
         self.min_ = None
         self.max_ = None
         self.range_ = None
-        self.original_shape = None
 
     def fit(self, X):
-        # Handle both 2D and 3D arrays
+        # Flatten X to 2D if it's 3D
         X_reshaped = self._reshape_input(X)
-        self.min_ = np.min(X_reshaped, axis=1)  # Shape (samples,)
-        self.max_ = np.max(X_reshaped, axis=1)  # Shape (samples,)
+        self.min_ = np.min(X_reshaped, axis=1)  # Shape: (samples,)
+        self.max_ = np.max(X_reshaped, axis=1)  # Shape: (samples,)
         self.range_ = self.max_ - self.min_
         # Avoid division by zero
         self.range_[self.range_ == 0] = 1.0
@@ -311,38 +309,31 @@ class MinMaxSeqBySeqScaler2D(Scaler):
         return self._reshape_output(X, X_scaled)
 
     def _reshape_input(self, X):
-        self.original_shape = X.shape
         if X.ndim == 2:
             # Input is already 2D: (samples, features)
             return X
         elif X.ndim == 3:
-            # Flatten the last two dimensions in 'C' order
-            samples = X.shape[0]
-            return X.reshape(samples, -1, order='C')
+            # Flatten the last two dimensions
+            return X.reshape(X.shape[0], -1)
         else:
             raise ValueError("Input array must be 2D or 3D.")
 
     def _reshape_output(self, X_reshaped, X_original):
-        # Reshape back to the original shape using 'C' order
-        return X_reshaped.reshape(X_original.shape, order='C')
+        # Reshape back to the original shape
+        return X_reshaped.reshape(X_original.shape)
 
     def serialize(self):
         config = {
             'min': self.min_.tolist() if self.min_ is not None else [],
             'max': self.max_.tolist() if self.max_ is not None else [],
+            'range': self.range_.tolist() if self.range_ is not None else [],
         }
         return config
 
     def deserialize(self, config):
         self.min_ = np.array(config['min']) if config['min'] else None
         self.max_ = np.array(config['max']) if config['max'] else None
-        if self.min_ is not None and self.max_ is not None:
-            self.range_ = self.max_ - self.min_
-            self.range_[self.range_ == 0] = 1.0
-        else:
-            self.range_ = None
-
-
+        self.range_ = np.array(config['range']) if config['range'] else None
 
 
 

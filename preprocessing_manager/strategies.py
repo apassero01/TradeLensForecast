@@ -184,7 +184,6 @@ class ScaleByFeaturesStrategy(PreprocessingStrategy):
         return arr1_scaled, arr2_scaled
 
     def scale_Xy_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict, arr2_feature_dict):
-        #TODO BROKEN
         arr1_scaled = np.copy(arr1)
         arr2_scaled = np.copy(arr2)
 
@@ -192,6 +191,7 @@ class ScaleByFeaturesStrategy(PreprocessingStrategy):
             do_fit_test = feature_set.do_fit_test
             scaler = feature_set.scaler
 
+            # Extract feature indices for arr1 and arr2
             arr1_feature_indices = [
                 arr1_feature_dict[feature]
                 for feature in feature_set.feature_list
@@ -205,20 +205,21 @@ class ScaleByFeaturesStrategy(PreprocessingStrategy):
 
             # Extract features from arr1 and arr2
             arr1_features = arr1[:, :, arr1_feature_indices]  # Shape: (samples, time_steps, features)
-            arr2_features = arr2[:, arr2_feature_indices, : ]  # Shape: (samples, time_steps, features)
+            arr2_features = arr2[:, arr2_feature_indices, :]  # Shape: (samples, features, time_steps)
 
-            # Reshape arr1_features and arr2_features to (samples, time_steps * features)
+            # Flatten arr1 and arr2 to 2D arrays
             arr1_reshaped = arr1_features.reshape(arr1_features.shape[0], -1)
             arr2_reshaped = arr2_features.reshape(arr2_features.shape[0], -1)
 
-            # Fit scaler on arr1_reshaped and transform arr2_reshaped
+            # Fit and transform arr1, and transform arr2
             arr1_scaled_flat = scaler.fit_transform(arr1_reshaped)
             arr2_scaled_flat = scaler.transform(arr2_reshaped)
 
-            # Reshape back to original shapes
+            # Reshape scaled data back to original 3D shapes
             arr1_scaled_features = arr1_scaled_flat.reshape(arr1_features.shape)
             arr2_scaled_features = arr2_scaled_flat.reshape(arr2_features.shape)
 
+            # Update scaled arrays
             arr1_scaled[:, :, arr1_feature_indices] = arr1_scaled_features
             arr2_scaled[:, arr2_feature_indices, :] = arr2_scaled_features
 
