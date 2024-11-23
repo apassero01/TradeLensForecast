@@ -4,15 +4,15 @@ from training_session.models import TrainingSession
 
 
 # Create your models here.
-class Trainer(models.Model):
-    model_params = models.JSONField()
-    model_weights_dir = models.CharField(max_length=100)
+class ModelStage(models.Model):
+    model_strategy_request = models.JSONField()
+    model_weights_dir = models.CharField(max_length=100, default=None, null=True)
     training_session = models.ForeignKey(TrainingSession, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
 
 
 class Evaluation(models.Model):
-    trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE)
+    trainer = models.ForeignKey(ModelStage, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
     train_or_test = models.CharField(max_length=10)
     index_range = models.JSONField(default=None, null=True)

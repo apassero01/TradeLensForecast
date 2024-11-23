@@ -5,6 +5,7 @@ import { saveSession, removeSession, getSessionById } from './api';
 import SessionDetails from "./SessionDetails";
 import PageLayout from "./containers/PageLayout";
 import PreprocessingScreen from "./screens/PreprocessingScreen";
+import ModelStageScreen from "./screens/ModelStageScreen";
 
 function TrainingSession() {
   const [sessionState, setSessionState] = useState({
@@ -125,6 +126,14 @@ function TrainingSession() {
 
         {activeTab === 'preprocessing' && (
           <PreprocessingScreen
+            sessionState={sessionState}
+            updateSessionState={updateSessionState}
+            setError={setError}
+            setLoading={setLoading}
+          />
+        )}
+        {activeTab === 'ModelStage' && (
+          <ModelStageScreen
             sessionState={sessionState}
             updateSessionState={updateSessionState}
             setError={setError}

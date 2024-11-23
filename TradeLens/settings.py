@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'training_session',
     'train_eval_manager',
     'preprocessing_manager',
+    'shared_utils',
 
 ]
 

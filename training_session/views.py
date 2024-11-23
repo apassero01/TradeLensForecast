@@ -6,9 +6,13 @@ from django.shortcuts import render
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 
+from shared_utils.models import StrategyRequest
 from training_session.VizProcessingStrategies import HistVizProcessingStrategy
+from training_session.entities.entities import TrainingSessionEntity
+from training_session.services.TrainingSessionEntityService import TrainingSessionEntityService
 from training_session.services.TrainingSessionService import TrainingSessionService, TrainingSessionStatus
 from training_session.services.StrategyService import ModelSetStrategyService, VizProcessingStrategyService
+from training_session.strategy.services.TrainingSessionStrategyService import TrainingSessionStrategyService
 
 
 # Create your views here.
@@ -174,6 +178,42 @@ def post_strategy(request):
     else:
         return JsonResponse({'error': 'POST method required'}, status=400)
 
+@csrf_exempt
+def post_strategy_request(request):
+    print('post_strategy_request')
+    if request.method == 'POST':
+        session = cache.get('current_session')
+        if not session:
+            print('No session in progress')
+            return JsonResponse({'error': 'No session in progress'}, status=400)
+
+        strategy_request_config = json.loads(request.body)["config"]
+
+        if not strategy_request_config:
+            print('strategy is required')
+            return JsonResponse({'error': 'strategy is required'}, status=400)
+
+        training_session_service = TrainingSessionService()
+
+        strategy_name = strategy_request_config['strategy_name']
+        strategy_path = strategy_request_config['strategy_path']
+        param_config = strategy_request_config['param_config']
+        strategy = StrategyRequest(strategy_name = strategy_name, strategy_path = strategy_path, param_config = param_config)
+
+        try:
+            session_entity = TrainingSessionEntity(session)
+            session_entity_service = TrainingSessionEntityService()
+            ret_val = session_entity_service.execute_strat_request(strategy, session_entity)
+            print("Session ordered model set strategies: ", session.ordered_model_set_strategies)
+            session_state = training_session_service.serialize_session(session)
+            cache.set('current_session', session)
+            return JsonResponse({'status': 'success', 'sessionData': session_state, 'ret_val': ret_val})
+        except Exception as e:
+            print("exception")
+            print(str(e))
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'POST method required'}, status=400)
 
 ## Stategy APIs
 @csrf_exempt
@@ -181,6 +221,20 @@ def get_model_set_strategies(request):
     print('get model set strategies')
     if request.method == 'GET':
         strategy_service = ModelSetStrategyService()
+        try:
+            strategies = strategy_service.get_available_strategies()
+            return JsonResponse(strategies, safe=False)
+        except Exception as e:
+            print(str(e))
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'GET method required'}, status=400)
+
+@csrf_exempt
+def get_training_session_strategies(request):
+    print('get training session strategies')
+    if request.method == 'GET':
+        strategy_service = TrainingSessionStrategyService
         try:
             strategies = strategy_service.get_available_strategies()
             return JsonResponse(strategies, safe=False)

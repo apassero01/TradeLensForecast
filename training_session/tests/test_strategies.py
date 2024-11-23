@@ -2,7 +2,7 @@ from django.test import TestCase
 from peewee import Model
 
 from training_session.models import ModelSet
-from training_session.strategies import RetrieveSequenceSetsStrategy, CreateFeatureSetsStrategy
+from training_session.strategy import RetrieveSequenceSetsStrategy, CreateFeatureSetsStrategy
 
 
 # Create your tests here.

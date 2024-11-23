@@ -9,7 +9,7 @@ from preprocessing_manager.strategies import Create3dArraySequenceSetStrategy, T
 from sequenceset_manager.models import SequenceSet
 from sequenceset_manager.services import SequenceSetService
 from training_session.models import ModelSet
-from training_session.strategies import CreateFeatureSetsStrategy
+from training_session.strategy import CreateFeatureSetsStrategy
 
 
 class Create3dArraySequenceSetStrategyTestCase(TestCase):
