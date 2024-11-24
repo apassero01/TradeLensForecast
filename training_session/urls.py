@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import start_training_session, save_session, remove_session, get_sessions, get_session, \
     get_model_set_strategies, post_strategy, get_viz_processing_strategies, get_training_session_strategies, \
-    post_strategy_request
+    post_strategy_request, get_strategy_registry
 
 urlpatterns = [
     path('start_training_session/', start_training_session, name='start_training_session'),
@@ -17,4 +17,7 @@ urlpatterns = [
     path('get_model_set_strategies/', get_model_set_strategies, name='get_model_set_strategies'),
     path('get_viz_processing_strategies/', get_viz_processing_strategies, name='get_viz_processing_strategies'),
     path('get_training_session_strategies', get_training_session_strategies, name='get_training_session_strategies'),
+
+    # new strategy end points
+    path('get_strategy_registry/', get_strategy_registry, name='get_strategy_registry'),
 ]

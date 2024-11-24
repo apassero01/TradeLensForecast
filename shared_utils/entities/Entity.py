@@ -5,6 +5,7 @@ from shared_utils.entities.EnityEnum import EntityEnum
 
 class Entity(ABC):
     entity_name = EntityEnum.ENTITY
+    registered_strategies = []
 
     def __init__(self):
         # Initialize entity_map as an instance variable
@@ -26,6 +27,40 @@ class Entity(ABC):
         if key not in self.entity_map:
             raise ValueError(f"Key {key} not found in entity map")
         return self.entity_map[key]
+
+    def serialize(self):
+        serialized_children = []
+        for key, value in self.entity_map.items():
+                if isinstance(value, Entity):
+                    serialized_children.append(value.serialize())
+                else:
+                    for v in value:
+                        serialized_children.append(v.serialize())
+        return {
+            'entity_name': self.entity_name.value,
+            'children': serialized_children,
+            'meta_data': {}
+        }
+
+    @classmethod
+    def registered_strategies(cls):
+        return [cls.registered_strategies.__name__ for strategy in cls.registered_strategies]
+
+    def to_db(self):
+        """
+        Converts the entity's attributes into a dictionary for database storage.
+        Must be implemented by child classes.
+        """
+        raise NotImplementedError("Child classes must implement the 'to_db' method.")
+
+    @classmethod
+    def from_db(cls, data):
+        """
+        Creates an entity from a database object (or dictionary).
+        Must be implemented by child classes.
+        """
+        raise NotImplementedError("Child classes must implement the 'from_db' method.")
+
 
     @staticmethod
     def get_maximum_members():

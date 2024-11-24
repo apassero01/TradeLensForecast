@@ -5,7 +5,7 @@ from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.models import StrategyRequest
 from train_eval_manager.entities.entities import ModelEntity, ModelStageEntity
-from training_session.entities.entities import TrainingSessionEntity
+from training_session.entities.TrainingSessionEntity import TrainingSessionEntity
 from training_session.services.TrainingSessionEntityService import TrainingSessionEntityService
 
 

@@ -14,7 +14,7 @@ class TrainingSession(models.Model):
     y_feature_dict = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField()
-    ordered_model_set_strategies = models.JSONField()
+    strategy_history = models.JSONField()
     model_set_configs = models.JSONField(default=list)
     start_date = models.DateField(null=True)
     end_date = models.DateField(null=True)

@@ -14,6 +14,7 @@ function TrainingSessionCard({ sessionState }) {
     return shape ? `(${shape.join(', ')})` : 'None';
   };
 
+
   return (
     <div className="bg-[#1e1e1e] shadow-lg rounded-lg p-6 w-full max-w-md border border-gray-700 text-gray-200">
       {!sessionData ? (

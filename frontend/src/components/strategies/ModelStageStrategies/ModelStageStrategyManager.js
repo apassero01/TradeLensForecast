@@ -14,7 +14,7 @@ function ModelStageStrategyManager({ sessionState, updateSessionState }) {
     handleRemoveTempStrategy,
     handleSubmit,
   } = useStrategyData({
-    fetchAvailableEndpoint: 'http://localhost:8000/training_session/get_training_session_strategies',
+    fetchAvailableEndpoint: 'http://localhost:8000/training_session/get_strategy_registry',
     submitEndpoint: 'http://localhost:8000/training_session/post_strategy_request',
     sessionState,
     updateSessionState,

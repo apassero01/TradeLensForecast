@@ -1,3 +1,5 @@
+from markdown_it.rules_inline import entity
+
 from training_session.strategy.TrainingSessionStrategy import CreateModelStageStrategy
 
 

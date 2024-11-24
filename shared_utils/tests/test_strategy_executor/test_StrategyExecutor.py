@@ -1,3 +1,4 @@
+from unittest.mock import MagicMock
 from xxlimited import Error
 
 from django.test import TestCase
@@ -141,3 +142,43 @@ class StrategyExecutorTestCase(TestCase):
 
         # Ensure that Strategy1 did not complete its execution due to the nested failure
         self.assertFalse(self.strategy_request1.param_config.get("strategy1_executed", False))
+
+    def test_resolve_strat_request_path(self):
+        """Test resolving the path in a strategy request to fetch the correct entity."""
+        # Add a valid path to the strategy request
+        self.strategy_request1.strategy_path = "entity1.session.sequence_sets"
+
+        # Mock the session and sequence_sets structure
+        session_entity = MagicMock()
+        sequence_sets_mock = MagicMock()
+        session_entity.get_entity.return_value = sequence_sets_mock
+
+        # Simulate entity map with session
+        self.entity1.set_entity_map({"session": session_entity})
+
+        # Call resolve_strat_request_path
+        resolved_entity = self.executor.resolve_strat_request_path(self.strategy_request1, self.entity1)
+
+        # Verify that the session's sequence_sets were accessed
+        session_entity.get_entity.assert_called_once_with("sequence_sets")
+
+        # Ensure the resolved entity is the mock for sequence_sets
+        self.assertEqual(resolved_entity, sequence_sets_mock)
+
+    def test_resolve_strat_request_path_invalid(self):
+        """Test resolving an invalid path raises an appropriate error."""
+        # Add an invalid path to the strategy request
+        self.strategy_request1.strategy_path = "session.invalid_key"
+
+        # Mock the session structure
+        session_entity = MagicMock()
+        session_entity.get_entity.side_effect = lambda key: None if key == "invalid_key" else MagicMock()
+
+        # Simulate entity map with session
+        self.entity1.set_entity_map({"session": session_entity})
+
+        # Expect a ValueError when resolving the invalid path
+        with self.assertRaises(ValueError) as context:
+            self.executor.resolve_strat_request_path(self.strategy_request1, self.entity1)
+
+        # Verify the exception message

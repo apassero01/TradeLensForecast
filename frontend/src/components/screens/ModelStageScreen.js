@@ -6,13 +6,14 @@ import VizStrategyManager from "../strategies/VisualizationStrategies/VizStrateg
 import VisualizationContainer from "../Visualization/VisualizationContainer";
 import VisualizationScreen from "../Visualization/VisualizationScreen";
 import ModelStageStrategyManager from "../strategies/ModelStageStrategies/ModelStageStrategyManager";
+import SessionEntityMap from "../session/SessionEntityMap";
 
 function ModelStageScreen({ sessionState, updateSessionState, setError, setLoading }) {
   return (
     <div className="flex min-h-screen w-full bg-[#1a1a1a] text-gray-100">
       {/* Sidebar for Training Session Card */}
       <div className="w-1/5 min-h-screen bg-[#2b2b2b] p-4 rounded-lg shadow-lg mr-4 border border-gray-700 flex-shrink-0">
-        <TrainingSessionCard sessionState={sessionState} />
+        <SessionEntityMap sessionData={sessionState.sessionData} />
       </div>
 
       {/* Main content area for strategy managers */}

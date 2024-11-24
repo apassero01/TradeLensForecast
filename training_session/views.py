@@ -5,10 +5,13 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
+from html5lib.treewalkers.base import ENTITY
 
+from shared_utils.entities.Entity import Entity
 from shared_utils.models import StrategyRequest
+from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 from training_session.VizProcessingStrategies import HistVizProcessingStrategy
-from training_session.entities.entities import TrainingSessionEntity
+from training_session.entities.TrainingSessionEntity import TrainingSessionEntity
 from training_session.services.TrainingSessionEntityService import TrainingSessionEntityService
 from training_session.services.TrainingSessionService import TrainingSessionService, TrainingSessionStatus
 from training_session.services.StrategyService import ModelSetStrategyService, VizProcessingStrategyService
@@ -180,10 +183,15 @@ def post_strategy(request):
 
 @csrf_exempt
 def post_strategy_request(request):
+
     print('post_strategy_request')
     if request.method == 'POST':
-        session = cache.get('current_session')
-        if not session:
+        session_entity = cache.get('current_session')
+
+        if not isinstance(session_entity, Entity):
+            session_entity = TrainingSessionEntity.from_db(session_entity)
+
+        if not session_entity:
             print('No session in progress')
             return JsonResponse({'error': 'No session in progress'}, status=400)
 
@@ -200,13 +208,14 @@ def post_strategy_request(request):
         param_config = strategy_request_config['param_config']
         strategy = StrategyRequest(strategy_name = strategy_name, strategy_path = strategy_path, param_config = param_config)
 
+
         try:
-            session_entity = TrainingSessionEntity(session)
             session_entity_service = TrainingSessionEntityService()
             ret_val = session_entity_service.execute_strat_request(strategy, session_entity)
-            print("Session ordered model set strategies: ", session.ordered_model_set_strategies)
-            session_state = training_session_service.serialize_session(session)
-            cache.set('current_session', session)
+            for key, value in session_entity.get_entity_map().items():
+                print(key, value)
+            session_state = session_entity_service.serialize_entity_tree(session_entity)
+            cache.set('current_session', session_entity)
             return JsonResponse({'status': 'success', 'sessionData': session_state, 'ret_val': ret_val})
         except Exception as e:
             print("exception")
@@ -251,6 +260,19 @@ def get_viz_processing_strategies(request):
         strategy_service = VizProcessingStrategyService()
         try:
             strategies = strategy_service.get_available_strategies()
+            return JsonResponse(strategies, safe=False)
+        except Exception as e:
+            print(str(e))
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'GET method required'}, status=400)
+
+@csrf_exempt
+def get_strategy_registry(request):
+    print('get strategy registry')
+    if request.method == 'GET':
+        try:
+            strategies = StrategyExecutorService.get_registry()
             return JsonResponse(strategies, safe=False)
         except Exception as e:
             print(str(e))

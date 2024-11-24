@@ -81,6 +81,26 @@ class StrategyExecutor:
             self.strategies = {}
         self.strategies[strategy_name] = strategy_cls
 
+    def resolve_strat_request_path(self, strat_request, entity):
+        path = strat_request.strategy_path
+        if not path:
+            raise ValueError('Path not found in strat request')
+
+        path_components = path.split('.')
+        path_components = path_components[1:]
+
+        if len(path_components) == 0:
+            return entity
+
+        current_entity = entity
+        for component in path_components:
+            current_entity = current_entity.get_entity(component)
+            if not current_entity:
+                raise ValueError(f'Entity not found for path {path}')
+
+        return current_entity
+
+
     @classmethod
     def destroy(cls):
         with cls._lock:
