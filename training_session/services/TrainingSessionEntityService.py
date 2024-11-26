@@ -7,19 +7,21 @@ from training_session.models import TrainingSession
 from training_session.strategy.TrainingSessionStrategy import CreateModelStageStrategy
 
 class TrainingSessionEntityService:
-    def __init__(self, session):
+    def __init__(self):
         self.strategy_executor = StrategyExecutor()
         self.strategy_executor_service = StrategyExecutorService(self.strategy_executor)
+
+    def set_session(self, session):
         self.session = session
 
-
     def create_training_session_entity(self):
-        return TrainingSessionEntity()
+        self.session = TrainingSessionEntity()
+        return self.session
 
-    def initialize_params(self, X_features, y_features, model_set_configs, start_date, end_date=None):
+    def initialize_params(self, X_features, y_features, sequence_set_params, start_date, end_date=None):
         self.session.X_features = X_features
         self.session.y_features = y_features
-        self.session.model_set_configs = model_set_configs
+        self.session.sequence_set_params = sequence_set_params
         self.session.start_date = start_date
         return self.session
 
@@ -42,42 +44,44 @@ class TrainingSessionEntityService:
 
 
     def execute_strat_request(self, strat_request, session_entity):
-        entity = self.resolve_strat_request_path(strat_request, session_entity)
 
-        return self.strategy_executor.execute(entity, strat_request)
+        strat_request =  self.strategy_executor_service.execute(session_entity, strat_request)
+        if strat_request.add_to_history:
+            session_entity.add_to_strategy_history(strat_request)
 
-    def resolve_strat_request_path(self, strat_request, session_entity):
-        path = strat_request.strategy_path
-        if not path:
-            raise ValueError('Path not found in strat request')
-
-        path_components = path.split('.')
-        path_components = path_components[1:]  # Remove the first component, which is the root entity
-        num_components = len(path_components)
-
-        if num_components == 0:
-            return session_entity
-
-        current_entity = session_entity
-        for i, component in enumerate(path_components):
-            current_entity = current_entity.get_entity(component)
-            if not current_entity:
-                raise ValueError(f'Entity not found for path {path}')
-
-            if i == num_components - 1:
-                return current_entity
-
-        raise ValueError(f'Entity not found for path {path}')
+    # def resolve_strat_request_path(self, strat_request, session_entity):
+    #     path = strat_request.strategy_path
+    #     if not path:
+    #         raise ValueError('Path not found in strat request')
+    #
+    #     path_components = path.split('.')
+    #     path_components = path_components[1:]  # Remove the first component, which is the root entity
+    #     num_components = len(path_components)
+    #
+    #     if num_components == 0:
+    #         return session_entity
+    #
+    #     current_entity = session_entity
+    #     for i, component in enumerate(path_components):
+    #         current_entity = current_entity.get_entity(component)
+    #         if not current_entity:
+    #             raise ValueError(f'Entity not found for path {path}')
+    #
+    #         if i == num_components - 1:
+    #             return current_entity
+    #
+    #     raise ValueError(f'Entity not found for path {path}')
 
     def serialize_entity_tree(self):
         return self.session.serialize()
 
     def serialize_session(self):
         return {
-            'session_id': self.session.id,
+            'session_id': "test",
             'status': TrainingSessionStatus(self.session.status).name,
             'created_at': self.session.created_at,
-            'entity_map': self.serialize_entity_tree()
+            'entity_map': self.serialize_entity_tree(),
+            'strategy_history': [strategy_request.serialize() for strategy_request in self.session.strategy_history]
         }
 
 

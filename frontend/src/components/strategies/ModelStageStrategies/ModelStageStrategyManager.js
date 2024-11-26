@@ -18,7 +18,7 @@ function ModelStageStrategyManager({ sessionState, updateSessionState }) {
     submitEndpoint: 'http://localhost:8000/training_session/post_strategy_request',
     sessionState,
     updateSessionState,
-    strategyKey: 'none',
+    strategyKey: 'strategy_history',
     options: {
       manageTempStrategies: true,
       manageExistingStrategies: true,

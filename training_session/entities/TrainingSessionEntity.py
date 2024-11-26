@@ -21,6 +21,10 @@ class TrainingSessionEntity(Entity):
         self.X_feature_dict = None
         self.y_feature_dict = None
         self.strategy_history = []
+        self.sequence_set_params = []
+
+    def add_to_strategy_history(self, strategy_request):
+        self.strategy_history.append(strategy_request)
 
     @staticmethod
     def get_maximum_members():
@@ -58,6 +62,7 @@ class TrainingSessionAdapter:
         entity.X_feature_dict = model.X_feature_dict
         entity.y_feature_dict = model.y_feature_dict
         entity.strategy_history = model.strategy_history
+        entity.sequence_set_params = model.sequence_set_params
         return entity
 
     @staticmethod
@@ -82,5 +87,6 @@ class TrainingSessionAdapter:
         model.X_feature_dict = entity.X_feature_dict
         model.y_feature_dict = entity.y_feature_dict
         model.strategy_history = entity.strategy_history
+        model.sequence_set_params = entity.sequence_set_params
         return model
 

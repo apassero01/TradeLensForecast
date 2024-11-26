@@ -87,12 +87,12 @@ function EntityMapCard({ sessionData }) {
 
   return (
     <div className="bg-[#1e1e1e] shadow-lg rounded-lg p-6 w-full max-w-md border border-gray-700 text-gray-200">
-      {!sessionData ? (
+      {!sessionData.entity_map ? (
         <p className="text-gray-400">Loading entity data...</p>
       ) : (
         <div>
           <h2 className="text-2xl font-bold text-blue-500 mb-4">Entity Map</h2>
-          {renderEntity(sessionData)}
+          {renderEntity(sessionData.entity_map)}
         </div>
       )}
     </div>

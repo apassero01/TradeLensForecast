@@ -34,6 +34,8 @@ class LoadDataBundleDataStrategy(DataBundleStrategy):
         param_config = self.strategy_request.param_config
         data_bundle.set_dataset(param_config)
 
+        return self.strategy_request
+
     def verify_executable(self, entity, strategy_request):
         raise NotImplementedError("Child classes must implement the 'verify_executable' method.")
 
@@ -60,6 +62,8 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
             feature_sets.append(feature_set)
 
         data_bundle.set_entity_map({EntityEnum.FEATURE_SETS.value: feature_sets})
+
+        return self.strategy_request
 
 
     def verify_executable(self, entity, strategy_request):
@@ -113,6 +117,8 @@ class SplitBundleDateStrategy(DataBundleStrategy):
                                  'y_test': y_test,
                                  'train_row_ids': train_row_ids,
                                  'test_row_ids': test_row_ids})
+
+        return self.strategy_request
 
     def train_test_split(self, data_bundle, split_date, date_list):
         X = data_bundle.dataset['X']
@@ -185,6 +191,8 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         if len(Xy_feature_sets) > 0:
             data_bundle.dataset['X_train_scaled'], data_bundle.dataset['y_train_scaled'] = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.dataset['X_train'], data_bundle.dataset['y_train'], X_feature_dict, y_feature_dict)
             data_bundle.dataset['X_test_scaled'], data_bundle.dataset['y_test_scaled'] = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.dataset['X_test'], data_bundle.dataset['y_test'], X_feature_dict, y_feature_dict)
+
+        return self.strategy_request
 
     def scale_X_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict):
         arr1_scaled = np.zeros(arr1.shape)

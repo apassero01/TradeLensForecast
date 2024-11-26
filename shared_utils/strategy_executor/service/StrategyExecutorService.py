@@ -48,6 +48,11 @@ class StrategyExecutorService:
         self.register_strategies()
 
 
+    def execute(self, entity, strategy_request):
+        entity = self.strategy_executor.resolve_strat_request_path(strategy_request, entity)
+        return self.strategy_executor.execute(entity, strategy_request)
+
+
     def register_strategies(self):
         for entity, strategies in StrategyExecutorService.registry.items():
             for strategy in strategies:

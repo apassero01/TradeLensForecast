@@ -45,6 +45,8 @@ class CreateDataBundleStrategy(SequenceSetStrategy):
             data_bundle = self.create_bundle(sequence_set)
             sequence_set.set_entity_map({EntityEnum.DATA_BUNDLE.value: data_bundle})
 
+        return self.strategy_request
+
     def create_bundle(self, sequence_sets):
         data_bundle = DataBundleEntity()
         return data_bundle
@@ -78,6 +80,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
                                                             X_feature_dict, y_feature_dict)
             data_bundle = sequence_set.get_entity(EntityEnum.DATA_BUNDLE.value)
             self.strategy_executor.execute(data_bundle, strategy_request)
+        return self.strategy_request
 
 
     def create_strategy_request(self, X, y , row_ids, X_feature_dict, y_feature_dict):
@@ -166,6 +169,8 @@ class SplitAllBundlesDataStrategy(SequenceSetStrategy):
             bundle_strategy_request = self.create_strategy_request(dates, split_date)
             self.strategy_executor.execute(data_bundle, bundle_strategy_request)
 
+        return self.strategy_request
+
     def create_strategy_request(self, dates, split_date):
         strategy_request = StrategyRequestEntity()
         strategy_request.strategy_name = SplitBundleDateStrategy.__name__
@@ -207,6 +212,8 @@ class ScaleSeqSetsByFeaturesStrategy(SequenceSetStrategy):
             data_bundle = sequence_set.get_entity(EntityEnum.DATA_BUNDLE.value)
             bundle_strategy_request = self.create_strategy_request()
             self.strategy_executor.execute(data_bundle, bundle_strategy_request)
+
+        return self.strategy_request
 
     def create_strategy_request(self):
         strategy_request = StrategyRequestEntity()

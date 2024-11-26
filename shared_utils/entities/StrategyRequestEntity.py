@@ -17,6 +17,7 @@ class StrategyRequestEntity(Entity):
         self.id = None
         self.ret_val = {}
         self.is_applied = False # Flag to indicate if the strategy has been applied
+        self.add_to_history = True # Flag to indicate if the strategy should be added to the history
 
     def to_db(self):
         return StrategyRequestAdapter.entity_to_model(self)
@@ -24,6 +25,16 @@ class StrategyRequestEntity(Entity):
     @classmethod
     def from_db(cls, data):
         return StrategyRequestAdapter.model_to_entity(data)
+
+    def serialize(self):
+        return {
+            'name': self.strategy_name,
+            'config': {
+                'strategy_name': self.strategy_name,
+                'param_config': self.param_config,
+                'strategy_path': self.strategy_path,
+            }
+        }
 
 
 class StrategyRequestAdapter:
@@ -40,6 +51,7 @@ class StrategyRequestAdapter:
 
         entity.created_at = model.created_at
         entity.updated_at = model.updated_at
+        entity.add_to_history = model.add_to_history
 
         return entity
 
@@ -58,7 +70,8 @@ class StrategyRequestAdapter:
                                         param_config=entity.param_config,
                                         nested_requests=entity.nested_requests,
                                         created_at=entity.created_at,
-                                        updated_at=entity.updated_at)
+                                        updated_at=entity.updated_at,
+                                        add_to_history=entity.add_to_history)  # Create a new instance
         return model
 
 

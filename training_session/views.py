@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from html5lib.treewalkers.base import ENTITY
 
 from shared_utils.entities.Entity import Entity
+from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.models import StrategyRequest
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 from training_session.VizProcessingStrategies import HistVizProcessingStrategy
@@ -27,7 +28,7 @@ def start_training_session(request):
             print('A session is already in progress')
             return JsonResponse({'error': 'A session is already in progress'}, status=400)
 
-        training_session_service = TrainingSessionService()
+        training_session_service = TrainingSessionEntityService()
 
         sequence_params = request.POST.get('sequence_params')  # This will be a JSON string
         start_timestamp = request.POST.get('start_timestamp')
@@ -61,20 +62,20 @@ def start_training_session(request):
 
         session = None
         try:
-            session = training_session_service.create_training_session()
+            session = training_session_service.create_training_session_entity()
 
             print('session created')
             print("Sequence params: ", sequence_params)
             print("X_features: ", X_features)
             print("y_features: ", y_features)
 
-            session = training_session_service.initialize_params(session, X_features, y_features, sequence_params, start_timestamp)
+            session = training_session_service.initialize_params(X_features, y_features, sequence_params, start_timestamp)
 
             cache.set('current_session', session)
 
             return JsonResponse({
                 'status': 'success',
-                'sessionData': training_session_service.serialize_session(session)
+                'sessionData': training_session_service.serialize_session()
             })
         except Exception as e:
             if session is not None:
@@ -201,20 +202,27 @@ def post_strategy_request(request):
             print('strategy is required')
             return JsonResponse({'error': 'strategy is required'}, status=400)
 
-        training_session_service = TrainingSessionService()
+        training_session_service = TrainingSessionEntityService()
+        training_session_service.set_session(session_entity)
 
         strategy_name = strategy_request_config['strategy_name']
         strategy_path = strategy_request_config['strategy_path']
         param_config = strategy_request_config['param_config']
-        strategy = StrategyRequest(strategy_name = strategy_name, strategy_path = strategy_path, param_config = param_config)
+        strategy = StrategyRequestEntity()
+        strategy.strategy_name = strategy_name
+        strategy.strategy_path = strategy_path
+        strategy.param_config = param_config
+        if strategy_name == 'GetSequenceSetsStrategy':
+            strategy.param_config['model_set_configs'] = session_entity.sequence_set_params
+            strategy.param_config['X_features'] = session_entity.X_features
+            strategy.param_config['y_features'] = session_entity.y_features
 
 
         try:
-            session_entity_service = TrainingSessionEntityService()
-            ret_val = session_entity_service.execute_strat_request(strategy, session_entity)
+            ret_val = training_session_service.execute_strat_request(strategy, session_entity)
             for key, value in session_entity.get_entity_map().items():
                 print(key, value)
-            session_state = session_entity_service.serialize_entity_tree(session_entity)
+            session_state = training_session_service.serialize_session()
             cache.set('current_session', session_entity)
             return JsonResponse({'status': 'success', 'sessionData': session_state, 'ret_val': ret_val})
         except Exception as e:

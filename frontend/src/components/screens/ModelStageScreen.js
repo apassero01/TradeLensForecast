@@ -7,6 +7,8 @@ import VisualizationContainer from "../Visualization/VisualizationContainer";
 import VisualizationScreen from "../Visualization/VisualizationScreen";
 import ModelStageStrategyManager from "../strategies/ModelStageStrategies/ModelStageStrategyManager";
 import SessionEntityMap from "../session/SessionEntityMap";
+import EntityMapCard from "../session/SessionEntityMap";
+import EntityMap from "../session/EntityMap";
 
 function ModelStageScreen({ sessionState, updateSessionState, setError, setLoading }) {
   return (
@@ -23,6 +25,8 @@ function ModelStageScreen({ sessionState, updateSessionState, setError, setLoadi
           sessionState={sessionState}
           updateSessionState={updateSessionState}
         />
+
+          <EntityMap sessionData={sessionState.sessionData} />
 
       </div>
     </div>

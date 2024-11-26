@@ -88,6 +88,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                 raise ValueError("Failed to retrieve sequence data " + response.json()['error'] )
 
         session_entity.set_entity_map({EntityEnum.SEQUENCE_SETS.value: sequence_sets})
+        return self.strategy_request
 
     def verify_executable(self, session_entity, strategy_request):
         config = strategy_request.param_config
@@ -126,6 +127,8 @@ class CreateModelStageStrategy(TrainingSessionStrategy):
 
         training_session_entity.set_entity_map({ModelStageEntity.entity_name: model_stage_entity})
 
+        return self.strategy_request
+
     def verify_executable(self, session_entity, strategy_request):
         pass
 
@@ -152,6 +155,7 @@ class GetDataBundleStrategy(TrainingSessionStrategy):
         nested_request = self.strategy_executor.execute(nested_entity, nested_request)
         session_entity.set_entity_map({EntityEnum.DATA_BUNDLE.value: nested_request.ret_val[EntityEnum.DATA_BUNDLE.value]})
 
+        return self.strategy_request
 
     def verify_executable(self, session_entity, strategy_request):
         pass

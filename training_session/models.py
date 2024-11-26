@@ -15,7 +15,7 @@ class TrainingSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField()
     strategy_history = models.JSONField()
-    model_set_configs = models.JSONField(default=list)
+    sequence_set_params = models.JSONField(default=list)
     start_date = models.DateField(null=True)
     end_date = models.DateField(null=True)
 
