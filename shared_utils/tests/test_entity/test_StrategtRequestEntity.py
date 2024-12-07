@@ -39,12 +39,12 @@ class TestStrategyRequestEntity(TestCase):
         self.assertEqual(entity.param_config, {"main_param": "main_value"})
 
         # Check nested requests
-        self.assertEqual(len(entity.nested_requests), 2)
-        nested_request_1 = entity.nested_requests[0]
+        self.assertEqual(len(entity._nested_requests), 2)
+        nested_request_1 = entity._nested_requests[0]
         self.assertEqual(nested_request_1.strategy_name, "NestedStrategy1")
         self.assertEqual(nested_request_1.param_config, {"param1": "value1"})
 
-        nested_request_2 = entity.nested_requests[1]
+        nested_request_2 = entity._nested_requests[1]
         self.assertEqual(nested_request_2.strategy_name, "NestedStrategy2")
         self.assertEqual(nested_request_2.param_config, {"param2": "value2"})
 

@@ -1,12 +1,18 @@
 from abc import ABC, abstractmethod
+import importlib
+from typing import Any, Dict
 
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
+from shared_utils.entities.Entity import Entity
 
 
 class Strategy(ABC):
     entity_type = EntityEnum.ENTITY
+
+    strategy_description = 'This is the base strategy class'
+    
     def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
         self.strategy_request = strategy_request
         self.strategy_executor = strategy_executor
@@ -16,9 +22,9 @@ class Strategy(ABC):
         """Apply the strategy to the entity."""
         pass
 
-    @abstractmethod
     def verify_executable(self, entity, strategy_request):
-        raise NotImplementedError("Child classes must implement the 'verify_executable' method.")
+        """Base implementation that can be overridden by child classes"""
+        return True
 
     @staticmethod
     def get_request_config():
@@ -31,3 +37,91 @@ class Strategy(ABC):
             'config': cls.get_request_config()
         }
 
+
+
+class CreateEntityStrategy(Strategy):
+    """Generic strategy for creating any entity type"""
+    strategy_description = 'Creates a new entity and adds it as a child to the parent entity'
+    
+    def verify_executable(self, entity, strategy_request):
+        return 'entity_class' in strategy_request.param_config
+
+    def apply(self, parent_entity: Entity) -> StrategyRequestEntity:
+        """
+        Creates a new entity and adds it as a child to the parent entity
+        
+        param_config requirements:
+        - entity_class: fully qualified path to entity class
+        - entity_uuid: (optional) UUID to use for recreation
+        """
+        config = self.strategy_request.param_config
+        entity_class_path = config.get('entity_class')
+        
+        # Import the entity class
+        try:
+            module_path, class_name = entity_class_path.rsplit('.', 1)
+            module = importlib.import_module(module_path)
+            entity_class = getattr(module, class_name)
+        except (ImportError, AttributeError) as e:
+            raise ValueError(f"Failed to import entity class: {entity_class_path}") from e
+        
+        # Create entity with UUID if provided (recreation case)
+        entity_uuid = config.get('entity_uuid')
+        new_entity = entity_class(entity_id=entity_uuid)
+        
+        # Store UUID in param_config if this is a new entity
+        if entity_uuid is None:
+            self.strategy_request.param_config['entity_uuid'] = new_entity.entity_id
+            
+        # Add as child to parent
+        new_entity.on_create(self.strategy_request.param_config)
+        
+        parent_entity.add_child(new_entity)
+        
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'entity_class': '',
+            'entity_uuid': None  # Added to show it's an expected config option
+        }
+
+
+class AssignAttributesStrategy(Strategy):
+    """Generic strategy for assigning attributes between entities"""
+
+    strategy_description = 'Assigns attributes from parent to child entity based on mapping'
+        
+    def verify_executable(self, entity, strategy_request):
+        config = strategy_request.param_config
+        return all(key in config for key in ['child_path', 'attribute_map'])
+
+    def apply(self, parent_entity: Entity) -> Entity:
+        """
+        Assigns attributes from parent to child entity based on mapping
+        
+        param_config requirements:
+        - child_path: path to child entity
+        - attribute_map: dict mapping child attribute names to values
+        """
+        config = self.strategy_request.param_config
+        child_path = config.get('child_path')
+        attribute_map = config.get('attribute_map', {})
+        
+        # Find child entity
+        child_entity = parent_entity.find_entity_by_path(child_path)
+        if not child_entity:
+            raise ValueError(f"Child entity not found at path: {child_path}")
+            
+        # Assign attributes
+        child_entity.set_attributes(attribute_map)
+                
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'child_path': '',
+            'attribute_map': {}
+        }

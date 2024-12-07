@@ -1,6 +1,7 @@
 from shared_utils.entities.Entity import Entity
-
+from shared_utils.entities.EnityEnum import EntityEnum
 class FeatureSetEntity(Entity):
+    entity_name = EntityEnum.FEATURE_SET
     def __init__(self):
         super().__init__()
         self.feature_list = []

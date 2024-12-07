@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 
@@ -22,30 +24,30 @@ class DataBundleStrategy(Strategy):
         return {}
 
 
-class LoadDataBundleDataStrategy(DataBundleStrategy):
-    name = "LoadDataBundleData"
+# class LoadDataBundleDataStrategy(DataBundleStrategy):
+#     name = "LoadDataBundleData"
 
-    def __init__(self, strategy_executor, strategy_request):
-        super().__init__(strategy_executor, strategy_request)
-        self.strategy_request = strategy_request
-        self.strategy_executor = strategy_executor
+#     def __init__(self, strategy_executor, strategy_request):
+#         super().__init__(strategy_executor, strategy_request)
+#         self.strategy_request = strategy_request
+#         self.strategy_executor = strategy_executor
 
-    def apply(self, data_bundle):
-        param_config = self.strategy_request.param_config
-        data_bundle.set_dataset(param_config)
+#     def apply(self, data_bundle):
+#         param_config = self.strategy_request.param_config
+#         data_bundle.set_dataset(param_config)
 
-        return self.strategy_request
+#         return self.strategy_request
 
-    def verify_executable(self, entity, strategy_request):
-        raise NotImplementedError("Child classes must implement the 'verify_executable' method.")
+#     def verify_executable(self, entity, strategy_request):
+#         raise NotImplementedError("Child classes must implement the 'verify_executable' method.")
 
-    @staticmethod
-    def get_request_config():
-        return {
-            'strategy_name': LoadDataBundleDataStrategy.__name__,
-            'strategy_path': None,
-            'param_config': {}
-        }
+#     @staticmethod
+#     def get_request_config():
+#         return {
+#             'strategy_name': LoadDataBundleDataStrategy.__name__,
+#             'strategy_path': None,
+#             'param_config': {}
+#         }
 
 class CreateFeatureSetsStrategy(DataBundleStrategy):
     name = "CreateFeatureSets"
@@ -61,7 +63,8 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
             feature_set = self.feature_set_entity_service.create_feature_set(config)
             feature_sets.append(feature_set)
 
-        data_bundle.set_entity_map({EntityEnum.FEATURE_SETS.value: feature_sets})
+        for feature_set in feature_sets:
+            data_bundle.add_child(feature_set)
 
         return self.strategy_request
 
@@ -111,19 +114,19 @@ class SplitBundleDateStrategy(DataBundleStrategy):
         self.verify_executable(data_bundle, self.strategy_request)
         param_config = self.strategy_request.param_config
         X_train, X_test, y_train, y_test, train_row_ids, test_row_ids = self.train_test_split(data_bundle, param_config['split_date'], param_config['date_list'])
-        data_bundle.set_dataset({'X_train': X_train,
-                                 'X_test': X_test,
-                                 'y_train': y_train,
-                                 'y_test': y_test,
-                                 'train_row_ids': train_row_ids,
-                                 'test_row_ids': test_row_ids})
+        data_bundle.set_attribute('X_train', X_train)
+        data_bundle.set_attribute('X_test', X_test)
+        data_bundle.set_attribute('y_train', y_train)
+        data_bundle.set_attribute('y_test', y_test)
+        data_bundle.set_attribute('train_row_ids', train_row_ids)
+        data_bundle.set_attribute('test_row_ids', test_row_ids)
 
         return self.strategy_request
 
     def train_test_split(self, data_bundle, split_date, date_list):
-        X = data_bundle.dataset['X']
-        y = data_bundle.dataset['y']
-        row_ids = data_bundle.dataset['row_ids']
+        X = data_bundle.get_attribute('X')
+        y = data_bundle.get_attribute('y')
+        row_ids = data_bundle.get_attribute('row_ids')
 
         split_date = pd.to_datetime(split_date).tz_localize(None)
         date_list = [pd.to_datetime(date).tz_localize(None) for date in date_list]
@@ -149,11 +152,11 @@ class SplitBundleDateStrategy(DataBundleStrategy):
             raise ValueError("Missing split_date in config")
         if 'date_list' not in param_config.keys():
             raise ValueError("Missing date_list in config")
-        if 'X' not in entity.dataset.keys():
+        if not entity.has_attribute('X'):
             raise ValueError("Missing X in dataset")
-        if 'y' not in entity.dataset.keys():
+        if not entity.has_attribute('y'):
             raise ValueError("Missing y in dataset")
-        if 'row_ids' not in entity.dataset.keys():
+        if not entity.has_attribute('row_ids'):
             raise ValueError("Missing row_ids in dataset")
 
     @staticmethod
@@ -176,21 +179,30 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
     def apply(self, data_bundle):
         self.verify_executable(data_bundle, self.strategy_request)
         param_config = self.strategy_request.param_config
-        X_feature_dict = data_bundle.dataset['X_feature_dict']
-        y_feature_dict = data_bundle.dataset['y_feature_dict']
-        feature_sets = data_bundle.get_entity(EntityEnum.FEATURE_SETS.value)
+        X_feature_dict = data_bundle.get_attribute('X_feature_dict')
+        y_feature_dict = data_bundle.get_attribute('y_feature_dict')
+        feature_sets = data_bundle.get_children_by_type(EntityEnum.FEATURE_SET)
 
         X_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'X']
         y_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'y']
         Xy_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'Xy']
 
         if len(X_feature_sets) > 0:
-            data_bundle.dataset['X_train_scaled'], data_bundle.dataset['X_test_scaled'] = self.scale_X_by_features(X_feature_sets, data_bundle.dataset['X_train'], data_bundle.dataset['X_test'], X_feature_dict)
+            X_train_scaled, X_test_scaled = self.scale_X_by_features(X_feature_sets, data_bundle.get_attribute('X_train'), data_bundle.get_attribute('X_test'), X_feature_dict)
+            data_bundle.set_attribute('X_train_scaled', X_train_scaled)
+            data_bundle.set_attribute('X_test_scaled', X_test_scaled)
         if len(y_feature_sets) > 0:
-            data_bundle.dataset['y_train_scaled'], data_bundle.dataset['y_test_scaled'] = self.scale_y_by_features(y_feature_sets, data_bundle.dataset['y_train'], data_bundle.dataset['y_test'], y_feature_dict)
+            y_train_scaled, y_test_scaled = self.scale_y_by_features(y_feature_sets, data_bundle.get_attribute('y_train'), data_bundle.get_attribute('y_test'), y_feature_dict)
+            data_bundle.set_attribute('y_train_scaled', y_train_scaled)
+            data_bundle.set_attribute('y_test_scaled', y_test_scaled)
         if len(Xy_feature_sets) > 0:
-            data_bundle.dataset['X_train_scaled'], data_bundle.dataset['y_train_scaled'] = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.dataset['X_train'], data_bundle.dataset['y_train'], X_feature_dict, y_feature_dict)
-            data_bundle.dataset['X_test_scaled'], data_bundle.dataset['y_test_scaled'] = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.dataset['X_test'], data_bundle.dataset['y_test'], X_feature_dict, y_feature_dict)
+            X_train_scaled, y_train_scaled = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.get_attribute('X_train'), data_bundle.get_attribute('y_train'), X_feature_dict, y_feature_dict)
+            X_test_scaled, y_test_scaled = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.get_attribute('X_test'), data_bundle.get_attribute('y_test'), X_feature_dict, y_feature_dict)
+
+            data_bundle.set_attribute('X_train_scaled', X_train_scaled)
+            data_bundle.set_attribute('y_train_scaled', y_train_scaled)
+            data_bundle.set_attribute('X_test_scaled', X_test_scaled)
+            data_bundle.set_attribute('y_test_scaled', y_test_scaled)
 
         return self.strategy_request
 
@@ -279,20 +291,20 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
 
     def verify_executable(self, entity, strategy_request):
         param_config = strategy_request.param_config
-        if 'X_feature_dict' not in entity.dataset.keys():
+        if not entity.has_attribute('X_feature_dict'):
             raise ValueError("Missing X_feature_dict in dataset")
-        if 'y_feature_dict' not in entity.dataset.keys():
+        if not entity.has_attribute('y_feature_dict'):
             raise ValueError("Missing y_feature_dict in dataset")
-        if 'X_train' not in entity.dataset.keys():
+        if not entity.has_attribute('X_train'):
             raise ValueError("Missing X in dataset")
-        if 'y_train' not in entity.dataset.keys():
+        if not entity.has_attribute('y_train'):
             raise ValueError("Missing y in dataset")
-        if 'X_test' not in entity.dataset.keys():
+        if not entity.has_attribute('X_test'):
             raise ValueError("Missing X_test in dataset")
-        if 'y_test' not in entity.dataset.keys():
+        if not entity.has_attribute('y_test'):
             raise ValueError("Missing y_test in dataset")
 
-        if entity.get_entity(EntityEnum.FEATURE_SETS.value) is None:
+        if len(entity.get_children_by_type(EntityEnum.FEATURE_SET)) == 0:
             raise ValueError("FeatureSets not found in DataBundleEntity")
 
     @staticmethod
@@ -313,28 +325,30 @@ class CombineDataBundlesStrategy(DataBundleStrategy):
         self.verify_executable(data_bundles, self.strategy_request)
 
         # confirm they have the same keys
-        keys = data_bundles[0].dataset.keys()
+        keys = data_bundles[0]._attributes.keys()
         for data_bundle in data_bundles[1:]:
-            if data_bundle.dataset.keys() != keys:
+            if data_bundle._attributes.keys() != keys:
                 raise ValueError("DataBundles do not have the same keys")
 
         # combine the datasets
         combined_dataset = {}
-        if 'X_feature_dict' in data_bundles[0].dataset.keys():
-            combined_dataset['X_feature_dict'] = data_bundles[0].dataset['X_feature_dict']
-        if 'y_feature_dict' in data_bundles[0].dataset.keys():
-            combined_dataset['y_feature_dict'] = data_bundles[0].dataset['y_feature_dict']
+        if data_bundles[0].has_attribute('X_feature_dict'):
+            combined_dataset['X_feature_dict'] = data_bundles[0].get_attribute('X_feature_dict')
+        if data_bundles[0].has_attribute('y_feature_dict'):
+            combined_dataset['y_feature_dict'] = data_bundles[0].get_attribute('y_feature_dict')
 
         for key in keys:
             if key in ['X', 'y','row_ids', 'X_train', 'y_train', 'X_test', 'y_test']:
-                combined_dataset[key] = np.concatenate([data_bundle.dataset[key] for data_bundle in data_bundles], axis=0)
+                combined_dataset[key] = np.concatenate([data_bundle.get_attribute(key) for data_bundle in data_bundles], axis=0)
             elif key in ['train_row_ids', 'test_row_ids', 'row_ids']:
-                continue
+                combined_dataset[key] = np.concatenate([data_bundle.get_attribute(key) for data_bundle in data_bundles], axis=0)
 
         new_bundle = DataBundleEntity()
-        new_bundle.set_dataset(combined_dataset)
-        old_entity_map = data_bundles[0].entity_map
-        new_bundle.set_entity_map(old_entity_map)
+        new_bundle.set_attributes(combined_dataset)
+        old_children = data_bundles[0].children
+        old_children = deepcopy(old_children)
+        for child in old_children:
+            new_bundle.add_child(child)
 
         self.strategy_request.ret_val[EntityEnum.DATA_BUNDLE.value] = new_bundle
 

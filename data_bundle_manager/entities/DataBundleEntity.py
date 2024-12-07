@@ -1,14 +1,12 @@
-
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.Entity import Entity
-
+from typing import Optional, Dict, Any
 
 class DataBundleEntity(Entity):
     entity_name = EntityEnum.DATA_BUNDLE
 
-    def __init__(self):
-        super().__init__()
-        self.dataset = {}
+    def on_create(self, param_config: Optional[Dict[str, Any]] = None):
+        pass 
 
     def to_db(self):
         raise NotImplementedError("Child classes must implement the 'to_db' method.")
@@ -16,39 +14,21 @@ class DataBundleEntity(Entity):
     def from_db(cls, data):
         raise NotImplementedError("Child classes must implement the 'from_db' method.")
 
-    def set_dataset(self, dataset):
-        for key, value in dataset.items():
-            self.dataset[key] = value
-
-    @staticmethod
-    def get_maximum_members():
-        return {
-            EntityEnum.FEATURE_SETS: None,
-        }
-
     def serialize(self):
-        serialized_children = []
-        for key, value in self.entity_map.items():
-            if isinstance(value, Entity):
-                serialized_children.append(value.serialize())
-            else:
-                for v in value:
-                    serialized_children.append(v.serialize())
-
+        dataset = self.get_attribute('dataset')
         return {
             'entity_name': self.entity_name.value,
-            'children': serialized_children,
+            'children': [child.serialize() for child in self.children],
             'meta_data': {
-                'X' : self.dataset['X'].shape if 'X' in self.dataset else None,
-                'y' : self.dataset['y'].shape if 'y' in self.dataset else None,
-                'X_train' : self.dataset['X_train'].shape if 'X_train' in self.dataset else None,
-                'X_test' : self.dataset['X_test'].shape if 'X_test' in self.dataset else None,
-                'y_train' : self.dataset['y_train'].shape if 'y_train' in self.dataset else None,
-                'y_test' : self.dataset['y_test'].shape if 'y_test' in self.dataset else None,
-                'y_train_scaled' : self.dataset['y_train_scaled'].shape if 'y_train_scaled' in self.dataset else None,
-                'y_test_scaled' : self.dataset['y_test_scaled'].shape if 'y_test_scaled' in self.dataset else None,
-                'X_train_scaled' : self.dataset['X_train_scaled'].shape if 'X_train_scaled' in self.dataset else None,
-                'X_test_scaled' : self.dataset['X_test_scaled'].shape if 'X_test_scaled' in self.dataset else None,
-
+                'X': self.get_attribute('X').shape if self.has_attribute('X') else None,
+                'y': self.get_attribute('y').shape if self.has_attribute('y') else None,
+                'X_train': self.get_attribute('X_train').shape if self.has_attribute('X_train') else None,
+                'X_test': self.get_attribute('X_test').shape if self.has_attribute('X_test') else None,
+                'y_train': self.get_attribute('y_train').shape if self.has_attribute('y_train') else None,
+                'y_test': self.get_attribute('y_test').shape if self.has_attribute('y_test') else None,
+                'y_train_scaled': self.get_attribute('y_train_scaled').shape if self.has_attribute('y_train_scaled') else None,
+                'y_test_scaled': self.get_attribute('y_test_scaled').shape if self.has_attribute('y_test_scaled') else None,
+                'X_train_scaled': self.get_attribute('X_train_scaled').shape if self.has_attribute('X_train_scaled') else None,
+                'X_test_scaled': self.get_attribute('X_test_scaled').shape if self.has_attribute('X_test_scaled') else None,
             }
         }

@@ -3,7 +3,7 @@ import requests
 
 from sequenceset_manager.entities.SequenceSetEntity import SequenceSetEntity
 from sequenceset_manager.models import SequenceSet, Sequence
-from sequenceset_manager.strategy.SequenceSetStrategy import CombineSeqBundlesStrategy
+# from sequenceset_manager.strategy.SequenceSetStrategy import CombineSeqBundlesStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.strategy.BaseStrategy import Strategy
 from train_eval_manager.entities.entities import ModelStageEntity
@@ -45,17 +45,20 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
         sequence_sets = []
 
         for param in param_config['model_set_configs']:
-
             sequence_set = SequenceSetEntity()
-            sequence_set.dataset_type = param_config['dataset_type']
-            sequence_set.sequence_length = param['sequence_length']
-            sequence_set.start_timestamp = param['start_timestamp']
-            sequence_set.sequences = []
-            sequence_set.metadata = param
+            
+            # Set attributes directly
+            sequence_set.set_attribute('dataset_type', param_config['dataset_type'])
+            sequence_set.set_attribute('sequence_length', param['sequence_length'])
+            sequence_set.set_attribute('start_timestamp', param['start_timestamp'])
+            sequence_set.set_attribute('sequences', [])
+            sequence_set.set_attribute('metadata', param)
+            sequence_set.set_attribute('X_features', param_config['X_features'])
+            sequence_set.set_attribute('y_features', param_config['y_features'])
 
             param['features'] = features
 
-            response = requests.get(self.url, params = param)
+            response = requests.get(self.url, params=param)
             if response.status_code == 200:
                 try:
                     data = response.json()
@@ -71,23 +74,24 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                                 sequence_length=param['sequence_length'],
                                 sequence_data=sequence_data
                             )
-                            sequence_set.sequences.append(sequence)
+                            sequence_set.get_attribute('sequences').append(sequence)
 
-                    # Assign model_set properties if sequences were added
-                    if sequence_set.sequences:  # Only assign if sequences exist
-                        sequence_set.X_features = param_config['X_features']
-                        sequence_set.y_features = param_config['y_features']
+                    # Only add sequence set if it has sequences
+                    if sequence_set.get_attribute('sequences'):
                         sequence_sets.append(sequence_set)
 
                 except Exception as e:
                     print(f"Failed to decode JSON: {e}")
                     raise e
-            else :
+            else:
                 print(f"Failed to retrieve sequence data: {response.status_code}")
                 print(response)
-                raise ValueError("Failed to retrieve sequence data " + response.json()['error'] )
+                raise ValueError("Failed to retrieve sequence data " + response.json()['error'])
 
-        session_entity.set_entity_map({EntityEnum.SEQUENCE_SETS.value: sequence_sets})
+        # Add sequence sets as children
+        for sequence_set in sequence_sets:
+            session_entity.add_child(sequence_set)
+            
         return self.strategy_request
 
     def verify_executable(self, session_entity, strategy_request):
@@ -121,12 +125,12 @@ class CreateModelStageStrategy(TrainingSessionStrategy):
         super().__init__(strategy_executor, strategy_request)
 
     def apply(self, session_entity):
-        training_session_entity = session_entity
         model_stage = "test_model_stage"
         model_stage_entity = ModelStageEntity(model_stage)
-
-        training_session_entity.set_entity_map({ModelStageEntity.entity_name: model_stage_entity})
-
+        
+        # Add model stage as child
+        session_entity.add_child(model_stage_entity)
+        
         return self.strategy_request
 
     def verify_executable(self, session_entity, strategy_request):
@@ -141,38 +145,38 @@ class CreateModelStageStrategy(TrainingSessionStrategy):
         }
 
 
-class GetDataBundleStrategy(TrainingSessionStrategy):
-    '''
-    The GetDataBundleStrategy class is a concrete class for getting data bundles inside the TrainingSessionEntity.
-    '''
-    name = "GetDataBundle"
-    def __init__(self, strategy_executor, strategy_request):
-        super().__init__(strategy_executor, strategy_request)
+# class GetDataBundleStrategy(TrainingSessionStrategy):
+#     '''
+#     The GetDataBundleStrategy class is a concrete class for getting data bundles inside the TrainingSessionEntity.
+#     '''
+#     name = "GetDataBundle"
+#     def __init__(self, strategy_executor, strategy_request):
+#         super().__init__(strategy_executor, strategy_request)
 
-    def apply(self, session_entity):
-        nested_request = self.strategy_request.nested_requests[0]
-        nested_entity = self.strategy_executor.resolve_strat_request_path(nested_request, session_entity)
-        nested_request = self.strategy_executor.execute(nested_entity, nested_request)
-        session_entity.set_entity_map({EntityEnum.DATA_BUNDLE.value: nested_request.ret_val[EntityEnum.DATA_BUNDLE.value]})
+#     def apply(self, session_entity):
+#         nested_request = self.strategy_request.nested_requests[0]
+#         nested_entity = self.strategy_executor.resolve_strat_request_path(nested_request, session_entity)
+#         nested_request = self.strategy_executor.execute(nested_entity, nested_request)
+#         session_entity.set_entity_map({EntityEnum.DATA_BUNDLE.value: nested_request.ret_val[EntityEnum.DATA_BUNDLE.value]})
 
-        return self.strategy_request
+#         return self.strategy_request
 
-    def verify_executable(self, session_entity, strategy_request):
-        pass
+#     def verify_executable(self, session_entity, strategy_request):
+#         pass
 
-    @staticmethod
-    def get_request_config():
-        return {
-            'strategy_name': GetDataBundleStrategy.__name__,
-            'strategy_path': 'training_session',
-            'param_config': {},
-            'nested_requests': [
-                {
-                    'strategy_name': CombineSeqBundlesStrategy.__name__,
-                    'strategy_path': EntityEnum.TRAINING_SESSION.value + '.' + EntityEnum.SEQUENCE_SETS.value,
-                    'param_config': {}
-                }
-            ]
-        }
+#     @staticmethod
+#     def get_request_config():
+#         return {
+#             'strategy_name': GetDataBundleStrategy.__name__,
+#             'strategy_path': 'training_session',
+#             'param_config': {},
+#             'nested_requests': [
+#                 {
+#                     'strategy_name': CombineSeqBundlesStrategy.__name__,
+#                     'strategy_path': EntityEnum.TRAINING_SESSION.value + '.' + EntityEnum.SEQUENCE_SETS.value,
+#                     'param_config': {}
+#                 }
+#             ]
+#         }
 
 

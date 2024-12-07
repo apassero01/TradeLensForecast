@@ -4,7 +4,7 @@ from shared_utils.entities.Entity import Entity
 
 
 class SequenceSetEntity(Entity):
-    entity_name = EntityEnum.SEQUENCE_SETS
+    entity_name = EntityEnum.SEQUENCE_SET
 
     def __init__(self):
         super().__init__()
@@ -27,7 +27,7 @@ class SequenceSetEntity(Entity):
     @staticmethod
     def get_maximum_members():
         return {
-            EntityEnum.SEQUENCE_SETS: None,
+            EntityEnum.SEQUENCE_SET: None,
         }
 
 
