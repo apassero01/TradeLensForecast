@@ -15,9 +15,10 @@ class DataBundleEntity(Entity):
         raise NotImplementedError("Child classes must implement the 'from_db' method.")
 
     def serialize(self):
-        dataset = self.get_attribute('dataset')
         return {
             'entity_name': self.entity_name.value,
+            'path': self.path,
+            'class_path': self.__class__.__module__ + '.' + self.__class__.__name__,
             'children': [child.serialize() for child in self.children],
             'meta_data': {
                 'X': self.get_attribute('X').shape if self.has_attribute('X') else None,

@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import '../../index.css';
+import '../../../index.css';
 
 function SelectionBox({label, items, itemKey, displayText, onSelectionChange, selectedItems}) {
     // Create state to store the search query

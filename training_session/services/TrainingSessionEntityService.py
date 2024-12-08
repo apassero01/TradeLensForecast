@@ -11,11 +11,11 @@ class TrainingSessionEntityService:
         self.strategy_executor = StrategyExecutor()
         self.strategy_executor_service = StrategyExecutorService(self.strategy_executor)
 
-    def set_session(self, session):
-        self.session = session
-
     def create_training_session_entity(self):
+        """Create a new training session with minimal initialization"""
         self.session = TrainingSessionEntity()
+        self.session.id = None
+        self.session.strategy_history = []
         return self.session
 
     def initialize_params(self, X_features, y_features, sequence_set_params, start_date, end_date=None):
@@ -24,6 +24,9 @@ class TrainingSessionEntityService:
         self.session.sequence_set_params = sequence_set_params
         self.session.start_date = start_date
         return self.session
+    
+    def set_session(self, session_entity):
+        self.session = session_entity
 
     def get_sessions(self):
         sessions = TrainingSession.objects.all()
@@ -49,40 +52,21 @@ class TrainingSessionEntityService:
         if strat_request.add_to_history:
             session_entity.add_to_strategy_history(strat_request)
 
-    # def resolve_strat_request_path(self, strat_request, session_entity):
-    #     path = strat_request.strategy_path
-    #     if not path:
-    #         raise ValueError('Path not found in strat request')
-    #
-    #     path_components = path.split('.')
-    #     path_components = path_components[1:]  # Remove the first component, which is the root entity
-    #     num_components = len(path_components)
-    #
-    #     if num_components == 0:
-    #         return session_entity
-    #
-    #     current_entity = session_entity
-    #     for i, component in enumerate(path_components):
-    #         current_entity = current_entity.get_entity(component)
-    #         if not current_entity:
-    #             raise ValueError(f'Entity not found for path {path}')
-    #
-    #         if i == num_components - 1:
-    #             return current_entity
-    #
-    #     raise ValueError(f'Entity not found for path {path}')
-
-    def serialize_entity_tree(self):
-        return self.session.serialize()
 
     def serialize_session(self):
+        """Serialize the current session state"""
+
         return {
-            'session_id': "test",
-            'status': TrainingSessionStatus(self.session.status).name,
+            'id': self.session.id,
             'created_at': self.session.created_at,
-            'entity_map': self.serialize_entity_tree(),
+            'entity_map': self.session.serialize(),
             'strategy_history': [strategy_request.serialize() for strategy_request in self.session.strategy_history]
         }
+    
+    def save_session(self):
+        model = TrainingSessionEntity.entity_to_model(self.session)
+        model.save()
+        return model.id
 
 
 

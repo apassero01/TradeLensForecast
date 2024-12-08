@@ -10,6 +10,7 @@ from shared_utils.strategy.BaseStrategy import Strategy
 
 
 class DataBundleStrategy(Strategy):
+    entity_type = EntityEnum.DATA_BUNDLE
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
 

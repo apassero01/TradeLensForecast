@@ -7,7 +7,7 @@ class EntityEnum(Enum):
     MODEL_STAGE = "model_stage"
     FEATURE_SET = "feature_set"
     MODEL = "model"
-    SEQUENCE_SET = "sequence_sets"
+    SEQUENCE_SET = "sequence_set"
     DATA_BUNDLE = "data_bundle"
     STRATEGY_REQUESTS = "strategy_request"
 

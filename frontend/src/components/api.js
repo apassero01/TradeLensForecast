@@ -70,3 +70,26 @@ export const getSessionById = async (sessionId) => {
         throw err;
     }
 };
+
+export const fetchAvailableEntities = async () => {
+  try {
+    const response = await axios.get('http://localhost:8000/training_session/api/get_available_entities/');
+    return response.data.entities;
+  } catch (err) {
+    console.error('Error fetching available entities:', err);
+    throw err;
+  }
+};
+
+export const executeStrategy = async (entityId, strategyRequest) => {
+  try {
+    const response = await axios.post('http://localhost:8000/api/execute_strategy/', {
+      entity_id: entityId,
+      ...strategyRequest.toJSON()
+    });
+    return response.data;
+  } catch (err) {
+    console.error('Error executing strategy:', err);
+    throw err;
+  }
+};

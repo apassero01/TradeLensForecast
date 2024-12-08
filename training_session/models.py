@@ -8,16 +8,8 @@ class FeatureSet:
         self.do_fit_test = do_fit_test
 
 class TrainingSession(models.Model):
-    X_features = models.JSONField()
-    y_features = models.JSONField()
-    X_feature_dict = models.JSONField()
-    y_feature_dict = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
-    status = models.IntegerField()
     strategy_history = models.JSONField()
-    sequence_set_params = models.JSONField(default=list)
-    start_date = models.DateField(null=True)
-    end_date = models.DateField(null=True)
 
 
 class ModelSet():

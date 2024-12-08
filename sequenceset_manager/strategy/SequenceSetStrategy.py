@@ -72,11 +72,15 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
         self.strategy_executor = strategy_executor
 
     def apply(self, sequence_sets):
+        if not isinstance(sequence_sets, list):
+            sequence_sets = [sequence_sets]
         self.verify_executable(sequence_sets, self.strategy_request)
         for sequence_set  in sequence_sets:
-            feature_dict = self.create_feature_dict(sequence_set.X_features, sequence_set.y_features)
-            X, y, row_ids = self.create_3d_array_seq(sequence_set, sequence_set.X_features, sequence_set.y_features, feature_dict)
-            X_feature_dict, y_feature_dict = self.create_xy_feature_dict(sequence_set.X_features, sequence_set.y_features)
+            X_features = sequence_set.get_attribute('X_features')
+            y_features = sequence_set.get_attribute('y_features')
+            feature_dict = self.create_feature_dict(X_features, y_features)
+            X, y, row_ids = self.create_3d_array_seq(sequence_set, X_features, y_features, feature_dict)
+            X_feature_dict, y_feature_dict = self.create_xy_feature_dict(X_features, y_features)
             data_bundle = sequence_set.get_children_by_type(EntityEnum.DATA_BUNDLE)
             if not len(data_bundle) == 1:
                 raise ValueError("SequenceSetEntity should have exactly one DataBundleEntity child")
@@ -111,7 +115,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
         return feature_dict
 
     def create_3d_array_seq(self, sequence_set, X_features, y_features, feature_dict):
-        sequence_objs = sequence_set.sequences
+        sequence_objs = sequence_set.get_attribute('sequences')
         sequence_steps = len(sequence_objs[0].sequence_data)
         num_sequences = len(sequence_objs)
         # sequence set does not have a feature dict
@@ -156,7 +160,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
     def get_request_config():
         return {
             'strategy_name': PopulateDataBundleStrategy.__name__,
-            'strategy_path': EntityEnum.TRAINING_SESSION.value + '.' + EntityEnum.SEQUENCE_SETS.value,
+            'strategy_path': EntityEnum.TRAINING_SESSION.value + '.' + EntityEnum.SEQUENCE_SET.value,
             'param_config': {}
         }
 

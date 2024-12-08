@@ -12,81 +12,35 @@ class TrainingSessionEntity(Entity):
     entity_name = EntityEnum.TRAINING_SESSION
     def __init__(self):
         super().__init__()
-        self.X_features = None
-        self.y_features = None
         self.status = TrainingSessionStatus.ACTIVE
-        self.start_date = None
-        self.end_date = None
         self.created_at = None
-        self.X_feature_dict = None
-        self.y_feature_dict = None
         self.strategy_history = []
-        self.sequence_set_params = []
 
     def add_to_strategy_history(self, strategy_request):
         self.strategy_history.append(strategy_request)
 
     @staticmethod
-    def get_maximum_members():
-        return{
-            EntityEnum.MODEL_STAGE: None,
-        }
-
-    def to_db(self, model=None):
+    def from_db(model: TrainingSession):
         """
-        Converts the entity into a Django model instance using the adapter.
-        """
-        return TrainingSessionAdapter.entity_to_model(self, model)
-
-    @classmethod
-    def from_db(cls, model):
-        """
-        Creates an entity from a Django model instance using the adapter.
-        """
-        return TrainingSessionAdapter.model_to_entity(model)
-
-class TrainingSessionAdapter:
-    @staticmethod
-    def model_to_entity(model: TrainingSession) -> TrainingSessionEntity:
-        """
-        Converts a TrainingSession Django model instance to a TrainingSessionEntity.
+        Creates a TrainingSessionEntity from a TrainingSession Django model instance
         """
         entity = TrainingSessionEntity()
-        entity.id = model.pk  # Track the database model's ID
-        entity.X_features = model.X_features
-        entity.y_features = model.y_features
-        entity.status = model.status
-        entity.start_date = model.start_date
-        entity.end_date = model.end_date
+        entity.id = model.id
         entity.created_at = model.created_at
-        entity.X_feature_dict = model.X_feature_dict
-        entity.y_feature_dict = model.y_feature_dict
         entity.strategy_history = model.strategy_history
-        entity.sequence_set_params = model.sequence_set_params
         return entity
 
     @staticmethod
-    def entity_to_model(entity: TrainingSessionEntity, model: TrainingSession = None) -> TrainingSession:
-        """
-        Converts a TrainingSessionEntity to a TrainingSession Django model instance.
-        If `model` is not provided, creates a new instance.
-        """
+    def entity_to_model(entity, model = None) -> TrainingSession:
         if model is None:
-            # If the entity has an ID, fetch the existing model
+            print(f'entity.id: {entity.id}')
             if entity.id is not None:
+                print(f'Getting model with id: {entity.id}')
                 model = TrainingSession.objects.get(id=entity.id)
             else:
-                model = TrainingSession()  # Create a new instance
+                model = TrainingSession()
 
-        model.X_features = entity.X_features
-        model.y_features = entity.y_features
-        model.status = entity.status
-        model.start_date = entity.start_date
-        model.end_date = entity.end_date
-        model.created_at = entity.created_at  # Typically auto-managed by DB
-        model.X_feature_dict = entity.X_feature_dict
-        model.y_feature_dict = entity.y_feature_dict
+        model.created_at = entity.created_at
         model.strategy_history = entity.strategy_history
-        model.sequence_set_params = entity.sequence_set_params
         return model
 

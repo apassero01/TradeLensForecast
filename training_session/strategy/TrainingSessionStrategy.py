@@ -90,6 +90,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
 
         # Add sequence sets as children
         for sequence_set in sequence_sets:
+
             session_entity.add_child(sequence_set)
             
         return self.strategy_request

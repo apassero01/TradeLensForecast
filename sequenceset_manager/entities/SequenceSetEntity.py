@@ -30,6 +30,15 @@ class SequenceSetEntity(Entity):
             EntityEnum.SEQUENCE_SET: None,
         }
 
+    def serialize(self):
+        return {
+            'entity_name': self.entity_name.value,
+            'children': [child.serialize() for child in self.children],
+            'meta_data': self.get_attribute('metadata'),
+            'path': self.path
+
+        }
+
 
 class SequenceSetAdapter:
     @staticmethod
@@ -38,12 +47,19 @@ class SequenceSetAdapter:
         Converts a TrainingSession Django model instance to a TrainingSessionEntity.
         """
         entity = SequenceSetEntity()
-        entity.id = model.pk
-        entity.dataset_type = model.dataset_type
-        entity.start_timestamp = model.start_timestamp
-        entity.end_timestamp = model.end_timestamp
-        entity.sequence_length = model.sequence_length
-        entity.feature_dict = model.feature_dict
-        entity.metadata = model.metadata
+        # entity.id = model.pk
+        # entity.dataset_type = model.dataset_type
+        # entity.start_timestamp = model.start_timestamp
+        # entity.end_timestamp = model.end_timestamp
+        # entity.sequence_length = model.sequence_length
+        # entity.feature_dict = model.feature_dict
+        # entity.metadata = model.metadata
+        entity.set_attribute('id', model.pk)
+        entity.set_attribute('dataset_type', model.dataset_type)
+        entity.set_attribute('start_timestamp', model.start_timestamp)
+        entity.set_attribute('end_timestamp', model.end_timestamp)
+        entity.set_attribute('sequence_length', model.sequence_length)
+        entity.set_attribute('feature_dict', model.feature_dict)
+        entity.set_attribute('metadata', model.metadata)
 
         return entity

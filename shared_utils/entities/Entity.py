@@ -116,16 +116,14 @@ class Entity(ABC):
 
     def serialize(self):
         serialized_children = []
-        for key, value in self.entity_map.items():
-                if isinstance(value, Entity):
-                    serialized_children.append(value.serialize())
-                else:
-                    for v in value:
-                        serialized_children.append(v.serialize())
+        for child in self.children:
+            serialized_children.append(child.serialize())
         return {
             'entity_name': self.entity_name.value,
             'children': serialized_children,
-            'meta_data': {}
+            'meta_data': {},
+            'path': self.path,
+            'class_path': self.__class__.__module__ + '.' + self.__class__.__name__
         }
 
     def to_db(self):
@@ -147,6 +145,10 @@ class Entity(ABC):
     @staticmethod
     def get_maximum_members():
         pass
+    
+    @classmethod
+    def get_class_path(cls):
+        return f"{cls.__module__}.{cls.__name__}"
 
 
 

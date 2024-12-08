@@ -34,6 +34,7 @@ class Strategy(ABC):
     def serialize(cls):
         return {
             'name': cls.__name__,
+            'entity_type': cls.entity_type.value,
             'config': cls.get_request_config()
         }
 

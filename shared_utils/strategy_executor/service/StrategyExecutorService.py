@@ -6,10 +6,14 @@ from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.strategy_executor import StrategyExecutor
 from train_eval_manager.strategies.ModelStageStrategy import CreateModelStrategy
 from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy, CreateModelStageStrategy
-
+from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy
 
 class StrategyExecutorService:
     registry = {
+        EntityEnum.ENTITY.value: [
+            AssignAttributesStrategy,
+            CreateEntityStrategy,
+        ],
         EntityEnum.TRAINING_SESSION.value: [
             GetSequenceSetsStrategy,
             CreateModelStageStrategy
@@ -58,8 +62,10 @@ class StrategyExecutorService:
 
     @staticmethod
     def get_registry():
-        serialized_registry = []
+        serialized_registry = {}
         for entity, strategies in StrategyExecutorService.registry.items():
-            serialized_registry += [s.serialize() for s in strategies]
+            if entity not in serialized_registry:
+                serialized_registry[entity] = []
+            serialized_registry[entity] += [s.serialize() for s in strategies]
         return serialized_registry
 
