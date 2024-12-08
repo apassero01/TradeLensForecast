@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import EntityGraph from '../components/Graph/EntityGraph';
-import TopBar from '../components/TopBar/TopBar';
-import StrategyControlPanel from '../components/Strategy/StrategyControlPanel';
+import EntityGraph from './Graph/EntityGraph';
+import TopBar from './TopBar/TopBar';
+import StrategyControlPanel from './Strategy/StrategyControlPanel';
 import { entityApi } from '../services/api';
+import 'reactflow/dist/style.css';
 
 const TopLevel = () => {
   const [error, setError] = useState(null);
