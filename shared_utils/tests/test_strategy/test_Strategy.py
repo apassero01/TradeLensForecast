@@ -4,7 +4,7 @@ from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
-
+from shared_utils.strategy.BaseStrategy import RemoveEntityStrategy
 # Create test entities
 class TestConcreteEntity(Entity):
     entity_name = EntityEnum.ENTITY
@@ -152,3 +152,28 @@ class AssignAttributesStrategyTestCase(TestCase):
         # Test missing attribute_map
         invalid_request.param_config = {'child_path': 'path'}
         self.assertFalse(strategy.verify_executable(self.parent_entity, invalid_request))
+
+
+class TestRemoveEntityStrategy(TestCase):
+    def setUp(self):
+        self.strategy_executor = StrategyExecutor()
+        self.strategy_request = StrategyRequestEntity()
+        self.strategy = RemoveEntityStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Create a parent and child entity for testing
+        self.parent_entity = Entity()
+        self.child_entity = Entity()
+        self.parent_entity.add_child(self.child_entity)
+
+    def test_remove_entity(self):
+        # Verify child is initially in parent's children
+        self.assertIn(self.child_entity, self.parent_entity.children)
+        
+        # Apply the remove strategy
+        result = self.strategy.apply(self.child_entity)
+        
+        # Verify child was removed from parent
+        self.assertNotIn(self.child_entity, self.parent_entity.children)
+        
+        # Verify strategy request is returned
+        self.assertEqual(result, self.strategy_request)

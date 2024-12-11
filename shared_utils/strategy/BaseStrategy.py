@@ -126,3 +126,21 @@ class AssignAttributesStrategy(Strategy):
             'child_path': '',
             'attribute_map': {}
         }
+
+
+class RemoveEntityStrategy(Strategy):
+    """Generic strategy for removing an entity"""
+
+    strategy_description = 'Removes an entity from the parent entity'
+
+    def verify_executable(self, entity, strategy_request):
+        pass
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        parent_entity = entity._parent
+        parent_entity.remove_child(entity)
+        return self.strategy_request
+    
+    @staticmethod
+    def get_request_config():
+        return {}

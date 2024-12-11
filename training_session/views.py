@@ -403,8 +403,7 @@ def api_save_session(request):
             training_session_service = TrainingSessionEntityService()
             training_session_service.set_session(session_entity)
             session_id = training_session_service.save_session()
-            session = training_session_service.get_session(session_id)
-            cache.set('current_session', session)
+            cache.set('current_session', session_entity)
             
             return JsonResponse({
                 'status': 'success',

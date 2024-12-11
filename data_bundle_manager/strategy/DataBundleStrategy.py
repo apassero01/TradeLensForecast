@@ -93,7 +93,7 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
                 'feature_set_configs': [
                     {
                         'scaler_config': {
-                            'scaler_name': 'MEAN_VARIANCE_SCALER_3D'
+                            'scaler_name': 'MIN_MAX_SEQ_BY_SEQ_2D'
                         },
                         'feature_list': [],
                         'feature_set_type': 'X',
@@ -114,7 +114,7 @@ class SplitBundleDateStrategy(DataBundleStrategy):
     def apply(self, data_bundle):
         self.verify_executable(data_bundle, self.strategy_request)
         param_config = self.strategy_request.param_config
-        X_train, X_test, y_train, y_test, train_row_ids, test_row_ids = self.train_test_split(data_bundle, param_config['split_date'], param_config['date_list'])
+        X_train, X_test, y_train, y_test, train_row_ids, test_row_ids = self.train_test_split(data_bundle, param_config['split_date'])
         data_bundle.set_attribute('X_train', X_train)
         data_bundle.set_attribute('X_test', X_test)
         data_bundle.set_attribute('y_train', y_train)
@@ -130,6 +130,7 @@ class SplitBundleDateStrategy(DataBundleStrategy):
         row_ids = data_bundle.get_attribute('row_ids')
 
         split_date = pd.to_datetime(split_date).tz_localize(None)
+        date_list = data_bundle.get_attribute('seq_end_dates')
         date_list = [pd.to_datetime(date).tz_localize(None) for date in date_list]
 
         if split_date not in date_list:

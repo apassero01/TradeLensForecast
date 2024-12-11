@@ -78,6 +78,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
 
                     # Only add sequence set if it has sequences
                     if sequence_set.get_attribute('sequences'):
+                        sequence_set.set_attribute('seq_end_dates', [sequence.end_timestamp for sequence in sequence_set.get_attribute('sequences')])
                         sequence_sets.append(sequence_set)
 
                 except Exception as e:

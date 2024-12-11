@@ -6,13 +6,14 @@ from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.strategy_executor import StrategyExecutor
 from train_eval_manager.strategies.ModelStageStrategy import CreateModelStrategy
 from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy, CreateModelStageStrategy
-from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy
+from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy, RemoveEntityStrategy
 
 class StrategyExecutorService:
     registry = {
         EntityEnum.ENTITY.value: [
             AssignAttributesStrategy,
             CreateEntityStrategy,
+            RemoveEntityStrategy
         ],
         EntityEnum.TRAINING_SESSION.value: [
             GetSequenceSetsStrategy,

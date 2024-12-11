@@ -84,12 +84,12 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
             data_bundle = sequence_set.get_children_by_type(EntityEnum.DATA_BUNDLE)
             if not len(data_bundle) == 1:
                 raise ValueError("SequenceSetEntity should have exactly one DataBundleEntity child")
-            strategy_request = self.create_strategy_request(data_bundle[0], X, y, row_ids, X_feature_dict, y_feature_dict)
+            strategy_request = self.create_strategy_request(data_bundle[0], X, y, row_ids, X_feature_dict, y_feature_dict, sequence_set.get_attribute('seq_end_dates'))
             self.strategy_executor.execute(data_bundle[0], strategy_request)
         return self.strategy_request
 
 
-    def create_strategy_request(self, entity, X, y , row_ids, X_feature_dict, y_feature_dict):
+    def create_strategy_request(self, entity, X, y , row_ids, X_feature_dict, y_feature_dict, seq_end_dates):
         strategy_request = StrategyRequestEntity()
         strategy_request.strategy_name = AssignAttributesStrategy.__name__
         strategy_request.strategy_path = None
@@ -100,7 +100,8 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
                 'y' : y,
                 'row_ids': row_ids,
                 'X_feature_dict': X_feature_dict,
-                'y_feature_dict': y_feature_dict
+                'y_feature_dict': y_feature_dict,
+                'seq_end_dates': seq_end_dates
             }
         }
 

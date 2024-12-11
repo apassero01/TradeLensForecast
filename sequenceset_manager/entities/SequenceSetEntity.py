@@ -34,7 +34,13 @@ class SequenceSetEntity(Entity):
         return {
             'entity_name': self.entity_name.value,
             'children': [child.serialize() for child in self.children],
-            'meta_data': self.get_attribute('metadata'),
+            'meta_data': {
+                'ticker': self.get_attribute('metadata')['ticker'],
+                'start': self.get_attribute('start_timestamp'),
+                'sequence_length': self.get_attribute('sequence_length'),
+                'X_features': self.get_attribute('X_features'),
+                'y_features': self.get_attribute('y_features'),
+            },
             'path': self.path
 
         }

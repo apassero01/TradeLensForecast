@@ -49,6 +49,14 @@ class Entity(ABC):
         # Invalidate path cache since the parent relationship changed
         child._path = None
     
+    def remove_child(self, child: 'Entity'):
+        '''Remove a child from the entity'''
+        self.children.remove(child)
+        child._parent = None
+        child._path = None
+        # delete child from memory
+        del child
+    
     def find_entities_by_paths(self, paths: List[str]) -> Dict[str, Optional['Entity']]:
         """
         Find multiple entities by their paths in a single traversal
