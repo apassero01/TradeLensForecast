@@ -26,6 +26,11 @@ class StrategyRequestEntity(Entity):
             raise ValueError("Nested request must be a StrategyRequestEntity")
         self._nested_requests.append(request)
 
+    def add_nested_requests(self, requests: List['StrategyRequestEntity']):
+        """Add a list of nested strategy requests"""
+        for request in requests:
+            self.add_nested_request(request)
+
     def get_nested_requests(self) -> List['StrategyRequestEntity']:
         """Get all nested strategy requests"""
         return self._nested_requests
@@ -44,12 +49,13 @@ class StrategyRequestEntity(Entity):
 
     def serialize(self):
         return {
-            'name': self.strategy_name,
-            'config': {
-                'strategy_name': self.strategy_name,
-                'param_config': self.param_config,
-                'strategy_path': self.strategy_path,
-            }
+            'strategy_name': self.strategy_name,
+            'strategy_path': self.strategy_path,
+            'param_config': self.param_config,
+            'nested_requests': [nested_request.serialize() for nested_request in self._nested_requests],
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'add_to_history': self.add_to_history
         }
 
 
@@ -65,10 +71,19 @@ class StrategyRequestAdapter:
         entity.created_at = model.created_at
         entity.updated_at = model.updated_at
         entity.add_to_history = model.add_to_history
+        
+        # Handle the parent request (only if it exists)
+        if model.parent_request:
+            entity.parent_request_id = model.parent_request.pk
+        
+        # Handle training session (only if it exists)
+        if model.training_session:
+            entity.training_session_id = model.training_session.pk
 
-        # Convert nested requests
-        for nested_request in model.nested_requests.all():
-            entity.add_nested_request(StrategyRequestAdapter.model_to_entity(nested_request))
+        # Convert nested requests using the ForeignKey relationship
+        for nested_request in model.nested_requests.all():  # ForeignKey related_name='nested_requests'
+            nested_entity = StrategyRequestAdapter.model_to_entity(nested_request)
+            entity.add_nested_request(nested_entity)
 
         return entity
 
@@ -85,17 +100,26 @@ class StrategyRequestAdapter:
         model.strategy_name = entity.strategy_name
         model.param_config = entity.param_config
         model.strategy_path = entity.strategy_path
-        model.created_at = entity.created_at
-        model.updated_at = entity.updated_at
         model.add_to_history = entity.add_to_history
+
+        # Handle parent request (if parent exists)
+        if hasattr(entity, 'parent_request_id') and entity.parent_request_id:
+            model.parent_request_id = entity.parent_request_id
+
+        # Handle training session (if it exists)
+        if hasattr(entity, 'training_session_id') and entity.training_session_id:
+            model.training_session_id = entity.training_session_id
 
         if not model.pk:  # If this is a new model
             model.save()
 
         # Handle nested requests
+        existing_nested_request_ids = set(model.nested_requests.values_list('id', flat=True))
         for nested_request in entity.get_nested_requests():
             nested_model = StrategyRequestAdapter.entity_to_model(nested_request)
-            model.nested_requests.add(nested_model)
+            if nested_model.pk not in existing_nested_request_ids:
+                nested_model.parent_request = model  # Set the parent for the nested request
+                nested_model.save()
 
         return model
 

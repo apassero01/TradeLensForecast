@@ -481,6 +481,7 @@ def get_available_entities(request):
         return all_subclasses
     
     all_entities = get_all_entity_subclasses(Entity)
+    print(all_entities)
     
     # Format the response
     for entity_class in all_entities:
@@ -515,6 +516,8 @@ def api_execute_strategy(request):
         strat_request.strategy_name = strategy['strategy_name']
         strat_request.strategy_path = strategy['strategy_path']
         strat_request.param_config = strategy['param_config']
+        strat_request.nested_requests = strategy['nested_requests']
+        strat_request.add_to_history = strategy['add_to_history']
         print(session.serialize())
         try:
             ret_val = training_session_service.execute_strat_request(strat_request, session)
@@ -523,7 +526,8 @@ def api_execute_strategy(request):
             return JsonResponse({
                 'status': 'success',
                 'message': 'Session loaded successfully',
-                'session_data': session.serialize()
+                'session_data': session.serialize(),
+                'strategy_response': ret_val
             })
         except Exception as e:
             print("exception")
@@ -531,3 +535,24 @@ def api_execute_strategy(request):
             return JsonResponse({'error': str(e)}, status=400)
     else:
         return JsonResponse({'error': 'POST method required'}, status=400)
+
+@csrf_exempt
+def api_get_strategy_history(request):
+    print('api_get_strategy_history')
+    if request.method == 'GET':
+        session = cache.get('current_session')
+        if not session:
+            return JsonResponse({'error': 'No session in progress'}, status=400)
+
+        try:
+            strategy_requests = []
+            print(session.strategy_history)
+            for strategy_request in session.strategy_history:
+                strategy_requests.append(strategy_request.serialize())
+            
+            return JsonResponse({'strategy_requests': strategy_requests})
+        except Exception as e:
+            print(str(e))
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'GET method required'}, status=400)

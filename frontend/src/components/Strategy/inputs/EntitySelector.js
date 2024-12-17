@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchAvailableEntities } from '../api';
+import { entityApi } from '../../../services/api';
 
 const EntitySelector = ({ value, onChange }) => {
   const [entities, setEntities] = useState({});
@@ -9,7 +9,8 @@ const EntitySelector = ({ value, onChange }) => {
   useEffect(() => {
     const loadEntities = async () => {
       try {
-        const availableEntities = await fetchAvailableEntities();
+        const availableEntities = await entityApi.fetchAvailableEntities();
+        console.log("availableEntities", availableEntities);
         setEntities(availableEntities);
         setLoading(false);
       } catch (err) {

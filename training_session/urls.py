@@ -3,7 +3,7 @@ from .views import start_training_session, save_session, remove_session, get_ses
     get_model_set_strategies, post_strategy, get_viz_processing_strategies, get_training_session_strategies, \
     post_strategy_request, get_strategy_registry, api_start_session, api_get_entity_graph, api_stop_session, \
     api_save_session, api_get_saved_sessions, api_load_session, api_get_strategy_registry, get_available_entities, \
-    api_execute_strategy
+    api_execute_strategy, api_get_strategy_history
 
 urlpatterns = [
     path('start_training_session/', start_training_session, name='start_training_session'),
@@ -33,4 +33,5 @@ urlpatterns = [
     path('api/get_strategy_registry/', api_get_strategy_registry, name='api_get_strategy_registry'),
     path('api/get_available_entities/', get_available_entities, name='get_available_entities'),
     path('api/execute_strategy/', api_execute_strategy, name='api_execute_strategy'),
+    path('api/get_strategy_history/', api_get_strategy_history, name='api_get_strategy_history'),
 ]

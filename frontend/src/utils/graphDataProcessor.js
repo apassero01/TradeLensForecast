@@ -1,20 +1,27 @@
-export const processEntityGraph = (data) => {
+export const processEntityGraph = (data, existingNodes = []) => {
   const nodes = [];
   const edges = [];
   let nodeId = 1;
+
+  // Create a map of existing node positions by path
+  const existingPositions = new Map(
+    existingNodes.map(node => [node.data.path, node.position])
+  );
 
   const processNode = (entity, parentId = null) => {
     // Create node with all entity data
     const node = {
       id: nodeId.toString(),
       type: 'entityNode',
-      position: { x: nodeId * 200, y: nodeId * 100 }, // Simple positioning logic
+      // Use existing position if available, otherwise calculate new position
+      position: existingPositions.get(entity.path) || { x: nodeId * 200, y: nodeId * 100 },
       data: {
         label: entity.entity_name,
         metaData: entity.meta_data || {},
         entity_name: entity.entity_name,
         path: entity.path,
         class_path: entity.class_path,
+        visualization: entity.visualization,
         // Include all other entity data
         ...entity
       }

@@ -4,7 +4,6 @@ from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 from training_session.entities.TrainingSessionEntity import TrainingSessionEntity, TrainingSessionStatus
 from training_session.models import TrainingSession
-from training_session.strategy.TrainingSessionStrategy import CreateModelStageStrategy
 
 DEFAULT_SESSION_UUID = '2b012d92-1fd8-4c72-a8e4-981c45a9db6b'
 
@@ -53,8 +52,8 @@ class TrainingSessionEntityService:
     def execute_strat_request(self, strat_request, session_entity):
 
         strat_request =  self.strategy_executor_service.execute(session_entity, strat_request)
-        if strat_request.add_to_history:
-            session_entity.add_to_strategy_history(strat_request)
+        # if strat_request.add_to_history: #TODO maybe add this back in
+        session_entity.add_to_strategy_history(strat_request)
 
 
     def serialize_session(self):
@@ -68,7 +67,7 @@ class TrainingSessionEntityService:
         }
     
     def save_session(self):
-        model = TrainingSessionEntity.entity_to_model(self.session)
+        model = TrainingSessionEntity.to_db(self.session)
         model.save()
         return model.id
 

@@ -10,5 +10,5 @@ class EntityEnum(Enum):
     SEQUENCE_SET = "sequence_set"
     DATA_BUNDLE = "data_bundle"
     STRATEGY_REQUESTS = "strategy_request"
-
+    VISUALIZATION = "visualization"
 

@@ -91,24 +91,15 @@ class EntityApi {
     return response.json();
   }
 
-  async executeStrategy(entityId, strategy, config) {
-    const response = await fetch(`${API_BASE_URL}/training_session/api/execute_strategy/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        entity_id: entityId,
-        strategy: strategy,
-        config: config       
-      })
-    });
+  async fetchAvailableEntities() {
+    const response = await fetch(`${API_BASE_URL}/training_session/api/get_available_entities/`);
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to execute strategy');
+      throw new Error(error.error || 'Failed to fetch available entities');
     }
-    return response.json();
+    const data = await response.json();
+    return data.entities;
   }
 }
-
+    
 export const entityApi = new EntityApi(); 

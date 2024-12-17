@@ -4,10 +4,9 @@ from sequenceset_manager.strategy.SequenceSetStrategy import PopulateDataBundleS
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.strategy_executor import StrategyExecutor
-from train_eval_manager.strategies.ModelStageStrategy import CreateModelStrategy
-from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy, CreateModelStageStrategy
+from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy
 from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy, RemoveEntityStrategy
-
+from shared_utils.strategy.VisualizationStrategy import HistogramStrategy
 class StrategyExecutorService:
     registry = {
         EntityEnum.ENTITY.value: [
@@ -17,7 +16,6 @@ class StrategyExecutorService:
         ],
         EntityEnum.TRAINING_SESSION.value: [
             GetSequenceSetsStrategy,
-            CreateModelStageStrategy
         ],
         EntityEnum.DATA_BUNDLE.value: [
             CreateFeatureSetsStrategy,
@@ -27,7 +25,6 @@ class StrategyExecutorService:
         ],
         EntityEnum.MODEL.value: [],
         EntityEnum.MODEL_STAGE.value: [
-            CreateModelStrategy
         ],
         EntityEnum.FEATURE_SET.value: [
 
@@ -37,6 +34,9 @@ class StrategyExecutorService:
             PopulateDataBundleStrategy,
         ],
         EntityEnum.STRATEGY_REQUESTS.value: [],
+        EntityEnum.VISUALIZATION.value: [
+            HistogramStrategy
+        ]
 
     }
 

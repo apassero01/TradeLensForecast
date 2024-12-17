@@ -10,6 +10,7 @@ import ReactFlow, {
 import { processEntityGraph } from '../../utils/graphDataProcessor';
 import { calculateNewNodePosition } from '../../utils/nodePositionCalculator';
 import EntityNode from './EntityNode';
+import { isEqual } from 'lodash';
 
 const nodeTypes = {
   entityNode: EntityNode
@@ -57,8 +58,17 @@ const EntityGraph = ({ data, onNodeClick, selectedEntity }) => {
       const existingNode = prevNodesRef.current.get(node.data.path);
       const existingPosition = nodePositions.current.get(node.data.path);
 
-      // Preserve position for existing nodes
+      // If node exists, check for data changes
       if (existingNode) {
+        const hasDataChanged = !isEqual(existingNode.data, node.data);
+        
+        // If no data changes, return existing node with its position
+        if (!hasDataChanged) {
+          console.log("existingNode Data has not changed");
+          return existingNode;
+        }
+        console.log("existingNode Data has changed");
+        // If data changed, return new node with preserved position
         return {
           ...node,
           position: existingPosition || existingNode.position,
@@ -84,16 +94,36 @@ const EntityGraph = ({ data, onNodeClick, selectedEntity }) => {
   useEffect(() => {
     if (!processedElements.nodes.length) return;
 
-    const newNodes = processNodeUpdates(processedElements.nodes, processedElements.edges);
-    prevNodesRef.current = new Map(newNodes.map(node => [node.data.path, node]));
-    
-    setNodes(newNodes);
-    setEdges(processedElements.edges);
-  }, [processedElements, processNodeUpdates, setNodes, setEdges]);
+    // Process new nodes while preserving existing positions
+    const { nodes: newNodes, edges: newEdges } = processEntityGraph(data, nodes);
+
+    // Only update if data has changed (excluding positions)
+    const hasDataChanged = newNodes.some((newNode, index) => {
+      const existingNode = nodes[index];
+      return !existingNode || 
+        !isEqual(
+          { ...existingNode.data, position: undefined }, 
+          { ...newNode.data, position: undefined }
+        );
+    });
+
+    if (hasDataChanged) {
+      setNodes(newNodes);
+      setEdges(newEdges);
+    }
+  }, [data, nodes, setNodes, setEdges]);
 
   const onNodeDragStop = useCallback((event, node) => {
-    nodePositions.current.set(node.data.path, node.position);
-  }, []);
+    // Update only the position
+    setNodes(nds => 
+      nds.map(n => {
+        if (n.id === node.id) {
+          return { ...n, position: node.position };
+        }
+        return n;
+      })
+    );
+  }, [setNodes]);
 
   const nodesWithStyles = useMemo(() => {
     return nodes.map(node => ({

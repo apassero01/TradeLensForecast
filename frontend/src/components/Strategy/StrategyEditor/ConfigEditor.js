@@ -1,28 +1,26 @@
 import React, { useState } from 'react';
-import EntitySelector from './EntitySelector';
-import StrategyRequest from '../../utils/StrategyRequest';
-import SequenceSetSelector from './inputs/SequenceSetSelector';
+import EntitySelector from '../inputs/EntitySelector';
+import SequenceSetSelector from '../inputs/SequenceSetSelector';
 
-const StrategyConfigEditor = ({ strategy, entityType, selectedEntity, onSubmit }) => {
-  const [strategyRequest] = useState(() => {
-    const strategyWithPath = {
-      ...strategy,
-      path: selectedEntity.data.path
-    };
-    return new StrategyRequest(strategyWithPath);
-  });
-
-  const [editedJson, setEditedJson] = useState(JSON.stringify(strategyRequest.toJSON(), null, 2));
+const ConfigEditor = ({ 
+  strategyRequest,
+  onExecute
+}) => {
+  const [editedJson, setEditedJson] = useState(
+    JSON.stringify(strategyRequest.toJSON(), null, 2)
+  );
   const [error, setError] = useState(null);
-  const [response, setResponse] = useState(null);
+  const [executionResult, setExecutionResult] = useState(null);
+
+  console.log(strategyRequest);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const parsed = JSON.parse(editedJson);
       strategyRequest.param_config = parsed.param_config;
-      const result = await onSubmit(strategyRequest.toJSON());
-      setResponse(result);
+      const result = await onExecute(strategyRequest.toJSON());
+      setExecutionResult(result.strategy_response);
       setError(null);
     } catch (error) {
       setError(error.message || 'Invalid JSON configuration');
@@ -32,7 +30,7 @@ const StrategyConfigEditor = ({ strategy, entityType, selectedEntity, onSubmit }
   const handleJsonChange = (e) => {
     setEditedJson(e.target.value);
     setError(null);
-    setResponse(null);
+    setExecutionResult(null);
   };
 
   const handleEntitySelect = (entityConfig) => {
@@ -62,11 +60,8 @@ const StrategyConfigEditor = ({ strategy, entityType, selectedEntity, onSubmit }
       <div className="flex justify-between items-start">
         <div>
           <h3 className="text-lg font-medium text-white">
-            Configure {strategy.name}
+            Configure {strategyRequest.strategy_name}
           </h3>
-          <p className="text-sm text-gray-400 mt-1">
-            For {entityType}
-          </p>
         </div>
         {error && (
           <div className="flex items-center bg-red-500/10 text-red-500 px-4 py-2 rounded-lg">
@@ -82,20 +77,22 @@ const StrategyConfigEditor = ({ strategy, entityType, selectedEntity, onSubmit }
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {strategy.name === 'CreateEntityStrategy' && (
+        {/* Special input components for specific strategies */}
+        {strategyRequest.strategy_name === 'CreateEntityStrategy' && (
           <EntitySelector 
             value={strategyRequest.param_config.entity_class || ''}
             onChange={handleEntitySelect}
           />
         )}
         
-        {strategy.name === 'GetSequenceSetsStrategy' && (
+        {strategyRequest.strategy_name === 'GetSequenceSetsStrategy' && (
           <SequenceSetSelector
             value={strategyRequest.param_config}
             onChange={handleSequenceSetSelect}
           />
         )}
         
+        {/* JSON Editor */}
         <textarea
           value={editedJson}
           onChange={handleJsonChange}
@@ -104,15 +101,17 @@ const StrategyConfigEditor = ({ strategy, entityType, selectedEntity, onSubmit }
           spellCheck="false"
         />
 
-        {response && (
+        {/* Execution Result */}
+        {executionResult && (
           <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
             <h4 className="text-sm font-medium text-green-400 mb-2">Strategy Response:</h4>
             <pre className="text-sm text-gray-300 font-mono overflow-auto">
-              {JSON.stringify(response, null, 2)}
+              {JSON.stringify(executionResult, null, 2)}
             </pre>
           </div>
         )}
 
+        {/* Execute Button */}
         <div className="flex justify-end">
           <button
             type="submit"
@@ -127,4 +126,4 @@ const StrategyConfigEditor = ({ strategy, entityType, selectedEntity, onSubmit }
   );
 };
 
-export default StrategyConfigEditor; 
+export default ConfigEditor; 

@@ -1,9 +1,28 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import MetadataList from './MetadataList';
 import MetadataValue from './MetadataValue';
+import visualizationComponents from '../Visualization/visualizationComponents';
 
 const EntityNode = ({ data }) => {
+  // Memoize the visualization component
+  const visualizationContent = useMemo(() => {
+    if (!data.visualization || !data.visualization.type) return null;
+    
+    const VisualizationComponent = visualizationComponents[data.visualization.type.toLowerCase()];
+    
+    if (!VisualizationComponent) {
+      console.warn(`No visualization component found for type: ${data.visualization.type}`);
+      return null;
+    }
+
+    return (
+      <div className="w-full p-2">
+        <VisualizationComponent visualization={data.visualization} />
+      </div>
+    );
+  }, [data.visualization]); // Only re-render when visualization data changes
+
   const renderMetadataValue = (value) => {
     if (Array.isArray(value)) {
       return <MetadataList items={value} />;
@@ -21,12 +40,16 @@ const EntityNode = ({ data }) => {
       />
       <div className="text-white font-medium mb-2">{data.label}</div>
       <div className="space-y-1.5">
-        {Object.entries(data.metaData).map(([key, value]) => (
-          <div key={key} className="text-sm flex items-start gap-2">
-            <span className="text-gray-400">{key}:</span>
-            {renderMetadataValue(value)}
-          </div>
-        ))}
+        {data.visualization ? (
+          visualizationContent
+        ) : (
+          Object.entries(data.metaData || {}).map(([key, value]) => (
+            <div key={key} className="text-sm flex items-start gap-2">
+              <span className="text-gray-400">{key}:</span>
+              {renderMetadataValue(value)}
+            </div>
+          ))
+        )}
       </div>
       <Handle 
         type="source" 

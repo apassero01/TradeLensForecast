@@ -1,5 +1,4 @@
 from django.db import models
-from shared_utils.models import StrategyRequest
 class FeatureSet:
     def __init__(self, scaler_config, feature_list, do_fit_test, secondary_feature_list=None):
         self.scaler_config = scaler_config
@@ -9,7 +8,6 @@ class FeatureSet:
 
 class TrainingSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
-    strategy_history = models.ManyToManyField(StrategyRequest, related_name='training_session_strategy_history')
     entity_id = models.CharField(max_length=255, null=True, blank=True)
 
 

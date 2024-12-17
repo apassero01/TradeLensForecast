@@ -17,7 +17,7 @@ function SelectionBox({label, items, itemKey, displayText, onSelectionChange, se
 
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-semibold">{label}</h3>
+            <h3 className="text-lg font-semibold text-gray-300">{label}</h3>
 
             {/* Search input field */}
             <input
@@ -32,7 +32,7 @@ function SelectionBox({label, items, itemKey, displayText, onSelectionChange, se
                 {filteredItems.length > 0 ? (
                     filteredItems.map(item => (
                         <div key={item[itemKey]} className="mb-0">
-                            <label className="flex items-center space-x-2">
+                            <label className="flex items-center space-x-2 text-gray-300">
                                 <input
                                     type="checkbox"
                                     checked={selectedItems.some(selected => selected[itemKey] === item[itemKey])} // Determine if it's selected

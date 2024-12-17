@@ -1,12 +1,9 @@
 from markdown_it.rules_inline import entity
 
-from training_session.strategy.TrainingSessionStrategy import CreateModelStageStrategy
 
 
 class TrainingSessionStrategyService:
-    registered_strategies = [
-        CreateModelStageStrategy,
-    ]
+
     @staticmethod
     def get_available_strategies():
         available_stragies = []

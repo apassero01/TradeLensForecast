@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchSequenceSetsMetaData, fetchAllXFeatures, fetchAllyFeatures } from '../../api';
+import { fetchSequenceSetsMetaData, fetchAllXFeatures, fetchAllyFeatures } from './SequenceSetSelectorApi';
 import SelectionBox from './SelectionBox';
 import DateInput from './DateInput';
 
@@ -111,10 +111,10 @@ const SequenceSetSelector = ({ value, onChange }) => {
         {/* Sequence Set Selection */}
         <div>
           <SelectionBox
-            label="Select Sequence Sets"
+            label="SequenceSets"
             items={allModelSets}
             itemKey="id"
-            displayText={(item) => `${item.ticker} - ${item.sequence_length} - ${item.interval}`}
+            displayText={(item) => `${item.ticker}-${item.sequence_length}-${item.interval}`}
             onSelectionChange={(set, isSelected) => {
               setSelectedModelSets(prev => 
                 isSelected 

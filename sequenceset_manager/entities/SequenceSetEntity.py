@@ -1,13 +1,13 @@
 from sequenceset_manager.models import SequenceSet
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.Entity import Entity
-
+from typing import Optional
 
 class SequenceSetEntity(Entity):
     entity_name = EntityEnum.SEQUENCE_SET
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, entity_id: Optional[str] = None):
+        super().__init__(entity_id)
         self.id = None
         self.dataset_type= None
         self.start_timestamp = None

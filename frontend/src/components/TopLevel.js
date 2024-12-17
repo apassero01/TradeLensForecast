@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import EntityGraph from './Graph/EntityGraph';
 import TopBar from './TopBar/TopBar';
-import StrategyControlPanel from './Strategy/StrategyControlPanel';
+import StrategyPanel from './Strategy/StrategyPanel';
 import { entityApi } from '../services/api';
+import { strategyApi } from '../services/strategyApi';
 import 'reactflow/dist/style.css';
 
 const TopLevel = () => {
@@ -117,14 +118,16 @@ const TopLevel = () => {
     setSelectedEntity(node);
   }, []);
 
-  const handleExecuteStrategy = async (entity, strategy, strategyRequest) => {
+  const handleStrategyExecute = async (strategyRequest) => {
     try {
       setIsLoading(true);
-      await entityApi.executeStrategy(entity.id, strategyRequest);
-      await fetchGraphData();
+      const response = await strategyApi.executeStrategy(strategyRequest);
+      setGraphData(response.session_data);
       setError(null);
+      return response;
     } catch (err) {
       setError('Failed to execute strategy: ' + err.message);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -171,10 +174,10 @@ const TopLevel = () => {
 
       {/* Strategy Panel */}
       {sessionStarted && (
-        <StrategyControlPanel
+        <StrategyPanel
           selectedEntity={selectedEntity}
           availableStrategies={availableStrategies}
-          onExecuteStrategy={handleExecuteStrategy}
+          onStrategyExecute={handleStrategyExecute}
         />
       )}
     </div>

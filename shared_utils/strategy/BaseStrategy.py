@@ -78,6 +78,9 @@ class CreateEntityStrategy(Strategy):
         new_entity.on_create(self.strategy_request.param_config)
         
         parent_entity.add_child(new_entity)
+
+        # Add the new entity to the strategy request
+        self.strategy_request.ret_val['entity'] = new_entity
         
         return self.strategy_request
 

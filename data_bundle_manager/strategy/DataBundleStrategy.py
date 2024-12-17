@@ -124,7 +124,7 @@ class SplitBundleDateStrategy(DataBundleStrategy):
 
         return self.strategy_request
 
-    def train_test_split(self, data_bundle, split_date, date_list):
+    def train_test_split(self, data_bundle, split_date):
         X = data_bundle.get_attribute('X')
         y = data_bundle.get_attribute('y')
         row_ids = data_bundle.get_attribute('row_ids')
@@ -152,8 +152,6 @@ class SplitBundleDateStrategy(DataBundleStrategy):
         param_config = strategy_request.param_config
         if 'split_date' not in param_config.keys():
             raise ValueError("Missing split_date in config")
-        if 'date_list' not in param_config.keys():
-            raise ValueError("Missing date_list in config")
         if not entity.has_attribute('X'):
             raise ValueError("Missing X in dataset")
         if not entity.has_attribute('y'):
@@ -168,7 +166,6 @@ class SplitBundleDateStrategy(DataBundleStrategy):
             'strategy_path': None,
             'param_config': {
                 'split_date': None,
-                'date_list': None
             }
         }
 
