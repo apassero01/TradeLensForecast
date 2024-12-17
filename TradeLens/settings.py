@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     'dataset_manager',
     'sequenceset_manager',
     'training_session',
-    'preprocessing_manager',
     'shared_utils',
 
 ]

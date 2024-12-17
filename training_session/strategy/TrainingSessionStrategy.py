@@ -149,67 +149,6 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
             ]
         }
 
-# class CreateModelStageStrategy(TrainingSessionStrategy):
-#     '''
-#     The CreateModelStageStrategy class is a concrete class for creating a model stage inside the TrainingSessionEntity.
-#     '''
-#     name = "CreateModelStage"
-#     def __init__(self, strategy_executor, strategy_request):
-#         super().__init__(strategy_executor, strategy_request)
 
-#     def apply(self, session_entity):
-#         model_stage = "test_model_stage"
-#         model_stage_entity = ModelStageEntity(model_stage)
-        
-#         # Add model stage as child
-#         session_entity.add_child(model_stage_entity)
-        
-#         return self.strategy_request
-
-#     def verify_executable(self, session_entity, strategy_request):
-#         pass
-
-#     @staticmethod
-#     def get_request_config():
-#         return {
-#             'strategy_name': CreateModelStageStrategy.__name__,
-#             'strategy_path': 'training_session',
-#             'param_config': {}
-#         }
-
-
-# class GetDataBundleStrategy(TrainingSessionStrategy):
-#     '''
-#     The GetDataBundleStrategy class is a concrete class for getting data bundles inside the TrainingSessionEntity.
-#     '''
-#     name = "GetDataBundle"
-#     def __init__(self, strategy_executor, strategy_request):
-#         super().__init__(strategy_executor, strategy_request)
-
-#     def apply(self, session_entity):
-#         nested_request = self.strategy_request.nested_requests[0]
-#         nested_entity = self.strategy_executor.resolve_strat_request_path(nested_request, session_entity)
-#         nested_request = self.strategy_executor.execute(nested_entity, nested_request)
-#         session_entity.set_entity_map({EntityEnum.DATA_BUNDLE.value: nested_request.ret_val[EntityEnum.DATA_BUNDLE.value]})
-
-#         return self.strategy_request
-
-#     def verify_executable(self, session_entity, strategy_request):
-#         pass
-
-#     @staticmethod
-#     def get_request_config():
-#         return {
-#             'strategy_name': GetDataBundleStrategy.__name__,
-#             'strategy_path': 'training_session',
-#             'param_config': {},
-#             'nested_requests': [
-#                 {
-#                     'strategy_name': CombineSeqBundlesStrategy.__name__,
-#                     'strategy_path': EntityEnum.TRAINING_SESSION.value + '.' + EntityEnum.SEQUENCE_SETS.value,
-#                     'param_config': {}
-#                 }
-#             ]
-#         }
 
 

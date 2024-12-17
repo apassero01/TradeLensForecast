@@ -24,10 +24,10 @@ class TestSequenceSetEntity(TestCase):
         entity = SequenceSetEntity.from_db(self.model)
 
         # Check that all attributes, including ID and new fields, are correctly populated
-        self.assertEqual(entity.id, self.model.id)
-        self.assertEqual(entity.dataset_type, self.model.dataset_type)
-        self.assertEqual(entity.start_timestamp, self.model.start_timestamp)
-        self.assertEqual(entity.end_timestamp, self.model.end_timestamp)
-        self.assertEqual(entity.sequence_length, self.model.sequence_length)
-        self.assertEqual(entity.feature_dict, self.model.feature_dict)
-        self.assertEqual(entity.metadata, self.model.metadata)
+        self.assertEqual(entity.get_attribute('id'), self.model.id)
+        self.assertEqual(entity.get_attribute('dataset_type'), self.model.dataset_type)
+        self.assertEqual(entity.get_attribute('start_timestamp'), self.model.start_timestamp)
+        self.assertEqual(entity.get_attribute('end_timestamp'), self.model.end_timestamp)
+        self.assertEqual(entity.get_attribute('sequence_length'), self.model.sequence_length)
+        self.assertEqual(entity.get_attribute('feature_dict'), self.model.feature_dict)
+        self.assertEqual(entity.get_attribute('metadata'), self.model.metadata)

@@ -121,8 +121,8 @@ class PopulateDataBundleStrategyTestCase(TestCase):
         self.sequence_set_entity_1 = SequenceSetEntity.from_db(self.sequence_set_model_1)
         self.sequence_set_entity_2 = SequenceSetEntity.from_db(self.sequence_set_model_2)
 
-        self.sequence_set_entity_1.sequences = sequences_1
-        self.sequence_set_entity_2.sequences = sequences_2
+        self.sequence_set_entity_1.set_attribute('sequences', sequences_1)
+        self.sequence_set_entity_2.set_attribute('sequences', sequences_2)
 
         X_features = ['open', 'high']
         y_features = ['close+1']
@@ -144,7 +144,14 @@ class PopulateDataBundleStrategyTestCase(TestCase):
         self.strategy = PopulateDataBundleStrategy(self.strategy_executor, self.strategy_request)
 
         self.sequence_set_entity_1.add_child(DataBundleEntity())
+        self.sequence_set_entity_1.set_attribute('X_features', X_features)
+        self.sequence_set_entity_1.set_attribute('y_features', y_features)
         self.sequence_set_entity_2.add_child(DataBundleEntity())
+        self.sequence_set_entity_2.set_attribute('X_features', X_features)
+        self.sequence_set_entity_2.set_attribute('y_features', y_features)
+
+        self.sequence_set_entity_1.set_attribute('seq_end_dates', [seq.end_timestamp for seq in sequences_1])
+        self.sequence_set_entity_2.set_attribute('seq_end_dates', [seq.end_timestamp for seq in sequences_2])
 
         # Combine SequenceSetEntities into a list
         self.sequence_sets = [self.sequence_set_entity_1, self.sequence_set_entity_2]
@@ -188,7 +195,7 @@ class PopulateDataBundleStrategyTestCase(TestCase):
 
         expected_X = np.array([[[1, 2], [2, 1.5]], [[2, 1.5], [3, 2.5]], [[3, 2.5], [4, 4]], [[4, 4], [5, 5]]])
         expected_y = np.array([[[3]], [[4]], [[5]], [[6]]])
-        expected_row_ids = [seq.id for seq in self.sequence_set_entity_1.sequences]
+        expected_row_ids = [seq.id for seq in self.sequence_set_entity_1.get_attribute('sequences')]
 
         np.testing.assert_almost_equal(X, expected_X)
         np.testing.assert_almost_equal(y, expected_y)

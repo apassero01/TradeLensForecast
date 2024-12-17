@@ -22,7 +22,8 @@ class VisualizationStrategy(Strategy):
         array = entity._parent.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
         entity.set_attribute('data', {'array': array})
 
-    def get_request_config(self):
+    @staticmethod
+    def get_request_config():
         return {
             'parent_data_attribute_name': 'X'
         }
@@ -33,8 +34,7 @@ class HistogramStrategy(VisualizationStrategy):
         self.visualization_type = VisualizationTypeEnum.HISTOGRAM
 
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
-        if 'array' not in entity.get_attribute('data'):
-            raise ValueError('Array is required for histogram visualization')
+        pass
     
     def apply(self, entity: Entity):
         self.get_parent_attributes(entity)
@@ -67,7 +67,7 @@ class HistogramStrategy(VisualizationStrategy):
 
         return self.strategy_request
     @staticmethod
-    def get_request_config(): 
+    def get_request_config() -> dict:
         return {
             'num_bins': 10,
             'bin_width': 10,

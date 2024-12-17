@@ -20,34 +20,14 @@ class TrainingSessionEntityService:
         self.session = TrainingSessionEntity.from_db(self.session_model)
         self.session.strategy_history = []
         return self.session
-
-    def initialize_params(self, X_features, y_features, sequence_set_params, start_date, end_date=None):
-        self.session.X_features = X_features
-        self.session.y_features = y_features
-        self.session.sequence_set_params = sequence_set_params
-        self.session.start_date = start_date
-        return self.session
     
     def set_session(self, session_entity):
         self.session = session_entity
-
-    def get_sessions(self):
-        sessions = TrainingSession.objects.all()
-        ret_val = [
-            {
-                'id': session.id,
-                'status': TrainingSessionStatus(session.status).name,
-                'created_at': session.created_at
-            }
-            for session in sessions
-        ]
-        return ret_val
 
     def get_session(self, session_id):
         session = TrainingSession.objects.get(id=session_id)
         session = TrainingSessionEntity.from_db(session)
         return session
-
 
     def execute_strat_request(self, strat_request, session_entity):
 
@@ -71,23 +51,6 @@ class TrainingSessionEntityService:
         model.save()
         return model.id
 
-
-
-    # {
-    #     "entity_name": "session"
-    #     "children": [
-    #         {
-    #             "entity_name": "model_stage",
-    #             "children": []
-    #             "meta_data": {}
-    #         },
-    #         {
-    #             "entity_name": "data_bundle",
-    #             "children": []
-    #             "meta_data": {}
-    #         ]
-    #     "meta_data": {}
-    # }
 
 
 

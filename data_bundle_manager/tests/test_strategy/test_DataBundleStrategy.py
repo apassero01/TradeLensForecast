@@ -131,8 +131,9 @@ class SplitBundleDateStrategyTestCase(TestCase):
         self.strategy_request = StrategyRequestEntity()
         self.strategy_request.param_config = {
             'split_date': pd.Timestamp('2020-01-04'),
-            'date_list': self.dates
         }
+
+        self.data_bundle.set_attribute('seq_end_dates', self.dates)
 
         self.strategy_executor = StrategyExecutor()
         self.strategy = SplitBundleDateStrategy(self.strategy_executor, self.strategy_request)
@@ -196,11 +197,7 @@ class SplitBundleDateStrategyTestCase(TestCase):
 
         # Test missing `date_list`
         invalid_request.param_config = {
-            'split_date': '2020-01-04'
         }
-        with self.assertRaises(ValueError) as context:
-            self.strategy.verify_executable(self.data_bundle, invalid_request)
-        self.assertEqual(str(context.exception), "Missing date_list in config")
 
         # Test missing `X` in dataset
         self.data_bundle._attributes = {}  # Clear attributes
@@ -230,8 +227,6 @@ class SplitBundleDateStrategyTestCase(TestCase):
         param_config = request_config['param_config']
         self.assertIn('split_date', param_config)
         self.assertIsNone(param_config['split_date'])
-        self.assertIn('date_list', param_config)
-        self.assertIsNone(param_config['date_list'])
 
 
 class ScaleByFeatureSetsStrategyTestCase(TestCase):
