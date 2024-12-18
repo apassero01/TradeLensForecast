@@ -178,6 +178,7 @@ const TopLevel = () => {
           selectedEntity={selectedEntity}
           availableStrategies={availableStrategies}
           onStrategyExecute={handleStrategyExecute}
+          fetchAvailableStrategies={fetchAvailableStrategies}
         />
       )}
     </div>

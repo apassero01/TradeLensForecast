@@ -4,3 +4,4 @@
 from .Entity import Entity
 from .StrategyRequestEntity import StrategyRequestEntity
 from .VisualizationEntity import VisualizationEntity
+from model_stage.entities.ModelStageEntity import ModelStageEntity

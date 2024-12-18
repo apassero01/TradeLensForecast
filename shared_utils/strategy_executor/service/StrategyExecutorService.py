@@ -7,6 +7,8 @@ from shared_utils.strategy_executor import StrategyExecutor
 from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy
 from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy, RemoveEntityStrategy
 from shared_utils.strategy.VisualizationStrategy import HistogramStrategy
+from model_stage.strategy.ModelStageStrategy import CreateModelStrategy
+
 class StrategyExecutorService:
     registry = {
         EntityEnum.ENTITY.value: [
@@ -37,6 +39,9 @@ class StrategyExecutorService:
         EntityEnum.STRATEGY_REQUESTS.value: [],
         EntityEnum.VISUALIZATION.value: [
             HistogramStrategy
+        ],
+        EntityEnum.MODEL_STAGE.value: [
+            CreateModelStrategy
         ]
 
     }

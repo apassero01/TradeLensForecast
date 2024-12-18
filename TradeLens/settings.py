@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'sequenceset_manager',
     'training_session',
     'shared_utils',
+    'model_stage'
 
 ]
 

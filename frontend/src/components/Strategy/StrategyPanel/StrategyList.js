@@ -1,6 +1,6 @@
 import React from 'react';
 
-const StrategyList = ({ strategies, entityType, onSelect }) => {
+const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
   // Get entity-specific and generic strategies
   const entityTypeKey = entityType?.toLowerCase();
   const genericStrategies = strategies['entity'] || [];
@@ -9,13 +9,21 @@ const StrategyList = ({ strategies, entityType, onSelect }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-8 py-6 border-b border-gray-700">
-        <h3 className="text-xl text-white font-semibold">
-          {entityType} Strategies
-        </h3>
-        <p className="text-sm text-gray-400 mt-1">
-          Select a strategy to configure
-        </p>
+      <div className="flex-shrink-0 px-8 py-6 border-b border-gray-700 flex justify-between items-center">
+        <div>
+          <h3 className="text-xl text-white font-semibold">
+            {entityType} Strategies
+          </h3>
+          <p className="text-sm text-gray-400 mt-1">
+            Select a strategy to configure
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          className="text-gray-400 hover:text-white p-2"
+        >
+          ↻
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto">

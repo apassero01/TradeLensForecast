@@ -7,7 +7,8 @@ import { strategyApi } from '../../../services/strategyApi';
 const StrategyPanel = ({ 
   selectedEntity, 
   availableStrategies,
-  onStrategyExecute
+  onStrategyExecute,
+  fetchAvailableStrategies
 }) => {
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
@@ -84,6 +85,7 @@ const StrategyPanel = ({
                   strategies={availableStrategies}
                   entityType={selectedEntity.data.label}
                   onSelect={handleStrategySelect}
+                  onRefresh={fetchAvailableStrategies}
                 />
               </div>
             ) : (
