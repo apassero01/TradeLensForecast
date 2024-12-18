@@ -30,8 +30,18 @@ const EntityNode = ({ data }) => {
     return <MetadataValue value={value} />;
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    navigator.clipboard.writeText(data.path || data.label)
+      .then(() => console.log('Path copied to clipboard'))
+      .catch(err => console.error('Failed to copy:', err));
+  };
+
   return (
-    <div className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 cursor-grab active:cursor-grabbing min-w-[250px]">
+    <div 
+      className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 cursor-grab active:cursor-grabbing min-w-[250px]"
+      onContextMenu={handleContextMenu}
+    >
       <Handle 
         type="target" 
         position={Position.Top} 

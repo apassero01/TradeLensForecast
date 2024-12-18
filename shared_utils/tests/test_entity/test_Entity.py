@@ -31,15 +31,11 @@ class EntityTestCase(TestCase):
         self.child2 = TestChildEntity()
         
         # Set up test data
-        self.child1.set_attribute('test_data', {
-            'X_train': np.array([[1, 2], [3, 4]]),
-            'y_train': np.array([1, 0])
-        })
-        
-        self.child2.set_attribute('test_data', {
-            'X_train': np.array([[5, 6], [7, 8]]),
-            'y_train': np.array([0, 1])
-        })
+        self.child1.set_attribute('X_train', np.array([[1, 2], [3, 4]]))
+        self.child1.set_attribute('y_train', np.array([1, 0]))
+
+        self.child2.set_attribute('X_train', np.array([[5, 6], [7, 8]]))
+        self.child2.set_attribute('y_train', np.array([0, 1]))
 
     def test_entity_path_generation(self):
         """Test that entity paths are correctly generated with entity names and UUIDs"""
@@ -154,3 +150,48 @@ class EntityTestCase(TestCase):
         
         self.assertEqual(self.child1._parent, self.parent)
         self.assertIn(self.child1, self.parent.children)
+
+    def test_merge_entities_concatenate(self):
+        """Test merging entities using the concatenate method"""
+        # The parent does not have X_train or y_train set at the start
+        # We'll merge child1 and child2 into parent
+        merge_config = [
+            {
+                'method': 'concatenate',
+                'attributes': ['X_train', 'y_train']
+            }
+        ]
+
+        self.parent.merge_entities([self.child1, self.child2], merge_config)
+
+        # X_train should be vertically concatenated: shape (4,2)
+        expected_X = np.array([[1, 2],
+                               [3, 4],
+                               [5, 6],
+                               [7, 8]])
+        # y_train should be concatenated: shape (4,)
+        expected_y = np.array([1, 0, 0, 1])
+
+        np.testing.assert_array_equal(self.parent.get_attribute('X_train'), expected_X)
+        np.testing.assert_array_equal(self.parent.get_attribute('y_train'), expected_y)
+
+    def test_merge_entities_take_first(self):
+        """Test merging entities using the take_first method"""
+        # Let's say only child1 has an attribute 'metadata', child2 does not
+        self.child1.set_attribute('metadata', {'info': 'child1_info'})
+
+        merge_config = [
+            {
+                'method': 'take_first',
+                'attributes': ['metadata', 'X_train']
+            }
+        ]
+
+        # Merge them, parent + [child1, child2]
+        # For 'metadata', parent doesn't have it, child1 does, so take from child1.
+        # For 'X_train', parent doesn't have it, child1 does, so take from child1 (ignore child2).
+        
+        self.parent.merge_entities([self.child1, self.child2], merge_config)
+
+        self.assertEqual(self.parent.get_attribute('metadata'), {'info': 'child1_info'})
+        np.testing.assert_array_equal(self.parent.get_attribute('X_train'), np.array([[1, 2], [3, 4]]))

@@ -1,5 +1,6 @@
+import numpy as np
 from django.test import TestCase
-from shared_utils.strategy.BaseStrategy import CreateEntityStrategy, AssignAttributesStrategy
+from shared_utils.strategy.BaseStrategy import CreateEntityStrategy, AssignAttributesStrategy, MergeEntitiesStrategy
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
@@ -177,3 +178,93 @@ class TestRemoveEntityStrategy(TestCase):
         
         # Verify strategy request is returned
         self.assertEqual(result, self.strategy_request)
+
+
+class MergeEntitiesStrategyTestCase(TestCase):
+    def setUp(self):
+        # Create a parent entity
+        self.parent = TestConcreteEntity()
+
+        # Create children (data bundles)
+        self.child1 = TestChildEntity()
+        self.child2 = TestChildEntity()
+
+        # Add children to the parent
+        self.parent.add_child(self.child1)
+        self.parent.add_child(self.child2)
+
+        # Set attributes on the child entities
+        # For example, arrays that we want to merge
+        self.child1.set_attribute('X_train', np.array([[1, 2], [3, 4]]))
+        self.child1.set_attribute('y_train', np.array([1, 0]))
+
+        self.child2.set_attribute('X_train', np.array([[5, 6], [7, 8]]))
+        self.child2.set_attribute('y_train', np.array([0, 1]))
+
+        # Construct the strategy request
+        self.strategy_request = StrategyRequestEntity()
+        self.strategy_request.strategy_name = "MergeEntitiesStrategy"
+        self.strategy_request.param_config = {
+            'entities': [self.child1.path, self.child2.path],
+            'merge_config': [
+                {
+                    'method': 'concatenate',
+                    'attributes': ['X_train', 'y_train']
+                }
+            ]
+        }
+
+        self.strategy = MergeEntitiesStrategy(None, self.strategy_request)
+
+    def test_verify_executable_missing_params(self):
+        """Test that verify_executable raises ValueError if required params are missing"""
+        bad_request = StrategyRequestEntity()
+        bad_request.strategy_name = "MergeEntitiesStrategy"
+        bad_request.param_config = {}  # Missing both 'entities' and 'merge_config'
+
+        with self.assertRaises(ValueError) as context:
+            self.strategy.verify_executable(self.parent, bad_request)
+        self.assertIn('Missing required parameter: entities', str(context.exception))
+
+        bad_request.param_config = {'entities': []}
+        with self.assertRaises(ValueError) as context:
+            self.strategy.verify_executable(self.parent, bad_request)
+        self.assertIn('Missing required parameter: merge_config', str(context.exception))
+
+    def test_apply_merge_concatenate(self):
+        """Test that apply merges child attributes into the parent"""
+        # Before merge, parent doesn't have X_train or y_train
+        self.assertFalse(self.parent.has_attribute('X_train'))
+        self.assertFalse(self.parent.has_attribute('y_train'))
+
+        # Apply the strategy
+        self.strategy.apply(self.parent)
+
+        # After merge, parent should have concatenated arrays
+        expected_X = np.array([[1, 2],
+                               [3, 4],
+                               [5, 6],
+                               [7, 8]])
+        expected_y = np.array([1, 0, 0, 1])
+
+        np.testing.assert_array_equal(self.parent.get_attribute('X_train'), expected_X)
+        np.testing.assert_array_equal(self.parent.get_attribute('y_train'), expected_y)
+
+    def test_apply_missing_attributes(self):
+        """Test behavior if one child doesn't have a certain attribute"""
+        # Remove y_train from child2
+        del self.child2._attributes['y_train']
+
+        # Apply the strategy
+        self.strategy.apply(self.parent)
+
+        # Since concatenate is used, only those entities with the attribute get merged.
+        # child1 has y_train, child2 doesn't. So only child1's y_train should appear.
+        expected_X = np.array([[1, 2],
+                               [3, 4],
+                               [5, 6],
+                               [7, 8]])
+        expected_y = np.array([1, 0])  # Only from child1
+
+        np.testing.assert_array_equal(self.parent.get_attribute('X_train'), expected_X)
+        np.testing.assert_array_equal(self.parent.get_attribute('y_train'), expected_y)

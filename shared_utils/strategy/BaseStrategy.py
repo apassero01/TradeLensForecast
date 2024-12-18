@@ -147,3 +147,48 @@ class RemoveEntityStrategy(Strategy):
     @staticmethod
     def get_request_config():
         return {}
+
+
+class MergeEntitiesStrategy(Strategy):
+    """Generic strategy for merging multiple entities"""
+
+    strategy_description = 'Merges multiple entities into the single parent entity'
+
+    def verify_executable(self, entity, strategy_request):
+        if 'entities' not in strategy_request.param_config:
+            raise ValueError('Missing required parameter: entities')
+
+        if 'merge_config' not in strategy_request.param_config:
+            raise ValueError('Missing required parameter: merge_config')
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        config = self.strategy_request.param_config
+        entity_path_list = config.get('entities')
+        merge_config = config.get('merge_config')
+
+        # strategy passes in a list of paths. We need to get all of the entities. Might be a little anti pattern
+        # but for now this is what it is. We will assume that all entities are connected in the same graph via TrainingSessionEntity.
+        # Therefore we can traverse backward for the passed in entity, to the TrainingSessionEntity and then get all entities from there.
+        parent_entity = entity
+        while parent_entity._parent is not None:
+            parent_entity = parent_entity._parent
+
+        entities = parent_entity.find_entities_by_paths(entity_path_list)
+        entities = [entities[path] for path in entity_path_list]
+        # Merge entities
+        entity.merge_entities(entities, merge_config)
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'entities': [],
+            'merge_config': [
+                {
+                    'method': 'concatenate',
+                    'attributes': ['X_train', 'y_train', 'X_test', 'y_test', 'X', 'y']
+                }
+            ]
+        }
+

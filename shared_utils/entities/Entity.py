@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from shared_utils.entities.EnityEnum import EntityEnum
 from uuid import uuid4, UUID
-
+import numpy as np
 class Entity(ABC):
     entity_name = EntityEnum.ENTITY
 
@@ -121,6 +121,24 @@ class Entity(ABC):
     def get_available_attributes(self) -> List[str]:
         '''Get a list of all attributes on the entity'''
         return list(self._attributes.keys())
+    
+    def merge_entities(self, entities: List['Entity'], merge_config):
+
+        entities = [self] + entities
+        for config in merge_config:
+            merge_method = config['method']
+            attributes = config['attributes']
+
+            if merge_method == 'concatenate':
+                for attribute in attributes: 
+                    self.set_attribute(attribute, np.concatenate([entity.get_attribute(attribute) for entity in entities if entity.has_attribute(attribute)]))
+            if merge_method == 'take_first':
+                for attribute in attributes: 
+                    for entity in entities:
+                        if entity.has_attribute(attribute):
+                            self.set_attribute(attribute, entity.get_attribute(attribute))
+                            break
+
 
     def serialize(self):
         serialized_children = []
