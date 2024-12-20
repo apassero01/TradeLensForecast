@@ -8,14 +8,28 @@ from models.BaseModel import BaseLayer
 
 
 class Transformer(BaseLayer):
-    def __init__(self, num_layers, d_model, num_heads, d_ff, encoder_input_dim, decoder_input_dim, dropout=.1):
+    def __init__(self, config):
         super(Transformer, self).__init__()
 
-        self.encoder = TransformerEncoder(num_layers, d_model, num_heads, d_ff, dropout=dropout, name = "transformer_encoder")
+        self.config = config
 
-        self.input_projection = nn.Linear(encoder_input_dim, d_model)
+        self.encoder = TransformerEncoder(
+            self.config['num_layers'], 
+            self.config['d_model'], 
+            self.config['num_heads'], 
+            self.config['d_ff'], 
+            dropout=self.config.get('dropout', 0.1), 
+            name="transformer_encoder"
+        )
 
-        self.output_mechanism = EncoderToRNNWithMultiHeadAttention(d_model, d_ff, num_heads, decoder_input_dim)
+        self.input_projection = nn.Linear(self.config['encoder_input_dim'], self.config['d_model'])
+
+        self.output_mechanism = EncoderToRNNWithMultiHeadAttention(
+            self.config['d_model'], 
+            self.config['d_ff'], 
+            self.config['num_heads'], 
+            self.config['decoder_input_dim']
+        )
 
         self.traversable_layers = [self.encoder, self.output_mechanism]
 
@@ -23,8 +37,10 @@ class Transformer(BaseLayer):
 
         print(f"Transformer initialized with {len(self.traversable_layers)} layers")
 
-    def forward(self, encoder_input, decoder_input, target_mask=None):
+    def forward(self, encoder_input, decoder_input = None, target_mask=None):
+        print(encoder_input.device)
         encoder_input = self.input_projection(encoder_input)
+        print(encoder_input.device)
 
         encoder_output = self.encoder(encoder_input)
 

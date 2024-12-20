@@ -1,4 +1,5 @@
 import numpy as np
+from markdown_it.rules_inline import entity
 
 from data_bundle_manager.entities.DataBundleEntity import DataBundleEntity
 from data_bundle_manager.strategy.DataBundleStrategy import SplitBundleDateStrategy, \
@@ -80,28 +81,35 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
             y_features = sequence_set.get_attribute('y_features')
             feature_dict = self.create_feature_dict(X_features, y_features)
             X, y, row_ids = self.create_3d_array_seq(sequence_set, X_features, y_features, feature_dict)
+            sequence_set.set_attribute('X', X)
+            sequence_set.set_attribute('y', y)
+            sequence_set.set_attribute('row_ids', row_ids)
+
             X_feature_dict, y_feature_dict = self.create_xy_feature_dict(X_features, y_features)
+            sequence_set.set_attribute('X_feature_dict', X_feature_dict)
+            sequence_set.set_attribute('y_feature_dict', y_feature_dict)
+
             data_bundle = sequence_set.get_children_by_type(EntityEnum.DATA_BUNDLE)
             if not len(data_bundle) == 1:
                 raise ValueError("SequenceSetEntity should have exactly one DataBundleEntity child")
-            strategy_request = self.create_strategy_request(data_bundle[0], X, y, row_ids, X_feature_dict, y_feature_dict, sequence_set.get_attribute('seq_end_dates'))
-            self.strategy_executor.execute(data_bundle[0], strategy_request)
+            strategy_request = self.create_strategy_request(data_bundle[0])
+            self.strategy_executor.execute(sequence_set, strategy_request)
         return self.strategy_request
 
 
-    def create_strategy_request(self, entity, X, y , row_ids, X_feature_dict, y_feature_dict, seq_end_dates):
+    def create_strategy_request(self, target_entity):
         strategy_request = StrategyRequestEntity()
         strategy_request.strategy_name = AssignAttributesStrategy.__name__
         strategy_request.strategy_path = None
         strategy_request.param_config = {   
-            'child_path': entity.path,
+            'target_path': target_entity.path,
             'attribute_map': {
-                'X' : X,
-                'y' : y,
-                'row_ids': row_ids,
-                'X_feature_dict': X_feature_dict,
-                'y_feature_dict': y_feature_dict,
-                'seq_end_dates': seq_end_dates
+                'X' : 'X',
+                'y' : 'y',
+                'row_ids': 'row_ids',
+                'X_feature_dict': 'X_feature_dict',
+                'y_feature_dict': 'y_feature_dict',
+                'seq_end_dates': 'seq_end_dates'
             }
         }
 

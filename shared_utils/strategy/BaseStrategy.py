@@ -101,7 +101,7 @@ class AssignAttributesStrategy(Strategy):
         config = strategy_request.param_config
         return all(key in config for key in ['child_path', 'attribute_map'])
 
-    def apply(self, parent_entity: Entity) -> Entity:
+    def apply(self, sourceEntity: Entity) -> Entity:
         """
         Assigns attributes from parent to child entity based on mapping
         
@@ -110,24 +110,30 @@ class AssignAttributesStrategy(Strategy):
         - attribute_map: dict mapping child attribute names to values
         """
         config = self.strategy_request.param_config
-        child_path = config.get('child_path')
+        child_path = config.get('target_path')
         attribute_map = config.get('attribute_map', {})
         
         # Find child entity
-        child_entity = parent_entity.find_entity_by_path(child_path)
-        if not child_entity:
+        parentEntity = sourceEntity.get_parent()
+        while parentEntity.get_parent() is not None:
+            parentEntity = parentEntity.get_parent()
+
+
+        target_entity = parentEntity.find_entity_by_path(child_path)
+        if not target_entity:
             raise ValueError(f"Child entity not found at path: {child_path}")
             
         # Assign attributes
-        child_entity.set_attributes(attribute_map)
+        for source_name, target_name in attribute_map.items():
+            target_entity.set_attribute(target_name, sourceEntity.get_attribute(source_name))
                 
         return self.strategy_request
 
     @staticmethod
     def get_request_config():
         return {
-            'child_path': '',
-            'attribute_map': {}
+            'target_path': '',
+            'attribute_map': {"source_attribute": "target_attribute"}
         }
 
 

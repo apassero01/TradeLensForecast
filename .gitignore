@@ -21,11 +21,9 @@ staticfiles/
 .env.production.local
 
 # Ignore migrations
-*/migrations/*
 
 # Logs
 *.log
-*.txt
 
 # VS Code and JetBrains IDEs
 .vscode/

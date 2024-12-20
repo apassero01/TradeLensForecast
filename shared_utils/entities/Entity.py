@@ -121,6 +121,10 @@ class Entity(ABC):
     def get_available_attributes(self) -> List[str]:
         '''Get a list of all attributes on the entity'''
         return list(self._attributes.keys())
+
+    def get_parent(self) -> Optional['Entity']:
+        '''Get the parent of the entity'''
+        return self._parent
     
     def merge_entities(self, entities: List['Entity'], merge_config):
 

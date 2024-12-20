@@ -161,11 +161,14 @@ def api_load_session(request, session_id):
     if request.method == 'POST':
         try:
             # Load the session from database
-            session_model = TrainingSession.objects.get(id=session_id)
-            session_entity = TrainingSessionEntity.from_db(session_model)
-            
+            session_entity = cache.get('current_session')
+
+            if session_entity and session_entity.id == session_id:
+                cache.set('current_session', session_entity)
+            else:
+                session_model = TrainingSession.objects.get(id=session_id)
+                session_entity = TrainingSessionEntity.from_db(session_model)
             # Store in cache
-            cache.set('current_session', session_entity)
             
             return JsonResponse({
                 'status': 'success',
