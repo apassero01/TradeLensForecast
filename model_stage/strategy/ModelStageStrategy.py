@@ -259,9 +259,9 @@ class PredictModelStrategy(Strategy):
 
     def _predict(self, model, prediction_input, device):
         model.eval()
-        prediction_input = prediction_input.to(device)
+        X = torch.cat([X for X, y in prediction_input], dim=0)
         with torch.no_grad():
-            predictions = model(prediction_input)
+            predictions = model(X.to(device))
         # Convert predictions to CPU and numpy if necessary:
         return predictions.cpu().numpy() if hasattr(predictions, 'cpu') else predictions
 

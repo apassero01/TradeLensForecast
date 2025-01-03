@@ -38,9 +38,7 @@ class Transformer(BaseLayer):
         print(f"Transformer initialized with {len(self.traversable_layers)} layers")
 
     def forward(self, encoder_input, decoder_input = None, target_mask=None):
-        print(encoder_input.device)
         encoder_input = self.input_projection(encoder_input)
-        print(encoder_input.device)
 
         encoder_output = self.encoder(encoder_input)
 
