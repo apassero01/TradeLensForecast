@@ -29,11 +29,17 @@ class TrainingSessionEntityService:
         session = TrainingSessionEntity.from_db(session)
         return session
 
-    def execute_strat_request(self, strat_request, session_entity):
+    def execute_strat_request(self, new_strat_request, session_entity):
 
-        strat_request =  self.strategy_executor_service.execute(session_entity, strat_request)
+        new_strat_request =  self.strategy_executor_service.execute(session_entity, new_strat_request)
         # if strat_request.add_to_history: #TODO maybe add this back in
-        session_entity.add_to_strategy_history(strat_request)
+        for i, strategy_request in enumerate(session_entity.strategy_history):
+            if strategy_request.entity_id == new_strat_request.entity_id:
+                session_entity.strategy_history[i] = new_strat_request
+                return
+        session_entity.add_to_strategy_history(new_strat_request)
+
+        #TODO later we want to be able to potentially change the status of downstream requests when an existing request is re-executed
 
 
     def serialize_session(self):

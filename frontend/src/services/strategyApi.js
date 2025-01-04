@@ -24,6 +24,21 @@ class StrategyApi {
     }
     return response.json();
   }
+
+  async executeStrategyList(strategyList) {
+    const response = await fetch(`${API_BASE_URL}/training_session/api/execute_strategy_list/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ strategy_list: strategyList })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to execute strategy list');
+    }
+    return response.json();
+  }
 }
 
 export const strategyApi = new StrategyApi(); 

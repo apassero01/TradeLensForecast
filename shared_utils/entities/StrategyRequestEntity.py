@@ -7,8 +7,8 @@ from typing import List, Optional
 class StrategyRequestEntity(Entity):
     entity_name = EntityEnum.ENTITY
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, entity_id: Optional[str] = None):
+        super().__init__(entity_id)
         self.strategy_name = None
         self.strategy_path = None
         self.param_config = {}  # Initialize as empty dict instead of None
@@ -55,7 +55,8 @@ class StrategyRequestEntity(Entity):
             'nested_requests': [nested_request.serialize() for nested_request in self._nested_requests],
             'created_at': self.created_at,
             'updated_at': self.updated_at,
-            'add_to_history': self.add_to_history
+            'add_to_history': self.add_to_history,
+            'entity_id': self.entity_id,
         }
 
 

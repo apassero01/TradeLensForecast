@@ -1,13 +1,22 @@
 import React from 'react';
 
-const StrategyHistory = ({ items, selectedItem, onSelect }) => {
+const StrategyHistory = ({ items, selectedItem, onSelect, onListExecute }) => {
   const sortedItems = [...items].reverse();
 
   return (
     <div className="flex flex-col h-full bg-gray-800">
-      <div className="p-4 border-b border-gray-700">
+      {/* Header with Title and Play Button */}
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <h2 className="text-lg font-medium text-white">Strategy History</h2>
+        <button
+          onClick={() => onListExecute(items)}
+          className="text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+        >
+          ▶
+        </button>
       </div>
+
+      {/* History List */}
       <div className="flex-grow overflow-y-auto">
         {sortedItems.map((item, index) => (
           <button
@@ -36,4 +45,4 @@ const StrategyHistory = ({ items, selectedItem, onSelect }) => {
   );
 };
 
-export default StrategyHistory; 
+export default StrategyHistory;

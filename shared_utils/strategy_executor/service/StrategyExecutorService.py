@@ -29,8 +29,6 @@ class StrategyExecutorService:
             CombineDataBundlesStrategy
         ],
         EntityEnum.MODEL.value: [],
-        EntityEnum.MODEL_STAGE.value: [
-        ],
         EntityEnum.FEATURE_SET.value: [
 
         ],

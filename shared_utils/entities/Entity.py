@@ -41,7 +41,11 @@ class Entity(ABC):
         # If child already has a parent, remove it from that parent's children
         if child._parent is not None:
             child._parent.children.remove(child)
-        
+
+        for existing_child in self.children:
+            if existing_child.entity_id == child.entity_id:
+                self.children.remove(existing_child)
+        # TODO careful here - this is dangerous with cache approach as atomic operation is not guaranteed with databases might be a little easier later
         # Add to new parent
         self.children.append(child)
         child._parent = self
@@ -153,7 +157,8 @@ class Entity(ABC):
             'children': serialized_children,
             'meta_data': {},
             'path': self.path,
-            'class_path': self.__class__.__module__ + '.' + self.__class__.__name__
+            'class_path': self.__class__.__module__ + '.' + self.__class__.__name__,
+            'entity_id': self.entity_id,
         }
 
     def to_db(self):

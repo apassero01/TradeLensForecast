@@ -133,6 +133,21 @@ const TopLevel = () => {
     }
   };
 
+  const handleStrategyListExecute = async (strategyRequestList) => {
+    try {
+      setIsLoading(true);
+      const response = await strategyApi.executeStrategyList(strategyRequestList);
+      setGraphData(response.session_data);
+      setError(null);
+      return response;
+    } catch (err) {
+      setError('Failed to execute strategy list: ' + err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 flex">
       {/* Main content area */}
@@ -179,6 +194,7 @@ const TopLevel = () => {
           availableStrategies={availableStrategies}
           onStrategyExecute={handleStrategyExecute}
           fetchAvailableStrategies={fetchAvailableStrategies}
+          onStrategyListExecute={handleStrategyListExecute}
         />
       )}
     </div>

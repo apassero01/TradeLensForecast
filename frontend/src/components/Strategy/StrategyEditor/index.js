@@ -14,14 +14,22 @@ const StrategyEditor = ({
       return new StrategyRequest({
         name: historyItem.strategy_name,
         path: historyItem.strategy_path,
-        config: historyItem.param_config
+        config: historyItem.param_config,
+        nested_requests: historyItem.nested_requests,
+        add_to_history: historyItem.add_to_history,
+        entity_id: historyItem.entity_id
+
+
       });
     }
     if (strategy && selectedEntity) {
       return new StrategyRequest({
         name: strategy.name,
         path: selectedEntity.data.path,
-        config: strategy.config
+        config: strategy.config,
+        nested_requests: strategy.nested_requests,
+        add_to_history: strategy.add_to_history,
+        entity_id: selectedEntity.entity_id
       });
     }
     return null;

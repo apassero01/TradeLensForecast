@@ -8,7 +8,8 @@ const StrategyPanel = ({
   selectedEntity, 
   availableStrategies,
   onStrategyExecute,
-  fetchAvailableStrategies
+  fetchAvailableStrategies,
+  onStrategyListExecute,
 }) => {
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
@@ -48,6 +49,13 @@ const StrategyPanel = ({
     return response;  // Pass response back through the chain
   };
 
+  const handleExecuteListWithHistory = async (strategyList) => {
+    console.log('Executing strategy list with history:', strategyList);
+    const response = await onStrategyListExecute(strategyList);  // Get response
+    await fetchHistory();  // Update history
+    return response;  // Pass response back through the chain
+  }
+
   return (
     <div 
       className="flex h-screen bg-gray-800 border-l border-gray-700 relative transition-all duration-300"
@@ -70,6 +78,7 @@ const StrategyPanel = ({
               items={historyItems}
               selectedItem={selectedHistoryItem}
               onSelect={handleHistorySelect}
+              onListExecute={handleExecuteListWithHistory}
             />
           </div>
 
