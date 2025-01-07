@@ -54,4 +54,21 @@ class TestStrategyExecutorService(TestCase):
         # Verify direct execution on entity
         self.entity.find_entity_by_path.assert_not_called()
         self.executor.execute.assert_called_once_with(self.entity, self.strategy_request)
-        self.assertTrue(result.param_config["strategy_executed"]) 
+        self.assertTrue(result.param_config["strategy_executed"])
+
+    def test_execute_by_target_entity_id(self):
+        """Test executing a strategy by resolving target entity ID"""
+        # Setup target entity
+        target_entity = MagicMock()
+        self.entity.find_child_by_id.return_value = target_entity
+
+        # Set target entity ID in strategy request
+        self.strategy_request.target_entity_id = "target-entity-id"
+
+        # Execute
+        result = self.service.execute_by_target_entity_id(self.entity, self.strategy_request)
+
+        # Verify
+        self.entity.find_child_by_id.assert_called_once_with(self.strategy_request.target_entity_id)
+        self.executor.execute.assert_called_once_with(target_entity, self.strategy_request)
+        self.assertTrue(result.param_config["strategy_executed"])

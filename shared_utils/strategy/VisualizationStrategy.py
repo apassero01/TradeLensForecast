@@ -11,20 +11,31 @@ class VisualizationStrategy(Strategy):
     entity_type = EntityEnum.VISUALIZATION
     def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
         super().__init__(strategy_executor, strategy_request)
+        self.visualization_type = None
 
     def apply(self, entity: Entity):
-        raise NotImplementedError("VisualizationStrategy apply method not implemented")
+        self.get_parent_attributes(entity)
+        self.visualization_type = VisualizationTypeEnum(self.strategy_request.param_config.get('visualization_type'))
+        visualization = {
+            "type": self.visualization_type.value,
+            "config": {},
+            "data": entity.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
+        }
+        entity.set_attribute('visualization', visualization)
+
+        return self.strategy_request
     
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
         return True
     
     def get_parent_attributes(self, entity: Entity): 
-        array = entity._parent.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
-        entity.set_attribute('data', {'array': array})
+        array = entity.get_parent().get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
+        entity.set_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'), array)
 
     @staticmethod
     def get_request_config():
         return {
+            'visualization_type': 'stockchart',
             'parent_data_attribute_name': 'X'
         }
     
@@ -79,5 +90,69 @@ class HistogramStrategy(VisualizationStrategy):
 
 
         
+class LineGraphStrategy(VisualizationStrategy):
+    """
+    A strategy for creating a line graph visualization from a 3D array of shape:
+        (batch, seq_length, features).
+    Outputs metadata about the array's shape to allow flexible front-end grouping.
+    """
+    def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+        super().__init__(strategy_executor, strategy_request)
+        self.visualization_type = VisualizationTypeEnum.MULTILINE
 
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        """
+        Ensure the input is a valid 3D NumPy array.
+        """
+        pass
+
+    def apply(self, entity: Entity):
+        # 1. Retrieve parent array and configuration
+        self.get_parent_attributes(entity)
+        self.verify_executable(entity, self.strategy_request)
+
+        array_3d = entity.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
+        title = self.strategy_request.param_config.get('title', 'Line Graph')
+        x_axis_label = self.strategy_request.param_config.get('x_axis_label', 'X Axis')
+        y_axis_label = self.strategy_request.param_config.get('y_axis_label', 'Values')
+
+        if not isinstance(array_3d, np.ndarray) or len(array_3d.shape) != 3:
+            raise ValueError("Input must be a 3D NumPy array of shape (batch, seq_length, features).")
+
+        batch_size, seq_length, num_features = array_3d.shape
+
+        # 2. Prepare x-axis (seq_length dimension)
+        x_axis = list(range(seq_length))
+
+        # 3. Create the visualization object
+        visualization = {
+            "type": self.visualization_type.value,
+            "config": {
+                "title": title,
+                "xAxisLabel": x_axis_label,
+                "yAxisLabel": y_axis_label
+            },
+            "data": {
+                "x": x_axis,
+                "lines": array_3d.tolist(),  # Pass raw data as a list
+                "shape": [batch_size, seq_length, num_features],  # Include original shape metadata
+            }
+        }
+
+        # 4. Store the visualization in the entity
+        entity.set_attribute('visualization', visualization)
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config() -> dict:
+        """
+        Default params for the line graph strategy.
+        """
+        return {
+            'title': 'Line Graph Title',
+            'x_axis_label': 'X Axis (Seq Length)',
+            'y_axis_label': 'Y Axis (Values)',
+            'parent_data_attribute_name': 'X',
+            'visualization_type': 'multiline'
+        }
 

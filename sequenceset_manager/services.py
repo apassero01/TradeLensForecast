@@ -1,6 +1,8 @@
 import json
 import math
 from abc import ABC
+from collections import defaultdict
+
 from sequenceset_manager.models import SequenceSet, Sequence
 from django.db import transaction
 import requests
@@ -295,6 +297,128 @@ class SequenceService(ABC):
             metadata.append(meta_data)
 
         return metadata
+
+    @staticmethod
+    def get_sequences(sequence_ids, feature_list=None, start_date=None, end_date=None):
+        """
+        Retrieve sliced sequence_data for each sequence_id in `sequence_ids`,
+        grouped by their SequenceSet so we only fetch each set's feature_dict once.
+
+        Returns a list of results in the same order as `sequence_ids`.
+        Each entry in the returned list corresponds to one sequence ID,
+        containing fields like:
+          {
+            'id': <sequence_id>,
+            'sequence_set': <set_id>,
+            'start_timestamp': ...,
+            'end_timestamp': ...,
+            'sequence_length': ...,
+            'sliced_data': [...]
+          }
+        """
+        if feature_list is None:
+            feature_list = []
+
+        if not sequence_ids:
+            return []
+
+        # 1) Keep track of the original position of each ID (so we can preserve order in the final output)
+        id_to_index = {}
+        for i, seq_id in enumerate(sequence_ids):
+            id_to_index[seq_id] = i
+
+        # 2) Group sequence IDs by sequence_set so we don't repeatedly load the same set
+        set_groups = defaultdict(list)  # {set_id: [seq_id, seq_id, ...], ...}
+        for seq_id in sequence_ids:
+            try:
+                # Only fetch minimal fields (id + sequence_set_id)
+                seq_obj = Sequence.objects.only('id', 'sequence_set_id').get(id=seq_id)
+            except Sequence.DoesNotExist:
+                raise ValidationError(f"Sequence with ID {seq_id} does not exist.")
+
+            set_groups[seq_obj.sequence_set_id].append(seq_id)
+
+        # Prepare a list to hold final results in the correct order
+        final_results = [None] * len(sequence_ids)
+
+        # 3) For each distinct SequenceSet, build the slice expression and annotate the subset of Sequences
+        for set_id, seq_ids_in_this_set in set_groups.items():
+            # 3a) Retrieve the SequenceSet and its feature_dict
+            try:
+                seq_set = SequenceSet.objects.get(pk=set_id)
+            except SequenceSet.DoesNotExist:
+                raise ValidationError(f"SequenceSet with ID {set_id} does not exist.")
+
+            feature_dict = seq_set.feature_dict
+
+            # 3b) Convert the feature_list -> a list of column indices
+            indices = []
+            for feature in feature_list:
+                if feature not in feature_dict:
+                    raise ValidationError(
+                        f"Feature '{feature}' not found in feature_dict of SequenceSet ID {set_id}"
+                    )
+                indices.append(feature_dict[feature])
+
+            # 3c) Build the slice SQL expression
+            if indices:
+                # Example: ARRAY[sequence_data[1:1], sequence_data[2:2], ...]
+                slice_sql = "ARRAY[" + ", ".join(
+                    [f"sequence_data[{i + 1}:{i + 1}]" for i in indices]
+                ) + "]"
+            else:
+                # If no features, produce a typed empty array to avoid PostgreSQL type errors
+                slice_sql = "ARRAY[]::double precision[]"
+
+            # 3d) Build the queryset for the subset of sequences matching these IDs & optional date filters
+            subset_qs = Sequence.objects.filter(id__in=seq_ids_in_this_set)
+            if start_date:
+                subset_qs = subset_qs.filter(start_timestamp__gte=start_date)
+            if end_date:
+                subset_qs = subset_qs.filter(end_timestamp__lte=end_date)
+
+            # 3e) Annotate with the slice expression
+            annotated_qs = subset_qs.annotate(
+                sliced_data=RawSQL(slice_sql, [])
+            ).values(
+                'id',
+                'sequence_set',
+                'start_timestamp',
+                'end_timestamp',
+                'sequence_length',
+                'sliced_data'
+            ).order_by('start_timestamp')
+
+            # 3f) Process each record: convert None -> np.nan, shape the data via numpy
+            subset_list = list(annotated_qs)
+            for record in subset_list:
+                # Convert None -> np.nan
+                record['sliced_data'] = [
+                    [np.nan if val is None else val for val in row]
+                    for row in record['sliced_data']
+                ]
+                arr = np.array(record['sliced_data'])
+
+                # Step 1: squeeze away trivial dims, e.g. (F,1,T)->(F,T) or (1,1,T)->(T,)
+                arr = arr.squeeze()
+
+                # Step 2: if it's 1D, that means we have shape (T,). Make it (1, T).
+                if arr.ndim == 1:
+                    arr = np.expand_dims(arr, axis=0)
+
+                # Now shape is (F, T) if multi-feature, or (1, T) if single-feature.
+
+                # Step 3: transpose so we get (T, F) or (T, 1).
+                arr = arr.T
+
+                record['sliced_data'] = arr.tolist()
+                record['metadata'] = seq_set.metadata
+
+                # Place this record in final_results at the correct index
+                original_pos = id_to_index[record['id']]
+                final_results[original_pos] = record
+
+        return final_results
 
 
 class StockSequenceSetService(SequenceSetService):

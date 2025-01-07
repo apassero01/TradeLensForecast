@@ -17,19 +17,22 @@ const StrategyEditor = ({
         config: historyItem.param_config,
         nested_requests: historyItem.nested_requests,
         add_to_history: historyItem.add_to_history,
+        target_entity_id: historyItem.target_entity_id,
         entity_id: historyItem.entity_id
 
 
       });
     }
     if (strategy && selectedEntity) {
+      console.log("SELECTED ENTITY", selectedEntity)
       return new StrategyRequest({
         name: strategy.name,
         path: selectedEntity.data.path,
         config: strategy.config,
         nested_requests: strategy.nested_requests,
         add_to_history: strategy.add_to_history,
-        entity_id: selectedEntity.entity_id
+        target_entity_id: selectedEntity.data.entity_id,
+        entity_id: strategy.entity_id
       });
     }
     return null;

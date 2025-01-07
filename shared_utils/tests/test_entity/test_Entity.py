@@ -195,3 +195,49 @@ class EntityTestCase(TestCase):
 
         self.assertEqual(self.parent.get_attribute('metadata'), {'info': 'child1_info'})
         np.testing.assert_array_equal(self.parent.get_attribute('X_train'), np.array([[1, 2], [3, 4]]))
+
+    def test_remove_attribute(self):
+        """Test removing a single attribute from the entity"""
+        entity = TestConcreteEntity()
+        entity.set_attribute('test_key', 'test_value')
+        self.assertTrue(entity.has_attribute('test_key'))  # Verify attribute exists
+
+        entity.remove_attribute('test_key')  # Remove the attribute
+        self.assertFalse(entity.has_attribute('test_key'))  # Verify attribute is removed
+
+    def test_remove_attributes(self):
+        """Test removing multiple attributes from the entity"""
+        entity = TestConcreteEntity()
+        entity.set_attribute('key1', 'value1')
+        entity.set_attribute('key2', 'value2')
+        entity.set_attribute('key3', 'value3')
+
+        self.assertTrue(entity.has_attribute('key1'))
+        self.assertTrue(entity.has_attribute('key2'))
+        self.assertTrue(entity.has_attribute('key3'))
+
+        # Remove multiple attributes
+        entity.remove_attributes(['key1', 'key2'])
+
+        # Verify the attributes are removed
+        self.assertFalse(entity.has_attribute('key1'))
+        self.assertFalse(entity.has_attribute('key2'))
+        self.assertTrue(entity.has_attribute('key3'))  # key3 should still exist
+
+    def test_find_child_by_id(self):
+        """Test finding a child entity by its ID"""
+        self.parent.add_child(self.child1)
+        self.parent.add_child(self.child2)
+
+        # Verify child1 can be found by its ID
+        found_child = self.parent.find_child_by_id(self.child1.entity_id)
+        self.assertEqual(found_child, self.child1)
+
+        # Verify child2 can be found by its ID
+        found_child = self.parent.find_child_by_id(self.child2.entity_id)
+        self.assertEqual(found_child, self.child2)
+
+        # Verify non-existent ID returns None
+        non_existent_id = 'non-existent-id'
+        found_child = self.parent.find_child_by_id(non_existent_id)
+        self.assertIsNone(found_child)

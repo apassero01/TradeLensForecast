@@ -8,10 +8,12 @@ from django.views.decorators.csrf import csrf_exempt
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.models import StrategyRequest
+from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 from training_session.entities.TrainingSessionEntity import TrainingSessionEntity
 from training_session.services.TrainingSessionEntityService import TrainingSessionEntityService
 from training_session.models import TrainingSession
+from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 
 
 
@@ -85,7 +87,6 @@ def api_get_entity_graph(request):
         try:
             # Use the entity's serialize method to get the hierarchical structure
             graph_data = session_entity.serialize()
-            print(graph_data)
             return JsonResponse(graph_data)
         except Exception as e:
             print(str(e))
@@ -209,8 +210,7 @@ def get_available_entities(request):
         return all_subclasses
     
     all_entities = get_all_entity_subclasses(Entity)
-    print(all_entities)
-    
+
     # Format the response
     for entity_class in all_entities:
         entities[entity_class.entity_name.value] = {
@@ -242,21 +242,62 @@ def api_execute_strategy(request):
 
         strat_request = json_to_StrategyRequestEntity(strategy)
 
-        print(session.serialize())
+        strategy_executor_service = StrategyExecutorService(StrategyExecutor())
+
         try:
-            ret_val = training_session_service.execute_strat_request(strat_request, session)
+            ret_val = strategy_executor_service.execute_by_target_entity_id(session, strat_request)
+            add_to_strategy_history(session, ret_val)
             cache.set('current_session', session)
-            print(session.serialize())
             return JsonResponse({
                 'status': 'success',
                 'message': 'Session loaded successfully',
                 'session_data': session.serialize(),
-                'strategy_response': ret_val
+                # 'strategy_response': ret_val
             })
         except Exception as e:
             print("exception")
             print(str(e))
             return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'POST method required'}, status=400)
+    
+@csrf_exempt
+def api_execute_strategy_list(request):
+    print('execute_strategy_list')
+    if request.method == 'POST':
+        session = cache.get('current_session')
+        if not session:
+            return JsonResponse({'error': 'No session in progress'}, status=400)
+
+        print(json.loads(request.body))
+        strategies = json.loads(request.body).get('strategy_list')
+        print('strategies', strategies)
+
+        if not strategies:
+            return JsonResponse({'error': 'strategies are required'}, status=400)
+
+        training_session_service = TrainingSessionEntityService()
+        training_session_service.set_session(session)
+
+        strategy_executor_service = StrategyExecutorService(StrategyExecutor())
+        for strategy in strategies:
+            try:
+                strat_request = json_to_StrategyRequestEntity(strategy)
+                ret_val = strategy_executor_service.execute_by_target_entity_id(session, strat_request)
+                add_to_strategy_history(session, ret_val)
+
+
+            except Exception as e:
+                print(str(e))
+                cache.set('current_session', session)
+                return JsonResponse({'error': str(e)}, status=400)
+
+        cache.set('current_session', session)
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Session loaded successfully',
+            'session_data': session.serialize()
+        })
     else:
         return JsonResponse({'error': 'POST method required'}, status=400)
 
@@ -281,44 +322,6 @@ def api_get_strategy_history(request):
     else:
         return JsonResponse({'error': 'GET method required'}, status=400)
 
-@csrf_exempt
-def api_execute_strategy_list(request):
-    print('execute_strategy_list')
-    if request.method == 'POST':
-        session = cache.get('current_session')
-        if not session:
-            return JsonResponse({'error': 'No session in progress'}, status=400)
-
-        print(json.loads(request.body))
-        strategies = json.loads(request.body).get('strategy_list')
-        print('strategies', strategies)
-
-        if not strategies:
-            return JsonResponse({'error': 'strategies are required'}, status=400)
-
-        training_session_service = TrainingSessionEntityService()
-        training_session_service.set_session(session)
-
-
-        for strategy in strategies:
-            try:
-                strat_request = json_to_StrategyRequestEntity(strategy)
-                ret_val = training_session_service.execute_strat_request(strat_request, session)
-
-            except Exception as e:
-                print(str(e))
-                cache.set('current_session', session)
-                return JsonResponse({'error': str(e)}, status=400)
-
-        cache.set('current_session', session)
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Session loaded successfully',
-            'session_data': session.serialize()
-        })
-    else:
-        return JsonResponse({'error': 'POST method required'}, status=400)
-
 
 # Helper Functions
 
@@ -332,9 +335,19 @@ def json_to_StrategyRequestEntity(json_data):
     strat_request.strategy_path = json_data['strategy_path']
     strat_request.param_config = json_data['param_config']
     strat_request.add_to_history = json_data['add_to_history']
+    strat_request.target_entity_id = json_data['target_entity_id']
 
     nested_requests = json_data['nested_requests']
     for nested_request in nested_requests:
         strat_request.add_nested_request(json_to_StrategyRequestEntity(nested_request))
 
     return strat_request
+
+def add_to_strategy_history(session_entity, strat_request):
+    #TODO later the history will be stored in the entity that the strategy is executed on for now without db we store it in the session
+    for i, strategy_request in enumerate(session_entity.strategy_history):
+        if strategy_request.entity_id == strat_request.entity_id:
+            session_entity.strategy_history[i] = strat_request
+            return
+    session_entity.add_to_strategy_history(strat_request)
+    return

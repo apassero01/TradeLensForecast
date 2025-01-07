@@ -4,13 +4,14 @@ from django.test import TestCase, Client
 import json
 import pandas as pd
 import numpy as np
+from setuptools.dist import sequence
 
 from dataset_manager.models import DataSet
 from dataset_manager.services import DataSetService
 from sequenceset_manager.services import SequenceSetService, StockSequenceSetService, SequenceService
 import math
 from sequenceset_manager.models import SequenceSet, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from copy import deepcopy
 
@@ -192,6 +193,165 @@ class StockSequenceSetServiceTest(TestCase):
                 index = feature_dict[feature]
                 self.assertTrue(compare_lists_with_nan(sequence.sequence_data[:,index], np.array(df_seq[feature].values.tolist())))
 
+
+class GetSequencesFunctionTest(TestCase):
+    def setUp(self):
+        """
+        Create multiple SequenceSets and Sequences to test 'get_sequences'.
+        We'll also set up some random data to simulate multiple features.
+        """
+        self.num_features = 4
+        self.feature_names = [f"feat_{i}" for i in range(self.num_features)]
+
+        # Create two SequenceSets for demonstration
+        self.sequence_set_1 = SequenceSet.objects.create(
+            dataset_type='test',
+            sequence_length=5,
+            start_timestamp=datetime(2021, 1, 1),
+            end_timestamp=datetime(2021, 1, 31),
+            feature_dict={feature: idx for idx, feature in enumerate(self.feature_names)},
+            metadata={'test_meta': 'set1'}
+        )
+        self.sequence_set_2 = SequenceSet.objects.create(
+            dataset_type='test',
+            sequence_length=5,
+            start_timestamp=datetime(2021, 2, 1),
+            end_timestamp=datetime(2021, 2, 28),
+            feature_dict={feature: idx for idx, feature in enumerate(self.feature_names)},
+            metadata={'test_meta': 'set2'}
+        )
+
+        # Generate some fake data arrays and create Sequences for each set
+        # For simplicity, each Sequence will be 2D: shape = (sequence_length, num_features)
+        self.sequence_ids = range(0,5)
+        base_date = datetime(2021, 1, 1)
+
+
+        sequences_1 = []
+        for i in range(3):
+            # Create a random 5x4 matrix
+            data = np.random.rand(5, self.num_features).tolist()
+            seq_obj = Sequence(
+                sequence_set=self.sequence_set_1,
+                start_timestamp=base_date + timedelta(days=i),
+                end_timestamp=base_date + timedelta(days=i + 4),
+                sequence_length=5,
+                sequence_data=data,
+                pk=i
+            )
+            sequences_1.append(seq_obj)
+
+        SequenceService.save_sequences(sequences_1)
+
+
+        # Another set with different data
+        base_date_2 = datetime(2021, 2, 1)
+        sequences_2 = []
+        for i in range(2):
+            data = np.random.rand(5, self.num_features).tolist()
+            seq_obj = Sequence(
+                sequence_set=self.sequence_set_2,
+                start_timestamp=base_date_2 + timedelta(days=i),
+                end_timestamp=base_date_2 + timedelta(days=i + 4),
+                sequence_length=5,
+                sequence_data=data,
+                pk= i + 3
+            )
+            sequences_2.append(seq_obj)
+
+        SequenceService.save_sequences(sequences_2)
+
+
+
+    def test_get_sequences_single_feature(self):
+        """
+        Test retrieving data for a single feature from multiple sequences
+        across two SequenceSets. Check that the slicing is correct and
+        the results maintain the order of the sequence_ids we provided.
+        """
+        # We'll only fetch the first feature, e.g. 'feat_0'
+        feature_list = ['feat_0']
+        results = SequenceService.get_sequences(
+            sequence_ids=self.sequence_ids,
+            feature_list=feature_list
+        )
+
+        # Check that 'results' is the same length as self.sequence_ids
+        self.assertEqual(len(results), len(self.sequence_ids))
+
+        # The order of results must match the order of self.sequence_ids
+        for idx, seq_id in enumerate(self.sequence_ids):
+            self.assertEqual(results[idx]['id'], seq_id)
+
+            # Verify the shape of sliced_data is 5 (sequence_length) x 1 (feature_list size)
+            sliced_data = results[idx]['sliced_data']
+            self.assertEqual(len(sliced_data), 5)
+            self.assertEqual(len(sliced_data[0]), 1)
+
+    def test_get_sequences_multi_feature(self):
+        """
+        Test retrieving multiple features from the sequences.
+        Check that we slice out 2 features correctly, and
+        the shape is (sequence_length x 2).
+        """
+        feature_list = ['feat_0', 'feat_2']
+        results = SequenceService.get_sequences(
+            sequence_ids=self.sequence_ids,
+            feature_list=feature_list
+        )
+
+        self.assertEqual(len(results), len(self.sequence_ids))
+
+        for idx, seq_id in enumerate(self.sequence_ids):
+            rec = results[idx]
+            self.assertEqual(rec['id'], seq_id)
+
+            # shape: (5, 2) -> 5 time steps, 2 features
+            sliced_data = rec['sliced_data']
+            self.assertEqual(len(sliced_data), 5)
+            self.assertEqual(len(sliced_data[0]), 2)
+
+    def test_get_sequences_empty_feature_list(self):
+        """
+        Test handling of an empty feature_list, which should yield an empty slice
+        or array[]::double precision[] in SQL. The result is a shape of (5, 0).
+        """
+        feature_list = []
+        results = SequenceService.get_sequences(
+            sequence_ids=self.sequence_ids,
+            feature_list=feature_list
+        )
+
+        for idx, seq_id in enumerate(self.sequence_ids):
+            rec = results[idx]
+            self.assertEqual(rec['id'], seq_id)
+            sliced_data = rec['sliced_data']
+
+            # shape: (5, 0) -> each row has 0 columns
+            self.assertEqual(len(sliced_data), 0)
+            for row in sliced_data:
+                self.assertEqual(len(row), 0)
+
+    def test_get_sequences_non_existent_id(self):
+        """
+        Test that a non-existent Sequence ID triggers a ValidationError.
+        """
+        bad_id = max(self.sequence_ids) + 9999
+        with self.assertRaisesMessage(
+                Exception,
+                f"Sequence with ID {bad_id} does not exist."
+        ):
+            SequenceService.get_sequences(sequence_ids=[bad_id], feature_list=['feat_0'])
+
+    def test_get_sequences_missing_feature(self):
+        """
+        Test that a missing feature in the feature_dict triggers a ValidationError.
+        """
+        with self.assertRaisesMessage(
+                Exception,
+                "Feature 'feat_999' not found"
+        ):
+            SequenceService.get_sequences(sequence_ids=self.sequence_ids, feature_list=['feat_999'])
 
 
 

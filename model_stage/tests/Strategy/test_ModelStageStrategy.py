@@ -113,11 +113,18 @@ class TestPredictModelStrategy(TestCase):
     def setUp(self):
         self.entity = MockEntity()
         self.entity.set_attribute('model', MockModel())
-        # Normally, prediction_input might be a single batch of data
-        prediction_input = torch.randn(2, 10)  # batch_size=2, input_size=10
-        self.entity.set_attribute('eval_dataloader', prediction_input)
+
+        # Prepare dataset with both X (inputs) and Y (outputs)
+        X = torch.randn(5, 10)  # 5 samples, input_size=10
+        Y = torch.rand(5, 1)  # 5 samples, output_size=1
+        dataset = list(zip(X, Y))  # Combine X and Y into tuples
+        eval_dataloader = DataLoader(dataset, batch_size=1)  # DataLoader with tuples of (X, Y)
+
+        # Set attributes for the entity
+        self.entity.set_attribute('eval_dataloader', eval_dataloader)
         self.entity.set_attribute('device', 'cpu')
 
+        # Mock strategy request with config
         self.strategy_request = MockStrategyRequestEntity(param_config={
             'prediction_input_from_entity_name': 'eval_dataloader'
         })
@@ -166,7 +173,8 @@ class TestConfigureModelStageStrategy(TestCase):
             'X_train': 'my_X_train',
             'y_train': 'my_y_train',
             'X_test': 'my_X_test',
-            'y_test': 'my_y_test'
+            'y_test': 'my_y_test',
+            'device': 'cpu'
         })
         self.strategy_executor = MockStrategyExecutor()
         self.strategy = ConfigureModelStageStrategy(self.strategy_executor, self.strategy_request)
@@ -232,7 +240,7 @@ class TestConfigureModelStageStrategy(TestCase):
         self.entity._attributes.pop('my_X_train')
         with self.assertRaises(ValueError) as context:
             self.strategy.apply(self.entity)
-        self.assertIn("Entity does not have attribute my_X_train for X_train", str(context.exception))
+        self.assertIn("Entity does not have attribute: my_X_train", str(context.exception))
 
     def test_configure_model_stage_missing_X_test_key(self):
         self.strategy_request.param_config.pop('X_test')
@@ -245,4 +253,4 @@ class TestConfigureModelStageStrategy(TestCase):
         self.entity._attributes.pop('my_X_test')
         with self.assertRaises(ValueError) as context:
             self.strategy.apply(self.entity)
-        self.assertIn("Entity does not have attribute my_X_test for X_test", str(context.exception))
+        self.assertIn("Entity does not have attribute: my_X_test", str(context.exception))

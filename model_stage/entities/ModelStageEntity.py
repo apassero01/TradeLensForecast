@@ -8,18 +8,17 @@ class ModelStageEntity(Entity):
         super().__init__(entity_id)
 
     def serialize(self):
-        return {
-            'entity_name': self.entity_name.value,
-            'path': self.path,
-            'class_path': self.__class__.__module__ + '.' + self.__class__.__name__,
-            'children': [child.serialize() for child in self.children],
-            'meta_data': {
+        super_dict = super().serialize()
+        super_dict['meta_data'] =  {
                 # 'model': self.get_attribute("model").config if self.has_attribute("model") else None,
                 'optimizer': self.get_attribute("optimizer_name") if self.has_attribute("optimizer_name") else None,
-                'criterion': self.get_attribute("criterion_name") if self.has_attribute("criterion_name") else None
-
-            }
+                'criterion': self.get_attribute("criterion_name") if self.has_attribute("criterion_name") else None,
+                'val_loss': self.get_attribute("val_loss") if self.has_attribute("val_loss") else None,
+            'predictions': self.get_attribute("predictions").shape if self.has_attribute("predictions") else None,
+            'results': self.get_attribute("results").shape if self.has_attribute("results") else None,
         }
+
+        return super_dict
 
 
         

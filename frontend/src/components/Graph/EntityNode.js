@@ -8,7 +8,8 @@ const EntityNode = ({ data }) => {
   // Memoize the visualization component
   const visualizationContent = useMemo(() => {
     if (!data.visualization || !data.visualization.type) return null;
-    
+    console.log("EntityNode Input For visualization", data)
+    console.log("Visualization type is:", data.visualization.type.toLowerCase());
     const VisualizationComponent = visualizationComponents[data.visualization.type.toLowerCase()];
     
     if (!VisualizationComponent) {

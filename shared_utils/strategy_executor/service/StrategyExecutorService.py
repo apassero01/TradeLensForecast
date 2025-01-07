@@ -2,14 +2,15 @@ from data_bundle_manager.strategy.DataBundleStrategy import CreateFeatureSetsStr
     SplitBundleDateStrategy, ScaleByFeatureSetsStrategy, CombineDataBundlesStrategy
 from sequenceset_manager.strategy.SequenceSetStrategy import PopulateDataBundleStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
-from shared_utils.strategy.BaseStrategy import Strategy, MergeEntitiesStrategy
+from shared_utils.strategy.BaseStrategy import Strategy, MergeEntitiesStrategy, ClusterStrategy
 from shared_utils.strategy_executor import StrategyExecutor
 from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy
-from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy, RemoveEntityStrategy
-from shared_utils.strategy.VisualizationStrategy import HistogramStrategy
+from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy, CreateEntityStrategy, RemoveEntityStrategy, \
+    ExecuteCodeStrategy
+from shared_utils.strategy.VisualizationStrategy import HistogramStrategy, LineGraphStrategy, VisualizationStrategy
 from model_stage.strategy.ModelStageStrategy import CreateModelStrategy, ConfigureModelStageStrategy, FitModelStrategy, \
-    EvaluateModelStrategy, PredictModelStrategy
-
+    EvaluateModelStrategy, PredictModelStrategy, ComparePredictionsStrategy
+from shared_utils.strategy.BaseStrategy import RetreiveSequencesStrategy
 
 class StrategyExecutorService:
     registry = {
@@ -17,7 +18,10 @@ class StrategyExecutorService:
             AssignAttributesStrategy,
             CreateEntityStrategy,
             RemoveEntityStrategy,
-            MergeEntitiesStrategy
+            MergeEntitiesStrategy,
+            ClusterStrategy,
+            RetreiveSequencesStrategy,
+            ExecuteCodeStrategy
         ],
         EntityEnum.TRAINING_SESSION.value: [
             GetSequenceSetsStrategy,
@@ -38,14 +42,17 @@ class StrategyExecutorService:
         ],
         EntityEnum.STRATEGY_REQUESTS.value: [],
         EntityEnum.VISUALIZATION.value: [
-            HistogramStrategy
+            HistogramStrategy,
+            LineGraphStrategy,
+            VisualizationStrategy
         ],
         EntityEnum.MODEL_STAGE.value: [
             CreateModelStrategy,
             ConfigureModelStageStrategy,
             FitModelStrategy,
             EvaluateModelStrategy,
-            PredictModelStrategy
+            PredictModelStrategy,
+            ComparePredictionsStrategy
         ],
 
     }
@@ -63,6 +70,13 @@ class StrategyExecutorService:
                 raise ValueError(f'Entity not found for path: {strategy_request.strategy_path}')
             entity = target_entity
         return self.strategy_executor.execute(entity, strategy_request)
+    
+    def execute_by_target_entity_id(self, entity, strategy_request):
+        """Execute a strategy on an entity by its target entity id"""
+        target_entity = entity.find_child_by_id(strategy_request.target_entity_id)
+        if target_entity is None:
+            raise ValueError(f'Entity not found for id: {strategy_request.target_entity_id}')
+        return self.strategy_executor.execute(target_entity, strategy_request)
 
 
     def register_strategies(self):

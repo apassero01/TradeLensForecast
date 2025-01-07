@@ -6,6 +6,7 @@ class StrategyRequest {
     this.param_config = strategy.config?.param_config || strategy.config || {};
     this.nested_requests = strategy.nested_requests || [];
     this.add_to_history = strategy.add_to_history || false;
+    this.target_entity_id = strategy.target_entity_id || null;
     this.entity_id = strategy.entity_id || null;
   }
 
@@ -22,7 +23,8 @@ class StrategyRequest {
       param_config: this.param_config,
       nested_requests: this.nested_requests,
       add_to_history: this.add_to_history,
-      entity_id: this.entity_id
+      target_entity_id: this.target_entity_id,
+      entity_id : this.entity_id
     };
   }
 }

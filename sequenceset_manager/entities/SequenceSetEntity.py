@@ -31,19 +31,15 @@ class SequenceSetEntity(Entity):
         }
 
     def serialize(self):
-        return {
-            'entity_name': self.entity_name.value,
-            'children': [child.serialize() for child in self.children],
-            'meta_data': {
-                'ticker': self.get_attribute('metadata')['ticker'],
-                'start': self.get_attribute('start_timestamp'),
-                'sequence_length': self.get_attribute('sequence_length'),
-                'X_features': self.get_attribute('X_features'),
-                'y_features': self.get_attribute('y_features'),
-            },
-            'path': self.path
-
+        sup_dict = super().serialize()
+        sup_dict['meta_data'] = {
+            'ticker': self.get_attribute('metadata')['ticker'],
+            'start': self.get_attribute('start_timestamp'),
+            'sequence_length': self.get_attribute('sequence_length'),
+            'X_features': self.get_attribute('X_features'),
+            'y_features': self.get_attribute('y_features'),
         }
+        return sup_dict
 
 
 class SequenceSetAdapter:

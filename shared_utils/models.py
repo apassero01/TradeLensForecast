@@ -5,6 +5,7 @@ class StrategyRequest(models.Model):
     strategy_name = models.CharField(max_length=255)  # The name of the strategy
     strategy_path = models.CharField(max_length=255)  # The path to the strategy
     param_config = models.JSONField(default=dict)  # Parameters for the strategy
+    target_entity_id = models.CharField(max_length=255, null=True, blank=True)  # The id of the target entity
     
     # Link to the TrainingSession to specify which strategy history this request belongs to
     training_session = models.ForeignKey(

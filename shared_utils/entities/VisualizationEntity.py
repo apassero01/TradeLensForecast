@@ -32,8 +32,6 @@ class VisualizationEntity(Entity):
         return self.get_attribute('config')
     
     def serialize(self) -> dict:
-        return {
-            'entity_name': self.entity_name.value,
-            'path': self.path,
-            'visualization': self.get_attribute('visualization')
-        }
+        parent_dict = super().serialize()
+        parent_dict ['visualization'] = self.get_attribute('visualization')
+        return parent_dict

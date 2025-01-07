@@ -22,7 +22,6 @@ class Entity(ABC):
         self._path: Optional[str] = None
         self._attributes: Dict[str, Any] = {}
 
-    
     def on_create(self, param_config: Optional[Dict[str, Any]] = None):
         pass
 
@@ -97,6 +96,15 @@ class Entity(ABC):
         results = self.find_entities_by_paths([path])
         return results[path]
     
+    def find_child_by_id(self, entity_id: str) -> Optional['Entity']:
+        if self.entity_id == entity_id:
+            return self
+        for child in self.children:
+            child_result = child.find_child_by_id(entity_id)
+            if child_result is not None:
+                return child_result
+        return None
+    
     def get_children_by_type(self, entity_type: EntityEnum) -> List['Entity']:
         '''Get all children of a given type'''
         return [child for child in self.children if child.entity_name == entity_type]
@@ -117,6 +125,15 @@ class Entity(ABC):
     def get_attribute(self, name: str) -> Any:
         '''Get an attribute from the entity'''
         return self._attributes[name]
+
+    def remove_attribute(self, name: str):
+        '''Remove an attribute from the entity'''
+        del self._attributes[name]
+
+    def remove_attributes(self, names: List[str]):
+        '''Remove multiple attributes from the entity'''
+        for name in names:
+            self.remove_attribute(name)
 
     def has_attribute(self, name: str) -> bool:
         '''Check if an attribute exists on the entity'''

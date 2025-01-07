@@ -198,6 +198,7 @@ class EvaluateModelStrategy(Strategy):
 
         model.to(device)
         val_loss = self._evaluate(model, val_dataloader, criterion, device)
+        entity.set_attribute('val_loss', val_loss)
         self.strategy_request.ret_val['val_loss'] = val_loss
         return self.strategy_request
 
@@ -223,6 +224,7 @@ class EvaluateModelStrategy(Strategy):
 
         return total_loss / num_batches if num_batches > 0 else 0.0
 
+#TODO The evaluate model strategy should take a prediction input and return the loss no need to forward pass twice
 
 class PredictModelStrategy(Strategy):
     """
@@ -254,7 +256,7 @@ class PredictModelStrategy(Strategy):
     @staticmethod
     def get_request_config():
         return {
-            "prediction_input_from_entity_name": 'eval_dataloader'
+            "prediction_input_from_entity_name": 'val_dataloader'
         }
 
     def _predict(self, model, prediction_input, device):
@@ -375,3 +377,75 @@ class ConfigureModelStageStrategy(Strategy):
             return nn.MSELoss()
         else:
             raise ValueError(f"Unsupported criterion: {criterion_str}")
+        
+
+
+class ComparePredictionsStrategy(ModelStageStrategy):
+    """
+    Strategy that takes two attributes specified in the param_config:
+    1) 'predicted_attribute_name' - The entity attribute holding predicted values of shape (batch, time_steps, 1).
+    2) 'actual_attribute_name'    - The entity attribute holding actual values of shape (batch, time_steps, 1).
+
+    It computes the element-wise difference: (predicted - actual)
+    and stores the result in a new entity attribute: 'prediction_difference'.
+    """
+
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        config = strategy_request.param_config
+        
+        # Ensure the param_config has the required keys
+        if 'predicted_attribute_name' not in config:
+            raise ValueError("param_config must include 'predicted_attribute_name'.")
+        if 'actual_attribute_name' not in config:
+            raise ValueError("param_config must include 'actual_attribute_name'.")
+
+        # Check if the entity actually has these attributes
+        predicted_attr = config['predicted_attribute_name']
+        actual_attr = config['actual_attribute_name']
+
+        if not entity.has_attribute(predicted_attr):
+            raise ValueError(f"Entity does not have attribute: {predicted_attr}")
+        if not entity.has_attribute(actual_attr):
+            raise ValueError(f"Entity does not have attribute: {actual_attr}")
+
+    def apply(self, entity: ModelStageEntity):
+        # Extract the param_config
+        config = self.strategy_request.param_config
+        predicted_attr = config['predicted_attribute_name']
+        actual_attr = config['actual_attribute_name']
+
+        # Retrieve the predicted and actual arrays/tensors from the entity
+        predicted = entity.get_attribute(predicted_attr)
+        actual = entity.get_attribute(actual_attr)
+
+        # Optional shape check (assuming (batch, time_steps, 1))
+        if predicted.shape != actual.shape:
+            raise ValueError(
+                f"Predicted and actual must have the same shape. "
+                f"Got {predicted.shape} vs {actual.shape}"
+            )
+
+        # Compute the difference
+        difference = predicted - actual
+
+        # Store the difference in the entity
+        entity.set_attribute("prediction_difference", difference)
+
+        # Return the StrategyRequestEntity to signal completion
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        """
+        Returns default config keys for this strategy. 
+        The user can override 'predicted_attribute_name' and 'actual_attribute_name' 
+        with the correct entity keys containing the predicted and actual values.
+        """
+        return {
+            'strategy_name': ComparePredictionsStrategy.__name__,
+            'strategy_path': None,
+            'param_config': {
+                'predicted_attribute_name': 'predictions',
+                'actual_attribute_name': 'y_test_scaled'
+            }
+        }
