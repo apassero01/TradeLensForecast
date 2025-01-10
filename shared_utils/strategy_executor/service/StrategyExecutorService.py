@@ -11,7 +11,8 @@ from shared_utils.strategy.VisualizationStrategy import HistogramStrategy, LineG
 from model_stage.strategy.ModelStageStrategy import CreateModelStrategy, ConfigureModelStageStrategy, FitModelStrategy, \
     EvaluateModelStrategy, PredictModelStrategy, ComparePredictionsStrategy
 from shared_utils.strategy.BaseStrategy import RetreiveSequencesStrategy
-
+from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
+from shared_utils.entities.service.EntityService import EntityService
 class StrategyExecutorService:
     registry = {
         EntityEnum.ENTITY.value: [
@@ -59,6 +60,7 @@ class StrategyExecutorService:
 
     def __init__(self, strategy_executor: StrategyExecutor):
         self.strategy_executor = strategy_executor
+        self.entity_service = EntityService()
         self.register_strategies()
 
 
@@ -77,7 +79,19 @@ class StrategyExecutorService:
         if target_entity is None:
             raise ValueError(f'Entity not found for id: {strategy_request.target_entity_id}')
         return self.strategy_executor.execute(target_entity, strategy_request)
+    
+    def execute_request(self, strategy_request: StrategyRequestEntity): 
+        '''
+        Execute a strategy request 
+        '''
+        target_entity = self.entity_service.get_entity(strategy_request.target_entity_id)
+        if target_entity is None:
+            raise ValueError(f'Entity not found for id: {strategy_request.target_entity_id}')
+        
+        strategy_request = self.execute(target_entity, strategy_request)
+        self.entity_service.save_entity(target_entity)
 
+        return strategy_request
 
     def register_strategies(self):
         for entity, strategies in StrategyExecutorService.registry.items():

@@ -9,6 +9,7 @@ from shared_utils.entities.Entity import Entity
 import numpy as np
 from tslearn.clustering import TimeSeriesKMeans
 import requests
+from shared_utils.entities.service.EntityService import EntityService
 
 
 class Strategy(ABC):
@@ -41,7 +42,40 @@ class Strategy(ABC):
             'config': cls.get_request_config()
         }
 
+class GetEntityStrategy(Strategy):
+    """Generic strategy for getting an entity from anywhere (cache, db, etc.)"""
 
+    strategy_description = 'Retrieves an entity from the cache'
+
+    def verify_executable(self, entity, strategy_request):
+        pass
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        self.strategy_request.ret_val['entity'] = entity
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+        }
+
+class SaveEntityStrategy(Strategy):
+    """Generic strategy for saving an entity to anywhere (cache, db, etc.)"""
+
+    strategy_description = 'Saves an entity to the cache'
+
+    def verify_executable(self, entity, strategy_request):
+        pass
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        entity_service = EntityService()
+        entity_service.save_entity(entity)
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return
 
 class CreateEntityStrategy(Strategy):
     """Generic strategy for creating any entity type"""

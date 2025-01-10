@@ -104,6 +104,9 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                     if sequence_set.get_attribute('sequences'):
                         sequence_set.set_attribute('seq_end_dates', [sequence.end_timestamp for sequence in sequence_set.get_attribute('sequences')])
 
+                    ## TODO sending strategy request from this strategy might be wrong
+                    self.strategy_executor.execute(session_entity, self.strategy_request)
+
                 except Exception as e:
                     print(f"Failed to decode JSON: {e}")
                     raise e

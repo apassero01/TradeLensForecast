@@ -21,6 +21,8 @@ class Entity(ABC):
         self._parent: Optional[Entity] = None
         self._path: Optional[str] = None
         self._attributes: Dict[str, Any] = {}
+        self.children_ids = []
+        self._parent_id = None
 
     def on_create(self, param_config: Optional[Dict[str, Any]] = None):
         pass
@@ -166,16 +168,14 @@ class Entity(ABC):
 
 
     def serialize(self):
-        serialized_children = []
-        for child in self.children:
-            serialized_children.append(child.serialize())
+
         return {
             'entity_name': self.entity_name.value,
-            'children': serialized_children,
             'meta_data': {},
             'path': self.path,
             'class_path': self.__class__.__module__ + '.' + self.__class__.__name__,
             'entity_id': self.entity_id,
+            'entity_type': self.entity_name.value,
         }
 
     def to_db(self):

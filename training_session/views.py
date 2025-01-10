@@ -14,6 +14,8 @@ from training_session.entities.TrainingSessionEntity import TrainingSessionEntit
 from training_session.services.TrainingSessionEntityService import TrainingSessionEntityService
 from training_session.models import TrainingSession
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
+from shared_utils.cache.CacheService import CacheService
+from shared_utils.entities.service.EntityService import EntityService
 
 
 
@@ -50,20 +52,21 @@ def get_entity_graph(request):
 def api_start_session(request):
     print('api_start_session')
     if request.method == 'POST':
-        if cache.get('current_session'):
-            print('A session is already in progress')
-            return JsonResponse({'error': 'A session is already in progress'}, status=400)
-
-        training_session_service = TrainingSessionEntityService()
+        cache_service = CacheService()
+        entity_service = EntityService()
 
         try:
             # Create a new session with minimal initialization
+            training_session_service = TrainingSessionEntityService()
             session = training_session_service.create_training_session_entity()
-            cache.set('current_session', session)
+            
+            # Save session to cache and track current session ID
+            entity_service.save_entity(session)
+            cache_service.set('current_session_id', session.entity_id)
 
             return JsonResponse({
                 'status': 'success',
-                'sessionData': training_session_service.serialize_session()
+                'sessionData': session.serialize()  
             })
         except Exception as e:
             print(str(e))
@@ -98,12 +101,16 @@ def api_get_entity_graph(request):
 def api_stop_session(request):
     print('api_stop_session')
     if request.method == 'POST':
-        session = cache.get('current_session')
-        if not session:
+        cache_service = CacheService()
+        current_session_id = cache_service.get('current_session_id')
+        
+        if not current_session_id:
             return JsonResponse({'error': 'No session in progress'}, status=400)
         
         try:
-            cache.delete('current_session')
+            # Clear all entities from cache
+            cache_service.clear_all()
+            
             return JsonResponse({
                 'status': 'success',
                 'message': 'Session stopped successfully'
@@ -224,7 +231,7 @@ def get_available_entities(request):
 def api_execute_strategy(request):
     print('execute_strategy')
     if request.method == 'POST':
-        session = cache.get('current_session')
+        entity = cache.get()
         if not session:
             print('No session in progress')
             return JsonResponse({'error': 'No session in progress'}, status=400)
@@ -246,6 +253,7 @@ def api_execute_strategy(request):
 
         try:
             ret_val = strategy_executor_service.execute_by_target_entity_id(session, strat_request)
+            all_requests = get_strategy_tree(ret_val)
             add_to_strategy_history(session, ret_val)
             cache.set('current_session', session)
             return JsonResponse({
@@ -351,3 +359,6 @@ def add_to_strategy_history(session_entity, strat_request):
             return
     session_entity.add_to_strategy_history(strat_request)
     return
+
+def get_strategy_tree(strat_request):
+    return strat_request + [get_strategy_tree(nested_request) for nested_request in strat_request.nested_requests]
