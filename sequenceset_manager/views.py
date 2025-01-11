@@ -23,7 +23,6 @@ def get_sequence_data(request):
     end_date = request.GET.get('end_date', None)
     interval = request.GET.get('interval', None)
     sequence_length = request.GET.get('sequence_length', None)
-    sequence_ids = request.GET.getlist('sequence_ids', None)
     # Convert start_date and end_date to Python date objects, if provided
     if start_date:
         start_date = parse_date(start_date)
@@ -46,7 +45,6 @@ def get_sequence_data(request):
             ticker = ticker,
             interval = interval,
             dataset_type = "stock",
-            sequence_ids = sequence_ids
         )
         # Aggregate results from multiple tickers
 

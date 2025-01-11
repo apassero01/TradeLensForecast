@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
+import AceEditor from 'react-ace';
 import EntitySelector from '../inputs/EntitySelector';
 import SequenceSetSelector from '../inputs/SequenceSetSelector';
+import ace from 'ace-builds';
+
+// Import ace editor themes and modes
+import 'ace-builds/src-noconflict/mode-json';
+import 'ace-builds/src-noconflict/theme-monokai';
+import 'ace-builds/src-noconflict/ext-language_tools';
+import 'ace-builds/src-noconflict/worker-json';
+
+// Configure ace paths
+ace.config.set('basePath', '/ace-builds');
+ace.config.set('modePath', '/ace-builds');
+ace.config.set('themePath', '/ace-builds');
+ace.config.set('workerPath', '/ace-builds');
 
 const ConfigEditor = ({ 
   strategyRequest,
@@ -93,12 +107,33 @@ const ConfigEditor = ({
         )}
         
         {/* JSON Editor */}
-        <textarea
+        <AceEditor
+          mode="json"
+          theme="monokai"
           value={editedJson}
-          onChange={handleJsonChange}
-          className="w-full h-64 bg-gray-700/50 p-4 rounded-lg text-sm text-gray-300 font-mono 
-                   focus:outline-none focus:ring-2 focus:ring-blue-500"
-          spellCheck="false"
+          onChange={setEditedJson}
+          name="json-editor"
+          editorProps={{ $blockScrolling: true }}
+          setOptions={{
+            showLineNumbers: true,
+            tabSize: 2,
+            useSoftTabs: true,
+            showPrintMargin: false,
+            highlightActiveLine: true,
+            enableBasicAutocompletion: true,
+            enableLiveAutocompletion: true,
+            enableLinting: true,
+            useWorker: true
+          }}
+          width="100%"
+          height="32rem"
+          className="rounded-lg"
+          fontSize={14}
+          onValidate={(annotations) => {
+            if (annotations.length > 0) {
+              console.log('JSON validation issues:', annotations);
+            }
+          }}
         />
 
         {/* Execution Result */}

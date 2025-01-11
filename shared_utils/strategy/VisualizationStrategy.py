@@ -16,10 +16,12 @@ class VisualizationStrategy(Strategy):
     def apply(self, entity: Entity):
         self.get_parent_attributes(entity)
         self.visualization_type = VisualizationTypeEnum(self.strategy_request.param_config.get('visualization_type'))
+        data = entity.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
+        data = data.tolist() if isinstance(data, np.ndarray) else data
         visualization = {
             "type": self.visualization_type.value,
             "config": {},
-            "data": entity.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
+            "data": data
         }
         entity.set_attribute('visualization', visualization)
 
