@@ -59,7 +59,7 @@ const StrategyPanel = ({
   return (
     <div 
       className="flex h-screen bg-gray-800 border-l border-gray-700 relative transition-all duration-300"
-      style={{ width: isCollapsed ? '48px' : '800px' }}
+      style={{ width: isCollapsed ? '48px' : '1000px' }}
     >
       {/* Collapse Toggle Button */}
       <button

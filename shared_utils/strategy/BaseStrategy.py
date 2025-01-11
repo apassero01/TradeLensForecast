@@ -243,6 +243,7 @@ class ClusterStrategy(Strategy):
         config = self.strategy_request.param_config
         attribute_name = config.get('attribute_name', 'X')
         cluster_type = config.get('cluster_type', 'time_series_k_means')
+        target_arr_name = config.get('target_arr_name', 'cluster_arr')
         k = config.get('k', 3)
 
         # Retrieve the array from the entity
@@ -263,7 +264,7 @@ class ClusterStrategy(Strategy):
             raise ValueError(f"Unsupported cluster_type '{cluster_type}'. Only 'time_series_k_means' is supported.")
 
         # Store the cluster centers on the entity
-        entity.set_attribute('cluster_arr', cluster_centers)
+        entity.set_attribute(target_arr_name, cluster_centers)
 
         # Return the StrategyRequestEntity to chain further strategies if needed
         return self.strategy_request
@@ -281,6 +282,7 @@ class ClusterStrategy(Strategy):
                 'cluster_type': 'time_series_k_means',
                 'k': 3,
                 'attribute_name': 'X',
+                'target_arr_name': 'cluster_arr'
             }
         }
     

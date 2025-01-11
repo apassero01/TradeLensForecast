@@ -186,41 +186,40 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         y_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'y']
         Xy_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'Xy']
 
-        if len(X_feature_sets) > 0:
-            X_train_scaled, X_test_scaled = self.scale_X_by_features(X_feature_sets, data_bundle.get_attribute('X_train'), data_bundle.get_attribute('X_test'), X_feature_dict)
-            data_bundle.set_attribute('X_train_scaled', X_train_scaled)
-            data_bundle.set_attribute('X_test_scaled', X_test_scaled)
-        if len(y_feature_sets) > 0:
-            y_train_scaled, y_test_scaled = self.scale_y_by_features(y_feature_sets, data_bundle.get_attribute('y_train'), data_bundle.get_attribute('y_test'), y_feature_dict)
-            data_bundle.set_attribute('y_train_scaled', y_train_scaled)
-            data_bundle.set_attribute('y_test_scaled', y_test_scaled)
-        if len(Xy_feature_sets) > 0:
-            X_train_scaled, y_train_scaled = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.get_attribute('X_train'), data_bundle.get_attribute('y_train'), X_feature_dict, y_feature_dict)
-            X_test_scaled, y_test_scaled = self.scale_Xy_by_features(Xy_feature_sets, data_bundle.get_attribute('X_test'), data_bundle.get_attribute('y_test'), X_feature_dict, y_feature_dict)
+        self.X_train_scaled = np.zeros (data_bundle.get_attribute('X_train').shape)
+        self.X_test_scaled = np.zeros (data_bundle.get_attribute('X_test').shape)
+        self.y_test_scaled = np.zeros (data_bundle.get_attribute('y_test').shape)
+        self.y_train_scaled = np.zeros (data_bundle.get_attribute('y_train').shape)
 
-            data_bundle.set_attribute('X_train_scaled', X_train_scaled)
-            data_bundle.set_attribute('y_train_scaled', y_train_scaled)
-            data_bundle.set_attribute('X_test_scaled', X_test_scaled)
-            data_bundle.set_attribute('y_test_scaled', y_test_scaled)
+
+        if len(X_feature_sets) > 0:
+            self.scale_X_by_features(X_feature_sets, data_bundle.get_attribute('X_train'), data_bundle.get_attribute('X_test'), X_feature_dict)
+        if len(y_feature_sets) > 0:
+            self.scale_y_by_features(y_feature_sets, data_bundle.get_attribute('y_train'), data_bundle.get_attribute('y_test'), y_feature_dict)
+        if len(Xy_feature_sets) > 0:
+            self.scale_Xy_by_features(Xy_feature_sets, data_bundle.get_attribute('X_train'), data_bundle.get_attribute('y_train'), X_feature_dict, y_feature_dict, self.X_train_scaled, self.y_train_scaled)
+            self.scale_Xy_by_features(Xy_feature_sets, data_bundle.get_attribute('X_test'), data_bundle.get_attribute('y_test'), X_feature_dict, y_feature_dict, self.X_test_scaled, self.y_test_scaled)
+
+        data_bundle.set_attribute('X_train_scaled', self.X_train_scaled)
+        data_bundle.set_attribute('X_test_scaled', self.X_test_scaled)
+        data_bundle.set_attribute('y_train_scaled', self.y_train_scaled)
+        data_bundle.set_attribute('y_test_scaled', self.y_test_scaled)
+
 
         return self.strategy_request
 
     def scale_X_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict):
-        arr1_scaled = np.zeros(arr1.shape)
-        arr2_scaled = np.zeros(arr2.shape)
 
         for feature_set in feature_sets:
             do_fit_test = feature_set.do_fit_test
             scaler = feature_set.scaler
             arr1_feature_indices = [arr1_feature_dict[feature] for feature in feature_set.feature_list]
-            arr1_scaled[:, :, arr1_feature_indices] = scaler.fit_transform(arr1[:, :, arr1_feature_indices])
+            self.X_train_scaled[:, :, arr1_feature_indices] = scaler.fit_transform(arr1[:, :, arr1_feature_indices])
 
             if do_fit_test:
-                arr2_scaled[:, :, arr1_feature_indices] = scaler.fit_transform(arr2[:, :, arr1_feature_indices])
+                self.X_test_scaled[:, :, arr1_feature_indices] = scaler.fit_transform(arr2[:, :, arr1_feature_indices])
             else:
-                arr2_scaled[:, :, arr1_feature_indices] = scaler.transform(arr2[:, :, arr1_feature_indices])
-
-        return arr1_scaled, arr2_scaled
+                self.X_test_scaled[:, :, arr1_feature_indices] = scaler.transform(arr2[:, :, arr1_feature_indices])
 
     def scale_y_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict):
         '''
@@ -228,26 +227,19 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         but in the future, if for some reason we had y with different valued we would need to rework this.
         '''
 
-        arr1_scaled = np.zeros(arr1.shape)
-        arr2_scaled = np.zeros(arr2.shape)
-
         for feature_set in feature_sets:
             do_fit_test = feature_set.do_fit_test
             scaler = feature_set.scaler
             # Irrelivent for y features
             arr1_feature_indices = [arr1_feature_dict[feature] for feature in feature_set.feature_list]
-            arr1_scaled = scaler.fit_transform(arr1)
+            self.X_train_scaled = scaler.fit_transform(arr1)
 
             if do_fit_test:
-                arr2_scaled = scaler.fit_transform(arr2)
+                self.X_test_scaled = scaler.fit_transform(arr2)
             else:
-                arr2_scaled = scaler.transform(arr2)
+                self.X_test_scaled = scaler.transform(arr2)
 
-        return arr1_scaled, arr2_scaled
-
-    def scale_Xy_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict, arr2_feature_dict):
-        arr1_scaled = np.copy(arr1)
-        arr2_scaled = np.copy(arr2)
+    def scale_Xy_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict, arr2_feature_dict, target_arr1, target_arr2):
 
         for feature_set in feature_sets:
             do_fit_test = feature_set.do_fit_test
@@ -282,10 +274,8 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
             arr2_scaled_features = arr2_scaled_flat.reshape(arr2_features.shape)
 
             # Update scaled arrays
-            arr1_scaled[:, :, arr1_feature_indices] = arr1_scaled_features
-            arr2_scaled[:, arr2_feature_indices, :] = arr2_scaled_features
-
-        return arr1_scaled, arr2_scaled
+            target_arr1[:, :, arr1_feature_indices] = arr1_scaled_features
+            target_arr2[:, arr2_feature_indices, :] = arr2_scaled_features
 
 
     def verify_executable(self, entity, strategy_request):
