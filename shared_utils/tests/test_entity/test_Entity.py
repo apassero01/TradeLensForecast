@@ -37,57 +37,6 @@ class EntityTestCase(TestCase):
         self.child2.set_attribute('X_train', np.array([[5, 6], [7, 8]]))
         self.child2.set_attribute('y_train', np.array([0, 1]))
 
-    def test_entity_path_generation(self):
-        """Test that entity paths are correctly generated with entity names and UUIDs"""
-        # Add entities and capture paths
-        self.parent.add_child(self.child1)
-        
-        # Verify paths are correctly formatted
-        expected_path = (
-            f"{EntityEnum.ENTITY.value}:{self.parent.entity_id}/"
-            f"{EntityEnum.DATA_BUNDLE.value}:{self.child1.entity_id}"
-        )
-        self.assertEqual(self.child1.path, expected_path)
-
-    def test_root_entity_path(self):
-        """Test that root entity path is correctly formatted"""
-        expected_path = f"{EntityEnum.ENTITY.value}:{self.parent.entity_id}"
-        self.assertEqual(self.parent.path, expected_path)
-
-    def test_find_entity_by_path(self):
-        """Test finding entities by their path"""
-        self.parent.add_child(self.child1)
-        
-        # Find entity by path
-        path = self.child1.path
-        found_entity = self.parent.find_entity_by_path(path)
-        self.assertEqual(found_entity, self.child1)
-
-    def test_find_entities_by_paths(self):
-        """Test finding multiple entities by their paths"""
-        # Build entity hierarchy
-        self.parent.add_child(self.child1)
-        self.parent.add_child(self.child2)
-        
-        # Find multiple entities
-        paths = [self.child1.path, self.child2.path]
-        found_entities = self.parent.find_entities_by_paths(paths)
-        
-        self.assertEqual(found_entities[self.child1.path], self.child1)
-        self.assertEqual(found_entities[self.child2.path], self.child2)
-
-    def test_path_prefix_optimization(self):
-        """Test that find_entities_by_paths skips branches that can't contain target paths"""
-        self.parent.add_child(self.child1)
-        self.parent.add_child(self.child2)
-        
-        # Try to find path in child2 (should skip child1 branch)
-        target_path = f"{EntityEnum.ENTITY.value}:{self.parent.entity_id}/" \
-                     f"{EntityEnum.DATA_BUNDLE.value}:nonexistent-uuid"
-                     
-        results = self.parent.find_entities_by_paths([target_path])
-        self.assertIsNone(results[target_path])
-
     def test_set_and_get_attribute(self):
         """Test setting and getting attributes"""
         entity = TestConcreteEntity()
@@ -148,8 +97,8 @@ class EntityTestCase(TestCase):
         """Test parent-child relationship is correctly established"""
         self.parent.add_child(self.child1)
         
-        self.assertEqual(self.child1._parent, self.parent)
-        self.assertIn(self.child1, self.parent.children)
+        self.assertEqual(self.child1.parent_ids[0], self.parent.entity_id)
+        self.assertIn(self.child1.entity_id, self.parent.children_ids)
 
     def test_merge_entities_concatenate(self):
         """Test merging entities using the concatenate method"""
@@ -224,20 +173,3 @@ class EntityTestCase(TestCase):
         self.assertFalse(entity.has_attribute('key2'))
         self.assertTrue(entity.has_attribute('key3'))  # key3 should still exist
 
-    def test_find_child_by_id(self):
-        """Test finding a child entity by its ID"""
-        self.parent.add_child(self.child1)
-        self.parent.add_child(self.child2)
-
-        # Verify child1 can be found by its ID
-        found_child = self.parent.find_child_by_id(self.child1.entity_id)
-        self.assertEqual(found_child, self.child1)
-
-        # Verify child2 can be found by its ID
-        found_child = self.parent.find_child_by_id(self.child2.entity_id)
-        self.assertEqual(found_child, self.child2)
-
-        # Verify non-existent ID returns None
-        non_existent_id = 'non-existent-id'
-        found_child = self.parent.find_child_by_id(non_existent_id)
-        self.assertIsNone(found_child)

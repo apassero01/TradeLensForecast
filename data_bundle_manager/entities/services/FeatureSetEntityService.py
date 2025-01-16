@@ -7,7 +7,7 @@ from data_bundle_manager.scalers.scalers import ScalerEnum
 
 
 class FeatureSetEntityService:
-    def create_feature_set(self, feature_set_config):
+    def create_feature_set(self, feature_set_config, feature_set = None):
         scaler_config = feature_set_config['scaler_config']
         scaler_name = scaler_config['scaler_name']
         scaler = self.get_scaler(scaler_name)
@@ -16,7 +16,10 @@ class FeatureSetEntityService:
 
         feature_list = feature_set_config['feature_list']
 
-        feature_set = FeatureSetEntity()
+
+        if not feature_set:
+            feature_set = FeatureSetEntity()
+
         feature_set.feature_list = feature_list
         feature_set.do_fit_test = do_fit_test
         feature_set.feature_set_type = feature_set_type

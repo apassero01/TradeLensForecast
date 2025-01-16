@@ -1,9 +1,10 @@
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
+from typing import Optional, Dict, Any
 class FeatureSetEntity(Entity):
     entity_name = EntityEnum.FEATURE_SET
-    def __init__(self):
-        super().__init__()
+    def __init__(self, entity_id: Optional[str] = None):
+        super().__init__(entity_id)
         self.feature_list = []
         self.scaler_config = {}
         self.do_fit_test = False

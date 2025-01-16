@@ -122,7 +122,6 @@ const ConfigEditor = ({
             highlightActiveLine: true,
             enableBasicAutocompletion: true,
             enableLiveAutocompletion: true,
-            enableLinting: true,
             useWorker: true
           }}
           width="100%"

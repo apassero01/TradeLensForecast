@@ -9,7 +9,6 @@ from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.models import StrategyRequest
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
-from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 from training_session.entities.TrainingSessionEntity import TrainingSessionEntity
 from training_session.services.TrainingSessionEntityService import TrainingSessionEntityService
 from training_session.models import TrainingSession
@@ -18,41 +17,12 @@ from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities.service.EntityService import EntityService
 
 
-
-
-
-### Entity Graph APIs
-
-@csrf_exempt
-def get_entity_graph(request):
-    print('get_entity_graph')
-    if request.method == 'GET':
-        session_entity = cache.get('current_session')
-        
-        if not isinstance(session_entity, Entity):
-            session_entity = TrainingSessionEntity.from_db(session_entity)
-
-        if not session_entity:
-            print('No session in progress')
-            return JsonResponse({'error': 'No session in progress'}, status=400)
-
-        try:
-            # Use the entity's serialize method to get the hierarchical structure
-            graph_data = session_entity.serialize()
-            return JsonResponse(graph_data)
-        except Exception as e:
-            print(str(e))
-            return JsonResponse({'error': str(e)}, status=400)
-    else:
-        return JsonResponse({'error': 'GET method required'}, status=400)
-
 ### New API Endpoints ###
 
 @csrf_exempt
 def api_start_session(request):
     print('api_start_session')
     if request.method == 'POST':
-        cache_service = CacheService()
         entity_service = EntityService()
 
         try:
@@ -62,11 +32,13 @@ def api_start_session(request):
             
             # Save session to cache and track current session ID
             entity_service.save_entity(session)
-            cache_service.set('current_session_id', session.entity_id)
+            entity_service.set_session_id(session.entity_id)
 
             return JsonResponse({
                 'status': 'success',
-                'sessionData': session.serialize()  
+                'sessionData': {
+                    session.entity_id : session.serialize()
+                }  
             })
         except Exception as e:
             print(str(e))
@@ -75,41 +47,18 @@ def api_start_session(request):
         return JsonResponse({'error': 'POST method required'}, status=400)
 
 @csrf_exempt
-def api_get_entity_graph(request):
-    print('api_get_entity_graph')
-    if request.method == 'GET':
-        session_entity = cache.get('current_session')
-        
-        if not isinstance(session_entity, Entity):
-            session_entity = TrainingSessionEntity.from_db(session_entity)
-
-        if not session_entity:
-            print('No session in progress')
-            return JsonResponse({'error': 'No session in progress'}, status=400)
-
-        try:
-            # Use the entity's serialize method to get the hierarchical structure
-            graph_data = session_entity.serialize()
-            return JsonResponse(graph_data)
-        except Exception as e:
-            print(str(e))
-            return JsonResponse({'error': str(e)}, status=400)
-    else:
-        return JsonResponse({'error': 'GET method required'}, status=400)
-
-@csrf_exempt
 def api_stop_session(request):
     print('api_stop_session')
     if request.method == 'POST':
-        cache_service = CacheService()
-        current_session_id = cache_service.get('current_session_id')
+        entity_service = EntityService()
+        current_session_id = entity_service.get_session_id()
         
         if not current_session_id:
             return JsonResponse({'error': 'No session in progress'}, status=400)
         
         try:
             # Clear all entities from cache
-            cache_service.clear_all()
+            entity_service.clear_all_entities()
             
             return JsonResponse({
                 'status': 'success',
@@ -126,16 +75,17 @@ def api_stop_session(request):
 def api_save_session(request):
     print('api_save_session')
     if request.method == 'POST':
-        session_entity = cache.get('current_session')
-        if not session_entity:
+        entity_service = EntityService()
+        session_entity_id = entity_service.get_session_id()
+        if not session_entity_id:
             return JsonResponse({'error': 'No session in progress'}, status=400)
         
         try:
             # Convert and save to database
+            session_entity = entity_service.get_entity(session_entity_id)
             training_session_service = TrainingSessionEntityService()
             training_session_service.set_session(session_entity)
             session_id = training_session_service.save_session()
-            cache.set('current_session', session_entity)
             
             return JsonResponse({
                 'status': 'success',
@@ -166,23 +116,25 @@ def api_get_saved_sessions(request):
 @csrf_exempt
 def api_load_session(request, session_id):
     print(f'api_load_session: {session_id}')
+    entity_service = EntityService()
     if request.method == 'POST':
         try:
             # Load the session from database
-            session_entity = cache.get('current_session')
+            entity_id = TrainingSession.objects.get(id=session_id).entity_id
+            cur_session_id = entity_service.get_session_id()
 
-            if session_entity and session_entity.id == session_id:
-                cache.set('current_session', session_entity)
-            else:
+            if cur_session_id != entity_id:
                 session_model = TrainingSession.objects.get(id=session_id)
                 session_entity = TrainingSessionEntity.from_db(session_model)
-                cache.set('current_session', session_entity)
+                entity_service.cache_service.clear_all()
+                cache.set('current_session_id', session_entity.entity_id)
+                entity_service.save_entity(session_entity)
+            serialized = serialize_entity_and_children(entity_id)
             # Store in cache
-            
             return JsonResponse({
                 'status': 'success',
                 'message': 'Session loaded successfully',
-                'session_data': session_entity.serialize()
+                'session_data': serialized
             })
         except TrainingSession.DoesNotExist:
             return JsonResponse({'error': f'Session {session_id} not found'}, status=404)
@@ -197,7 +149,8 @@ def api_get_strategy_registry(request):
     print('api_get_strategy_registry')
     if request.method == 'GET':
         try:
-            strategies = StrategyExecutorService.get_registry()
+            executor_service = StrategyExecutorService(StrategyExecutor())
+            strategies = executor_service.get_registry()
             return JsonResponse(strategies, safe=False)
         except Exception as e:
             print(str(e))
@@ -231,11 +184,12 @@ def get_available_entities(request):
 def api_execute_strategy(request):
     print('execute_strategy')
     if request.method == 'POST':
-        entity = cache.get()
-        if not session:
+        entity_service = EntityService()
+        session_id = entity_service.get_session_id()
+        if not session_id:
             print('No session in progress')
             return JsonResponse({'error': 'No session in progress'}, status=400)
-
+    
         print(json.loads(request.body))
         strategy = json.loads(request.body).get('strategy')
         print('strategy', strategy)
@@ -244,22 +198,18 @@ def api_execute_strategy(request):
             print('strategy is required')
             return JsonResponse({'error': 'strategy is required'}, status=400)
 
-        training_session_service = TrainingSessionEntityService()
-        training_session_service.set_session(session)
-
         strat_request = json_to_StrategyRequestEntity(strategy)
 
         strategy_executor_service = StrategyExecutorService(StrategyExecutor())
 
         try:
-            ret_val = strategy_executor_service.execute_by_target_entity_id(session, strat_request)
-            all_requests = get_strategy_tree(ret_val)
-            add_to_strategy_history(session, ret_val)
-            cache.set('current_session', session)
+            ret_val = strategy_executor_service.execute_request(strat_request)
+            add_to_strategy_history(session_id, ret_val)
+
             return JsonResponse({
                 'status': 'success',
                 'message': 'Session loaded successfully',
-                'session_data': session.serialize(),
+                'entities': get_updated_entities(ret_val)
                 # 'strategy_response': ret_val
             })
         except Exception as e:
@@ -313,11 +263,13 @@ def api_execute_strategy_list(request):
 def api_get_strategy_history(request):
     print('api_get_strategy_history')
     if request.method == 'GET':
-        session = cache.get('current_session')
-        if not session:
+        entity_service = EntityService()
+        session_id = entity_service.get_session_id()
+        if not session_id:
             return JsonResponse({'error': 'No session in progress'}, status=400)
 
         try:
+            session = entity_service.get_entity(session_id)
             strategy_requests = []
             print(session.strategy_history)
             for strategy_request in session.strategy_history:
@@ -340,7 +292,6 @@ def json_to_StrategyRequestEntity(json_data):
         strat_request = StrategyRequestEntity()
 
     strat_request.strategy_name = json_data['strategy_name']
-    strat_request.strategy_path = json_data['strategy_path']
     strat_request.param_config = json_data['param_config']
     strat_request.add_to_history = json_data['add_to_history']
     strat_request.target_entity_id = json_data['target_entity_id']
@@ -351,14 +302,52 @@ def json_to_StrategyRequestEntity(json_data):
 
     return strat_request
 
-def add_to_strategy_history(session_entity, strat_request):
+def add_to_strategy_history(session_id, strat_request):
     #TODO later the history will be stored in the entity that the strategy is executed on for now without db we store it in the session
+    entity_service = EntityService()
+    session_entity = entity_service.get_entity(session_id)
     for i, strategy_request in enumerate(session_entity.strategy_history):
         if strategy_request.entity_id == strat_request.entity_id:
             session_entity.strategy_history[i] = strat_request
             return
     session_entity.add_to_strategy_history(strat_request)
+    entity_service.save_entity(session_entity)
     return
 
 def get_strategy_tree(strat_request):
-    return strat_request + [get_strategy_tree(nested_request) for nested_request in strat_request.nested_requests]
+    result = [strat_request]
+    for nested_request in strat_request.get_nested_requests():
+        result.extend(get_strategy_tree(nested_request))
+    return result
+
+def get_updated_entities(strat_request):
+    all_requests = get_strategy_tree(strat_request)
+    all_entities = set([request.target_entity_id for request in all_requests])
+    entity_service = EntityService()
+    entities_serialized = {}
+    for entity_id in all_entities:
+        entity = entity_service.get_entity(entity_id)
+        if entity:
+            if hasattr(entity, 'deleted') and entity.deleted:
+                entities_serialized[entity_id] = {'deleted': True}
+                entity_service.clear_entity(entity_id)
+            else:
+                entities_serialized[entity_id] = entity.serialize()
+
+    return entities_serialized
+
+def serialize_entity_and_children(entity_id, return_dict = None):
+    entity_service = EntityService()
+    entity = entity_service.get_entity(entity_id)
+    if not entity:
+        return None
+    entity_dict = entity.serialize()
+    children = entity.get_children()
+    if return_dict is None:
+        return_dict = {}
+    return_dict[entity_id] = entity_dict
+
+    for child_id in children:
+        return_dict = serialize_entity_and_children(child_id, return_dict)
+
+    return return_dict

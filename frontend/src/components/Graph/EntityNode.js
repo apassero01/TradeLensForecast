@@ -4,44 +4,69 @@ import MetadataList from './MetadataList';
 import MetadataValue from './MetadataValue';
 import visualizationComponents from '../Visualization/visualizationComponents';
 
-const EntityNode = ({ data }) => {
-  // Memoize the visualization component
-  const visualizationContent = useMemo(() => {
-    if (!data.visualization || !data.visualization.type) return null;
-    console.log("EntityNode Input For visualization", data)
-    console.log("Visualization type is:", data.visualization.type.toLowerCase());
-    const VisualizationComponent = visualizationComponents[data.visualization.type.toLowerCase()];
+const EntityNode = React.memo(({ data }) => {
+  // Memoize the entire content to prevent re-renders during drag
+  const content = useMemo(() => {
+    console.log('EntityNode content being recalculated for:', data.entity_name + data.id);
     
-    if (!VisualizationComponent) {
-      console.warn(`No visualization component found for type: ${data.visualization.type}`);
-      return null;
-    }
+    // Memoize the visualization component
+    const visualizationContent = data.visualization?.type ? (
+      (() => {
+        const VisualizationComponent = visualizationComponents[data.visualization.type.toLowerCase()];
+        if (!VisualizationComponent) {
+          console.warn(`No visualization component found for type: ${data.visualization.type}`);
+          return null;
+        }
+        return (
+          <div className="w-full p-2">
+            <VisualizationComponent visualization={data.visualization} />
+          </div>
+        );
+      })()
+    ) : null;
+
+    // Get metadata from either meta_data or metaData
+    const metadata = data.meta_data || data.metaData || {};
+
+    const renderMetadataValue = (value) => {
+      if (Array.isArray(value)) {
+        return <MetadataList items={value} />;
+      }
+      return <MetadataValue value={value} />;
+    };
 
     return (
-      <div className="w-full p-2">
-        <VisualizationComponent visualization={data.visualization} />
-      </div>
+      <>
+        <div className="text-white font-medium mb-2">{data.entity_name}</div>
+        <div className="space-y-1.5">
+          {data.visualization ? (
+            visualizationContent
+          ) : (
+            Object.entries(metadata).map(([key, value]) => (
+              <div key={key} className="text-sm flex items-start gap-2">
+                <span className="text-gray-400">{key}:</span>
+                {renderMetadataValue(value)}
+              </div>
+            ))
+          )}
+        </div>
+      </>
     );
-  }, [data.visualization]); // Only re-render when visualization data changes
-
-  const renderMetadataValue = (value) => {
-    if (Array.isArray(value)) {
-      return <MetadataList items={value} />;
-    }
-    return <MetadataValue value={value} />;
-  };
+  }, [data.entity_name, data.visualization, data.meta_data, data.metaData]); // Only re-render when these change
 
   const handleContextMenu = (e) => {
     e.preventDefault();
-    navigator.clipboard.writeText(data.path || data.label)
-      .then(() => console.log('Path copied to clipboard'))
-      .catch(err => console.error('Failed to copy:', err));
+    // Copy entity ID instead of path
+    navigator.clipboard.writeText(data.id)
+      .then(() => console.log('Entity ID copied to clipboard:', data.id))
+      .catch(err => console.error('Failed to copy ID:', err));
   };
 
   return (
     <div 
       className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 cursor-grab active:cursor-grabbing min-w-[250px]"
       onContextMenu={handleContextMenu}
+      title={`Right click to copy ID: ${data.id}`} // Added tooltip
     >
       <Handle 
         type="target" 
@@ -49,19 +74,7 @@ const EntityNode = ({ data }) => {
         id="top"
         style={{ background: '#4b5563' }}
       />
-      <div className="text-white font-medium mb-2">{data.label}</div>
-      <div className="space-y-1.5">
-        {data.visualization ? (
-          visualizationContent
-        ) : (
-          Object.entries(data.metaData || {}).map(([key, value]) => (
-            <div key={key} className="text-sm flex items-start gap-2">
-              <span className="text-gray-400">{key}:</span>
-              {renderMetadataValue(value)}
-            </div>
-          ))
-        )}
-      </div>
+      {content}
       <Handle 
         type="source" 
         position={Position.Bottom} 
@@ -70,6 +83,14 @@ const EntityNode = ({ data }) => {
       />
     </div>
   );
-};
+}, (prev, next) => {
+  // Custom comparison function for React.memo
+  // Only re-render if these specific properties change
+  return (
+    prev.data.entity_name === next.data.entity_name &&
+    prev.data.meta_data === next.data.meta_data &&
+    prev.data.visualization === next.data.visualization
+  );
+});
 
-export default React.memo(EntityNode); 
+export default EntityNode; 

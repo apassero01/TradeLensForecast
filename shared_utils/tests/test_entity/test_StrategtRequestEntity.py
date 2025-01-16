@@ -15,7 +15,6 @@ class TestStrategyRequestEntity(TestCase):
         # Create the main StrategyRequest object (top-level)
         self.model = StrategyRequest.objects.create(
             strategy_name="MainStrategy",
-            strategy_path="path.to.main_strategy",
             param_config={"main_param": "main_value"},
             training_session=self.training_session
         )
@@ -23,7 +22,6 @@ class TestStrategyRequestEntity(TestCase):
         # Create child StrategyRequest objects (nested requests)
         self.nested_request_1 = StrategyRequest.objects.create(
             strategy_name="NestedStrategy1",
-            strategy_path="path.to.nested_strategy_1",
             param_config={"param1": "value1"},
             parent_request=self.model,
             training_session=self.training_session
@@ -31,7 +29,6 @@ class TestStrategyRequestEntity(TestCase):
 
         self.nested_request_2 = StrategyRequest.objects.create(
             strategy_name="NestedStrategy2",
-            strategy_path="path.to.nested_strategy_2",
             param_config={"param2": "value2"},
             parent_request=self.model,
             training_session=self.training_session
@@ -119,7 +116,6 @@ class TestStrategyRequestEntity(TestCase):
         """
         child_request = StrategyRequest.objects.create(
             strategy_name="ChildStrategy",
-            strategy_path="path.to.child_strategy",
             param_config={"child_param": "child_value"},
             parent_request=self.model,
             training_session=self.training_session

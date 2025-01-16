@@ -10,23 +10,3 @@ class TrainingSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     entity_id = models.CharField(max_length=255, null=True, blank=True)
 
-
-class ModelSet():
-    X_features = None
-    y_features = None
-    X_feature_dict = None
-    y_feature_dict = None
-    X = None
-    y = None
-    data_set = None
-    row_ids = None
-    X_train = None
-    X_test = None
-    y_train = None
-    y_test = None
-    X_train_scaled = None
-    X_test_scaled = None
-    y_train_scaled = None
-    y_test_scaled = None
-    train_row_ids = None
-    test_row_ids = None

@@ -7,13 +7,12 @@ from data_bundle_manager.strategy.DataBundleStrategy import SplitBundleDateStrat
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.strategy.BaseStrategy import Strategy
-from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from shared_utils.strategy.BaseStrategy import AssignAttributesStrategy
 
 
 class SequenceSetStrategy(Strategy):
     entity_type = EntityEnum.SEQUENCE_SET
-    def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+    def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
         super().__init__(strategy_executor, strategy_request)
         self.strategy_request = strategy_request
         self.strategy_executor = strategy_executor
@@ -36,7 +35,7 @@ class SequenceSetStrategy(Strategy):
 #     entity_type = EntityEnum.SEQUENCE_SET
 #     name = "CreateDataBundle"
 
-#     def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+#     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
 #         super().__init__(strategy_executor, strategy_request)
 #         self.strategy_request = strategy_request
 #         self.strategy_executor = strategy_executor
@@ -67,7 +66,7 @@ class SequenceSetStrategy(Strategy):
 
 class PopulateDataBundleStrategy(SequenceSetStrategy):
     name = 'PopulateDataBundle'
-    def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+    def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
         super().__init__(strategy_executor, strategy_request)
         self.strategy_request = strategy_request
         self.strategy_executor = strategy_executor
@@ -89,20 +88,21 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
             sequence_set.set_attribute('X_feature_dict', X_feature_dict)
             sequence_set.set_attribute('y_feature_dict', y_feature_dict)
 
-            data_bundle = sequence_set.get_children_by_type(EntityEnum.DATA_BUNDLE)
-            if not len(data_bundle) == 1:
+            bundle_ids = self.entity_service.get_children_ids_by_type(sequence_set, EntityEnum.DATA_BUNDLE)
+            if not len(bundle_ids) == 1:
                 raise ValueError("SequenceSetEntity should have exactly one DataBundleEntity child")
-            strategy_request = self.create_strategy_request(data_bundle[0])
-            self.strategy_executor.execute(sequence_set, strategy_request)
+            strategy_request = self.create_strategy_request(bundle_ids[0])
+            strategy_request = self.strategy_executor.execute(sequence_set, strategy_request)
+            self.strategy_request.add_nested_request(strategy_request)
+
         return self.strategy_request
 
 
     def create_strategy_request(self, target_entity):
         strategy_request = StrategyRequestEntity()
         strategy_request.strategy_name = AssignAttributesStrategy.__name__
-        strategy_request.strategy_path = None
-        strategy_request.param_config = {   
-            'target_path': target_entity.path,
+        strategy_request.param_config = {
+            'assign_id': target_entity,
             'attribute_map': {
                 'X' : 'X',
                 'y' : 'y',
@@ -161,9 +161,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
         return X_feature_dict, y_feature_dict
 
     def verify_executable(self, sequence_sets, strategy_request):
-        for sequence_set in sequence_sets:
-            if len(sequence_set.get_children_by_type(EntityEnum.DATA_BUNDLE)) != 1:
-                raise ValueError("SequenceSetEntity should have exactly one DataBundleEntity child")
+        pass
 
     @staticmethod
     def get_request_config():
@@ -176,7 +174,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
 
 # class SplitAllBundlesDataStrategy(SequenceSetStrategy):
 #     name = 'SplitAllBundlesData'
-#     def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+#     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
 #         super().__init__(strategy_executor, strategy_request)
 
 #     def apply(self, sequence_sets):
@@ -222,7 +220,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
 
 # class ScaleSeqSetsByFeaturesStrategy(SequenceSetStrategy):
 #     name = 'ScaleSeqSetsByFeatures'
-#     def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+#     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
 #         super().__init__(strategy_executor, strategy_request)
 
 #     def apply(self, sequence_sets):
@@ -260,7 +258,7 @@ class PopulateDataBundleStrategy(SequenceSetStrategy):
 
 # class CombineSeqBundlesStrategy(SequenceSetStrategy):
 #     name = 'CombineSeqBundles'
-#     def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+#     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
 #         super().__init__(strategy_executor, strategy_request)
 
 #     def apply(self, sequence_sets):

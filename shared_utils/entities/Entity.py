@@ -17,99 +17,46 @@ class Entity(ABC):
         
         # Generate new UUID if none provided
         self.entity_id = entity_id if entity_id is not None else str(uuid4())
-        self.children: List[Entity] = []
-        self._parent: Optional[Entity] = None
-        self._path: Optional[str] = None
         self._attributes: Dict[str, Any] = {}
         self.children_ids = []
-        self._parent_id = None
+        self.parent_ids = []
+        self.configured_strategies = []
 
     def on_create(self, param_config: Optional[Dict[str, Any]] = None):
         pass
 
-    @property
-    def path(self):
-        '''Get the full path to the entity'''
-        if self._path is None:
-            if self._parent is None:
-                self._path = self.entity_name.value+":"+self.entity_id
-            else:
-                self._path = f"{self._parent.path}/{self.entity_name.value}:{self.entity_id}"
-        return self._path
-
-    def add_child(self, child: 'Entity'):
+    def add_child(self, child):
         '''Add a child to the entity'''
-        # If child already has a parent, remove it from that parent's children
-        if child._parent is not None:
-            child._parent.children.remove(child)
-
-        for existing_child in self.children:
-            if existing_child.entity_id == child.entity_id:
-                self.children.remove(existing_child)
-        # TODO careful here - this is dangerous with cache approach as atomic operation is not guaranteed with databases might be a little easier later
-        # Add to new parent
-        self.children.append(child)
-        child._parent = self
-        
-        # Invalidate path cache since the parent relationship changed
-        child._path = None
+        self.children_ids.append(child.entity_id)
+        child.add_parent(self)
     
     def remove_child(self, child: 'Entity'):
         '''Remove a child from the entity'''
-        self.children.remove(child)
-        child._parent = None
-        child._path = None
-        # delete child from memory
-        del child
-    
-    def find_entities_by_paths(self, paths: List[str]) -> Dict[str, Optional['Entity']]:
-        """
-        Find multiple entities by their paths in a single traversal
-        Returns a dictionary mapping paths to found entities (None if not found)
-        """
-        results = {path: None for path in paths}
-        paths_set = set(paths)  # Convert to set for O(1) lookups
-        
-        # Check if current entity matches any paths
-        if self.path in paths_set:
-            results[self.path] = self
+        if child.entity_id in self.children_ids:
+            self.children_ids.remove(child.entity_id)
 
-        # If we've found all paths, return early
-        if all(results.values()):
-            return results
+    def add_parent(self, parent):
+        '''Add a parent to the entity'''
+        self.parent_ids.append(parent.entity_id)
 
-        # Recursively search children
-        for child in self.children:
-            # Skip this branch if child's path isn't a prefix of any remaining unfound paths
-            unfound_paths = [p for p in paths if results[p] is None]
-            if not any(p.startswith(child.path) for p in unfound_paths):
-                continue
-                
-            child_results = child.find_entities_by_paths(unfound_paths)
-            # Update results with found entities
-            for path, entity in child_results.items():
-                if entity is not None:
-                    results[path] = entity
+    def remove_parent(self, parent: 'Entity'):
+        '''Remove a parent from the entity'''
+        if parent.entity_id in self.parent_ids:
+            self.parent_ids.remove(parent.entity_id)
 
-        return results
 
-    def find_entity_by_path(self, path: str) -> Optional['Entity']:
-        """Find a single entity by path (uses find_entities_by_paths internally)"""
-        results = self.find_entities_by_paths([path])
-        return results[path]
-    
-    def find_child_by_id(self, entity_id: str) -> Optional['Entity']:
-        if self.entity_id == entity_id:
-            return self
-        for child in self.children:
-            child_result = child.find_child_by_id(entity_id)
-            if child_result is not None:
-                return child_result
-        return None
-    
-    def get_children_by_type(self, entity_type: EntityEnum) -> List['Entity']:
-        '''Get all children of a given type'''
-        return [child for child in self.children if child.entity_name == entity_type]
+    def get_children(self) -> List['str']:
+        '''Get all children of the entity'''
+        return self.children_ids
+
+    def get_parents(self) -> List['str']:
+        '''Get all parents of the entity'''
+        return self.parent_ids
+
+    def remove_child_by_id(self, child_id: str):
+        '''Remove a child from the entity by its ID'''
+        if child_id in self.children_ids:
+            self.children_ids.remove(child_id)
 
     def set_attribute(self, name: str, value: Any):
         '''Set an attribute on the entity'''
@@ -145,9 +92,9 @@ class Entity(ABC):
         '''Get a list of all attributes on the entity'''
         return list(self._attributes.keys())
 
-    def get_parent(self) -> Optional['Entity']:
-        '''Get the parent of the entity'''
-        return self._parent
+    def get_configured_strategies(self) -> List[str]:
+        '''Get a list of all configured strategies on the entity'''
+        return self.configured_strategies
     
     def merge_entities(self, entities: List['Entity'], merge_config):
 
@@ -172,10 +119,10 @@ class Entity(ABC):
         return {
             'entity_name': self.entity_name.value,
             'meta_data': {},
-            'path': self.path,
             'class_path': self.__class__.__module__ + '.' + self.__class__.__name__,
             'entity_id': self.entity_id,
             'entity_type': self.entity_name.value,
+            'child_ids': self.get_children(),
         }
 
     def to_db(self):

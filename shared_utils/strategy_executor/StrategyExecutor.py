@@ -81,6 +81,9 @@ class StrategyExecutor:
             self.strategies = {}
         self.strategies[strategy_name] = strategy_cls
 
+    def get_registry(self):
+        return self.strategies
+
 
     @classmethod
     def destroy(cls):

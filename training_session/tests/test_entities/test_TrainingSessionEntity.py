@@ -19,7 +19,6 @@ class TestTrainingSessionEntity(TestCase):
         # Create test strategy request
         self.strategy_request = StrategyRequest.objects.create(
             strategy_name="TestStrategy",
-            strategy_path="path.to.strategy",
             param_config={"param": "value"},
             training_session=self.test_session,
             parent_request=None
@@ -38,7 +37,6 @@ class TestTrainingSessionEntity(TestCase):
         self.assertEqual(len(entity.strategy_history), 1)
         strategy = entity.strategy_history[0]
         self.assertEqual(strategy.strategy_name, "TestStrategy")
-        self.assertEqual(strategy.strategy_path, "path.to.strategy")
         self.assertEqual(strategy.param_config, {"param": "value"})
 
     def test_to_db(self):
@@ -59,7 +57,6 @@ class TestTrainingSessionEntity(TestCase):
         self.assertEqual(model.strategy_requests.count(), 1)
         saved_strategy = model.strategy_requests.first()
         self.assertEqual(saved_strategy.strategy_name, "TestStrategy")
-        self.assertEqual(saved_strategy.strategy_path, "path.to.strategy")
         self.assertEqual(saved_strategy.param_config, {"param": "value"})
 
     def test_to_db_update_existing(self):
@@ -70,7 +67,6 @@ class TestTrainingSessionEntity(TestCase):
         # Modify entity
         new_strategy = StrategyRequestEntity()
         new_strategy.strategy_name = "UpdatedStrategy"
-        new_strategy.strategy_path = "updated.path"
         new_strategy.param_config = {"updated": "config"}
         entity.add_to_strategy_history(new_strategy)
         
@@ -81,5 +77,4 @@ class TestTrainingSessionEntity(TestCase):
         self.assertEqual(updated_model.strategy_requests.count(), 2)
         strategies = list(updated_model.strategy_requests.all())
         self.assertEqual(strategies[1].strategy_name, "UpdatedStrategy")
-        self.assertEqual(strategies[1].strategy_path, "updated.path")
         self.assertEqual(strategies[1].param_config, {"updated": "config"})

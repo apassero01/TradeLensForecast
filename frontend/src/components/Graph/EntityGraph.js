@@ -5,12 +5,8 @@ import ReactFlow, {
   MiniMap,
   useNodesState,
   useEdgesState,
-  Position
 } from 'reactflow';
-import { processEntityGraph } from '../../utils/graphDataProcessor';
-import { calculateNewNodePosition } from '../../utils/nodePositionCalculator';
 import EntityNode from './EntityNode';
-import { isEqual } from 'lodash';
 
 const nodeTypes = {
   entityNode: EntityNode
@@ -21,111 +17,50 @@ const defaultEdgeOptions = {
   animated: true
 };
 
-const EntityGraph = ({ data, onNodeClick, selectedEntity }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const nodePositions = useRef(new Map());
-  const prevNodesRef = useRef(new Map());
+const EntityGraph = React.memo(({ 
+  nodes: initialNodes = [],
+  edges: initialEdges = [],
+  onNodeClick,
+  selectedEntity,
+  onNodesChange: onExternalNodesChange 
+}) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Memoize processed graph data
-  const processedElements = useMemo(() => {
-    if (!data) return { nodes: [], edges: [] };
-    return processEntityGraph(data);
-  }, [data]);
-
-  // Find parent and siblings for a node
-  const findNodeRelatives = useCallback((nodeId, processedNodes, processedEdges) => {
-    const parentEdge = processedEdges.find(edge => edge.target === nodeId);
-    if (!parentEdge) return { parentNode: null, siblings: [] };
-
-    const parentNode = prevNodesRef.current.get(
-      processedNodes.find(n => n.id === parentEdge.source)?.data.path
-    );
-
-    const siblings = processedEdges
-      .filter(edge => edge.source === parentEdge.source && edge.target !== nodeId)
-      .map(edge => prevNodesRef.current.get(
-        processedNodes.find(n => n.id === edge.target)?.data.path
-      ))
-      .filter(Boolean);
-
-    return { parentNode, siblings };
-  }, []);
-
-  // Process node updates while preserving positions
-  const processNodeUpdates = useCallback((processedNodes, processedEdges) => {
-    return processedNodes.map(node => {
-      const existingNode = prevNodesRef.current.get(node.data.path);
-      const existingPosition = nodePositions.current.get(node.data.path);
-
-      // If node exists, check for data changes
-      if (existingNode) {
-        const hasDataChanged = !isEqual(existingNode.data, node.data);
-        
-        // If no data changes, return existing node with its position
-        if (!hasDataChanged) {
-          console.log("existingNode Data has not changed");
-          return existingNode;
-        }
-        console.log("existingNode Data has changed");
-        // If data changed, return new node with preserved position
-        return {
-          ...node,
-          position: existingPosition || existingNode.position,
-          sourcePosition: Position.Bottom,
-          targetPosition: Position.Top,
-        };
-      }
-
-      // Calculate position for new nodes
-      const { parentNode, siblings } = findNodeRelatives(node.id, processedNodes, processedEdges);
-      const position = calculateNewNodePosition(parentNode, siblings);
-
-      return {
-        ...node,
-        position,
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
-      };
-    });
-  }, [findNodeRelatives]);
-
-  // Update graph when data changes
   useEffect(() => {
-    if (!processedElements.nodes.length) return;
-
-    // Process new nodes while preserving existing positions
-    const { nodes: newNodes, edges: newEdges } = processEntityGraph(data, nodes);
-
-    // Only update if data has changed (excluding positions)
-    const hasDataChanged = newNodes.some((newNode, index) => {
-      const existingNode = nodes[index];
-      return !existingNode || 
-        !isEqual(
-          { ...existingNode.data, position: undefined }, 
-          { ...newNode.data, position: undefined }
-        );
-    });
-
-    if (hasDataChanged) {
-      setNodes(newNodes);
-      setEdges(newEdges);
-    }
-  }, [data, nodes, setNodes, setEdges]);
-
-  const onNodeDragStop = useCallback((event, node) => {
-    // Update only the position
-    setNodes(nds => 
-      nds.map(n => {
-        if (n.id === node.id) {
-          return { ...n, position: node.position };
+    if (initialNodes && initialEdges) {
+      const updatedNodes = initialNodes.map(newNode => {
+        const existingNode = nodes.find(n => n.id === newNode.id);
+        if (existingNode) {
+          return {
+            ...newNode,
+            position: existingNode.position
+          };
         }
-        return n;
-      })
-    );
-  }, [setNodes]);
+        return newNode;
+      });
+      
+      setNodes(updatedNodes);
+      setEdges(initialEdges);
+    }
+  }, [initialNodes, initialEdges]);
 
-  const nodesWithStyles = useMemo(() => {
+  const handleNodesChange = useCallback((changes) => {
+    const positionChanges = changes.filter(change => 
+      change.type === 'position' || change.type === 'dimensions'
+    );
+    
+    if (positionChanges.length > 0) {
+      onNodesChange(positionChanges);
+    }
+    
+    if (onExternalNodesChange) {
+      onExternalNodesChange(positionChanges);
+    }
+  }, [onNodesChange, onExternalNodesChange]);
+
+  const styledNodes = useMemo(() => {
+    if (!nodes) return [];
     return nodes.map(node => ({
       ...node,
       style: {
@@ -137,14 +72,13 @@ const EntityGraph = ({ data, onNodeClick, selectedEntity }) => {
   }, [nodes, selectedEntity]);
 
   return (
-    <div className="h-screen" tabIndex={-1}>
+    <div className="h-screen">
       <ReactFlow
-        nodes={nodesWithStyles}
-        edges={edges}
-        onNodesChange={onNodesChange}
+        nodes={styledNodes}
+        edges={edges || []}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
-        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         deleteKeyCode={null}
         fitView
@@ -156,6 +90,6 @@ const EntityGraph = ({ data, onNodeClick, selectedEntity }) => {
       </ReactFlow>
     </div>
   );
-};
+});
 
-export default React.memo(EntityGraph); 
+export default EntityGraph; 

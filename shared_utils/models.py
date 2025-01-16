@@ -3,7 +3,6 @@ from django.core.exceptions import ValidationError
 from training_session.models import TrainingSession
 class StrategyRequest(models.Model):
     strategy_name = models.CharField(max_length=255)  # The name of the strategy
-    strategy_path = models.CharField(max_length=255)  # The path to the strategy
     param_config = models.JSONField(default=dict)  # Parameters for the strategy
     target_entity_id = models.CharField(max_length=255, null=True, blank=True)  # The id of the target entity
     

@@ -5,8 +5,10 @@ import pandas as pd
 
 from data_bundle_manager.entities.DataBundleEntity import DataBundleEntity
 from data_bundle_manager.entities.services.FeatureSetEntityService import FeatureSetEntityService
+from shared_utils.entities import StrategyRequestEntity
 from shared_utils.entities.EnityEnum import EntityEnum
-from shared_utils.strategy.BaseStrategy import Strategy
+from shared_utils.models import StrategyRequest
+from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, GetEntityStrategy
 
 
 class DataBundleStrategy(Strategy):
@@ -61,11 +63,15 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
         param_config = self.strategy_request.param_config
         feature_sets = []
         for config in param_config['feature_set_configs']:
-            feature_set = self.feature_set_entity_service.create_feature_set(config)
+            strat_request = StrategyRequestEntity()
+            strat_request.strategy_name = CreateEntityStrategy.__name__
+            strat_request.target_entity_id = data_bundle.entity_id
+            strat_request.param_config['entity_class'] =  'data_bundle_manager.entities.FeatureSetEntity.FeatureSetEntity'
+            feature_set = self.executor_service.execute(data_bundle, strat_request).ret_val['entity']
+            feature_set = self.feature_set_entity_service.create_feature_set(config, feature_set)
+            self.strategy_request.add_nested_request(strat_request)
             feature_sets.append(feature_set)
-
-        for feature_set in feature_sets:
-            data_bundle.add_child(feature_set)
+            self.entity_service.save_entity(feature_set)
 
         return self.strategy_request
 
@@ -180,7 +186,10 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         param_config = self.strategy_request.param_config
         X_feature_dict = data_bundle.get_attribute('X_feature_dict')
         y_feature_dict = data_bundle.get_attribute('y_feature_dict')
-        feature_sets = data_bundle.get_children_by_type(EntityEnum.FEATURE_SET)
+        feature_set_ids = self.entity_service.get_children_ids_by_type(data_bundle, EntityEnum.FEATURE_SET)
+        feature_sets = [self.get_feature_set(feature_set_id) for feature_set_id in feature_set_ids]
+
+
 
         X_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'X']
         y_feature_sets = [feature_set for feature_set in feature_sets if feature_set.feature_set_type == 'y']
@@ -204,6 +213,9 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         data_bundle.set_attribute('X_test_scaled', self.X_test_scaled)
         data_bundle.set_attribute('y_train_scaled', self.y_train_scaled)
         data_bundle.set_attribute('y_test_scaled', self.y_test_scaled)
+
+        for feature_set in feature_sets:
+            self.entity_service.save_entity(feature_set)
 
 
         return self.strategy_request
@@ -293,8 +305,15 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         if not entity.has_attribute('y_test'):
             raise ValueError("Missing y_test in dataset")
 
-        if len(entity.get_children_by_type(EntityEnum.FEATURE_SET)) == 0:
-            raise ValueError("FeatureSets not found in DataBundleEntity")
+    def get_feature_set(self, entity_id):
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = GetEntityStrategy.__name__
+        strategy_request.target_entity_id = entity_id
+
+        strategy_request = self.executor_service.execute_request(strategy_request)
+        self.strategy_request.add_nested_request(strategy_request)
+
+        return strategy_request.ret_val['entity']
 
     @staticmethod
     def get_request_config():

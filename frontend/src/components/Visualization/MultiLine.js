@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import Line from "./Line";
 
+const LINE_LIMIT = 500; // Define constant for max lines
+
 /**
  * MultiLine:
  *
@@ -37,8 +39,10 @@ const MultiLine = ({ visualization }) => {
     return <div>No line chart data available</div>;
   }
 
-  // Transform data based on compression level
+  // Transform data based on compression level with line limit
   let transformedLines = [];
+  let isLimited = false;
+
   if (compressionLevel === 0) {
     // All batch * features lines on one graph
     transformedLines = Array.from({ length: batchSize }, (_, b) =>
@@ -47,6 +51,13 @@ const MultiLine = ({ visualization }) => {
         values: lines[b].map((seq) => seq[f]),
       }))
     ).flat();
+
+    // Apply line limit if needed
+    if (transformedLines.length > LINE_LIMIT) {
+      transformedLines = transformedLines.slice(0, LINE_LIMIT);
+      isLimited = true;
+    }
+
   } else if (compressionLevel === 1) {
     // One graph per batch, all features on the same graph
     transformedLines = Array.from({ length: batchSize }, (_, b) => ({
@@ -56,6 +67,16 @@ const MultiLine = ({ visualization }) => {
         values: lines[b].map((seq) => seq[f]),
       })),
     }));
+
+    // Check if any batch has too many features
+    if (numFeatures > LINE_LIMIT) {
+      transformedLines = transformedLines.map(batch => ({
+        ...batch,
+        values: batch.values.slice(0, LINE_LIMIT)
+      }));
+      isLimited = true;
+    }
+
   } else if (compressionLevel === 2) {
     // One graph per batch * feature pair
     transformedLines = Array.from({ length: batchSize }, (_, b) =>
@@ -64,6 +85,12 @@ const MultiLine = ({ visualization }) => {
         values: lines[b].map((seq) => seq[f]),
       }))
     ).flat();
+
+    // Apply line limit if needed
+    if (transformedLines.length > LINE_LIMIT) {
+      transformedLines = transformedLines.slice(0, LINE_LIMIT);
+      isLimited = true;
+    }
   }
 
   const totalGraphs = transformedLines.length;
@@ -123,6 +150,20 @@ const MultiLine = ({ visualization }) => {
 
   return (
     <div style={{ color: "#fff" }}>
+      {/* Show warning if lines were limited */}
+      {isLimited && (
+        <div style={{ 
+          backgroundColor: 'rgba(255, 165, 0, 0.2)', 
+          color: 'orange', 
+          padding: '0.5rem', 
+          marginBottom: '1rem',
+          borderRadius: '4px',
+          textAlign: 'center'
+        }}>
+          Warning: Only showing first {LINE_LIMIT} lines due to performance limitations
+        </div>
+      )}
+
       {/* Compression level controls */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
         <button onClick={() => handleCompressionChange(-1)} disabled={compressionLevel === 0}>

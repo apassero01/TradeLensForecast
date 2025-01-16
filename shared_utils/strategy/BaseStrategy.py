@@ -1,15 +1,14 @@
 from abc import ABC, abstractmethod
 import importlib
-from typing import Any, Dict
 
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
-from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from shared_utils.entities.Entity import Entity
 import numpy as np
 from tslearn.clustering import TimeSeriesKMeans
 import requests
 from shared_utils.entities.service.EntityService import EntityService
+from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 
 
 class Strategy(ABC):
@@ -17,9 +16,11 @@ class Strategy(ABC):
 
     strategy_description = 'This is the base strategy class'
     
-    def __init__(self, strategy_executor: StrategyExecutor, strategy_request: StrategyRequestEntity):
+    def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
         self.strategy_request = strategy_request
         self.strategy_executor = strategy_executor
+        self.entity_service = EntityService()
+        self.executor_service = StrategyExecutorService(strategy_executor)
 
     @abstractmethod
     def apply(self, entity):
@@ -115,7 +116,13 @@ class CreateEntityStrategy(Strategy):
         new_entity.on_create(self.strategy_request.param_config)
         
         parent_entity.add_child(new_entity)
+        self.entity_service.save_entity(new_entity)
 
+        # Workaround for the fact there needs to be a request on an entity for its updated state to be returned to whose asking so need to make a mock request that this is a new entity that exists
+        child_request = StrategyRequestEntity()
+        child_request.target_entity_id = new_entity.entity_id
+        child_request.strategy_name = "FRUAD"
+        self.strategy_request.add_nested_request(child_request)
         # Add the new entity to the strategy request
         self.strategy_request.ret_val['entity'] = new_entity
         
@@ -147,32 +154,87 @@ class AssignAttributesStrategy(Strategy):
         - attribute_map: dict mapping child attribute names to values
         """
         config = self.strategy_request.param_config
-        child_path = config.get('target_path')
+        assign_id = config.get('assign_id')
         attribute_map = config.get('attribute_map', {})
         
         # Find child entity
 
-        parentEntity = sourceEntity
-        while parentEntity.get_parent() is not None:
-            parentEntity = parentEntity.get_parent()
 
-
-        target_entity = parentEntity.find_entity_by_path(child_path)
+        target_entity = self.entity_service.get_entity(assign_id)
         if not target_entity:
-            raise ValueError(f"Child entity not found at path: {child_path}")
+            raise ValueError(f"Child entity not found at path: {assign_id}")
             
         # Assign attributes
         for source_name, target_name in attribute_map.items():
             target_entity.set_attribute(target_name, sourceEntity.get_attribute(source_name))
-                
+
+        self.entity_service.save_entity(target_entity)
+        #TODO again sloppy but going to make a fake request so that the entity is viewed as updated on the frontend
+        child_request = StrategyRequestEntity()
+        child_request.target_entity_id = target_entity.entity_id
+        child_request.strategy_name = "FRUAD"
+        self.strategy_request.add_nested_request(child_request)
+
         return self.strategy_request
 
     @staticmethod
     def get_request_config():
         return {
-            'target_path': '',
+            'assign_id': '',
             'attribute_map': {"source_attribute": "target_attribute"}
         }
+
+class GetAttributesStrategy(Strategy):
+    """Generic strategy for getting attributes from an entity"""
+
+    strategy_description = 'Retrieves attributes from an entity and stores them in the request'
+
+    def verify_executable(self, entity, strategy_request):
+        return 'attribute_names' in strategy_request.param_config
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        """
+        Retrieves attributes from an entity and stores them in the request
+
+        param_config requirements:
+        - attribute_names: list of attribute names to retrieve
+        """
+        config = self.strategy_request.param_config
+        attribute_names = config.get('attribute_names', [])
+
+        # Retrieve attributes
+        for name in attribute_names:
+            value = entity.get_attribute(name)
+            self.strategy_request.ret_val[name] = value
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'attribute_names': []
+        }
+
+class RemoveChildStrategy(Strategy):
+    """Generic strategy for removing a child entity from its parent"""
+
+    strategy_description = 'Removes a child entity from its parent'
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+
+        child_id = self.strategy_request.param_config.get('child_id')
+        if child_id is None:
+            raise ValueError("Missing required parameter: child_id")
+        entity.remove_child_by_id(child_id)
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'child_id': ''
+        }
+
 
 
 class RemoveEntityStrategy(Strategy):
@@ -184,8 +246,17 @@ class RemoveEntityStrategy(Strategy):
         pass
 
     def apply(self, entity: Entity) -> StrategyRequestEntity:
-        parent_entity = entity._parent
-        parent_entity.remove_child(entity)
+        for parent in entity.parent_ids:
+            remove_child_request = StrategyRequestEntity()
+            remove_child_request.target_entity_id = parent
+            remove_child_request.strategy_name = RemoveChildStrategy.__name__
+            remove_child_request.param_config['child_id'] = entity.entity_id
+            remove_child_request = self.executor_service.execute_request(remove_child_request)
+            self.strategy_request.add_nested_request(remove_child_request)
+
+        entity.deleted = True
+
+
         return self.strategy_request
     
     @staticmethod
@@ -207,22 +278,49 @@ class MergeEntitiesStrategy(Strategy):
 
     def apply(self, entity: Entity) -> StrategyRequestEntity:
         config = self.strategy_request.param_config
-        entity_path_list = config.get('entities')
-        merge_config = config.get('merge_config')
+        target_ids = config.get('entities')
+        merge_configs = config.get('merge_config')
 
         # strategy passes in a list of paths. We need to get all of the entities. Might be a little anti pattern
         # but for now this is what it is. We will assume that all entities are connected in the same graph via TrainingSessionEntity.
         # Therefore we can traverse backward for the passed in entity, to the TrainingSessionEntity and then get all entities from there.
-        parent_entity = entity
-        while parent_entity._parent is not None:
-            parent_entity = parent_entity._parent
+        all_attributes_list = [
+            attribute
+            for merge_config in merge_configs
+            for attribute in merge_config['attributes']
+        ]
+        combined_attributes = { attribute: None for attribute in all_attributes_list}
 
-        entities = parent_entity.find_entities_by_paths(entity_path_list)
-        entities = [entities[path] for path in entity_path_list]
-        # Merge entities
-        entity.merge_entities(entities, merge_config)
+        for id in target_ids:
+            strategy_request = self.create_get_attributes(id, all_attributes_list)
+            strategy_request = self.executor_service.execute_request(strategy_request)
+            for config in merge_configs:
+                merge_method = config['method']
+                attributes = config['attributes']
+
+                if merge_method == 'concatenate':
+                    for attribute in attributes:
+
+                            if combined_attributes[attribute] is None:
+                                combined_attributes[attribute] = strategy_request.ret_val[attribute]
+                            else:
+                                combined_attributes[attribute] = np.concatenate((combined_attributes[attribute], strategy_request.ret_val[attribute]), axis=0)
+
+        for attribute, value in combined_attributes.items():
+            entity.set_attribute(attribute, value)
 
         return self.strategy_request
+
+    def create_get_attributes(self, entity_id, attributes):
+        """
+        Creates a list of GetAttributesStrategy requests for each entity in the list.
+        """
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = GetAttributesStrategy.__name__
+        strategy_request.target_entity_id = entity_id
+        strategy_request.param_config['attribute_names'] = attributes
+
+        return strategy_request
 
     @staticmethod
     def get_request_config():

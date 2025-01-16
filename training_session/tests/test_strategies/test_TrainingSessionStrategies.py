@@ -7,6 +7,7 @@ from data_bundle_manager.strategy.DataBundleStrategy import CombineDataBundlesSt
 from sequenceset_manager.entities.SequenceSetEntity import SequenceSetEntity
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
+from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from training_session.entities.TrainingSessionEntity import TrainingSessionEntity
 from training_session.strategy.TrainingSessionStrategy import GetSequenceSetsStrategy
@@ -18,6 +19,8 @@ class GetSequenceSetsStrategyTestCase(TestCase):
         self.X_features = ['open', 'close']
         self.y_features = ['close+1']
         self.dataset_type = 'stock'
+
+        self.entity_service = EntityService()
 
         # Strategy request mock
         self.strategy_request = StrategyRequestEntity()
@@ -89,7 +92,8 @@ class GetSequenceSetsStrategyTestCase(TestCase):
         self.assertEqual(len(self.strategy_request.get_nested_requests()), 2)
 
         # Get sequence sets using get_children_by_type
-        sequence_sets = self.session_entity.get_children_by_type(EntityEnum.SEQUENCE_SET)
+        sequence_sets = self.entity_service.get_children_ids_by_type(self.session_entity, EntityEnum.SEQUENCE_SET)
+        sequence_sets = [self.entity_service.get_entity(uuid) for uuid in sequence_sets]
 
         # Validate the results
         self.assertEqual(len(sequence_sets), 2)
@@ -148,7 +152,8 @@ class GetSequenceSetsStrategyTestCase(TestCase):
         self.strategy.apply(self.session_entity)
 
         # Get sequence sets using get_children_by_type
-        sequence_sets = self.session_entity.get_children_by_type(EntityEnum.SEQUENCE_SET)
+        sequence_sets = self.entity_service.get_children_ids_by_type(self.session_entity, EntityEnum.SEQUENCE_SET)
+        sequence_sets = [self.entity_service.get_entity(uuid) for uuid in sequence_sets]
 
         # Verify the number of sequence sets
         self.assertEqual(len(sequence_sets), 2)

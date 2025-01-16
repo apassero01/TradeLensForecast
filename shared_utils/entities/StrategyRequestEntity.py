@@ -10,7 +10,6 @@ class StrategyRequestEntity(Entity):
     def __init__(self, entity_id: Optional[str] = None):
         super().__init__(entity_id)
         self.strategy_name = None
-        self.strategy_path = None
         self.param_config = {}  # Initialize as empty dict instead of None
         self._nested_requests: List[StrategyRequestEntity] = []  # Store nested requests
         self.created_at = None
@@ -50,7 +49,6 @@ class StrategyRequestEntity(Entity):
     def serialize(self):
         return {
             'strategy_name': self.strategy_name,
-            'strategy_path': self.strategy_path,
             'param_config': self.param_config,
             'nested_requests': [nested_request.serialize() for nested_request in self._nested_requests],
             'created_at': self.created_at,
@@ -69,10 +67,10 @@ class StrategyRequestAdapter:
         entity.id = model.pk
         entity.strategy_name = model.strategy_name
         entity.param_config = model.param_config
-        entity.strategy_path = model.strategy_path
         entity.created_at = model.created_at
         entity.updated_at = model.updated_at
         entity.add_to_history = model.add_to_history
+        entity.target_entity_id = model.target_entity_id
         
         # Handle the parent request (only if it exists)
         if model.parent_request:
@@ -101,8 +99,8 @@ class StrategyRequestAdapter:
         # Update model fields
         model.strategy_name = entity.strategy_name
         model.param_config = entity.param_config
-        model.strategy_path = entity.strategy_path
         model.add_to_history = entity.add_to_history
+        model.target_entity_id = entity.target_entity_id
 
         # Handle parent request (if parent exists)
         if hasattr(entity, 'parent_request_id') and entity.parent_request_id:

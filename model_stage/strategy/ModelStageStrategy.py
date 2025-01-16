@@ -341,8 +341,10 @@ class ConfigureModelStageStrategy(Strategy):
         train_dataset = TensorDataset(X_train, y_train)
         val_dataset = TensorDataset(X_test, y_test)
 
-        train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=False)
-        val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+        batch_size = config.get('batch_size', 64)
+
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
         entity.set_attribute('train_dataloader', train_dataloader)
         entity.set_attribute('val_dataloader', val_dataloader)
@@ -361,13 +363,15 @@ class ConfigureModelStageStrategy(Strategy):
             'y_train': 'y_train_scaled',
             'X_test': 'X_test_scaled',
             'y_test': 'y_test_scaled',
-            'device': 'mps'
+            'device': 'mps',
+            'learning_rate': 0.001,
+            'batch_size': 64
         }
 
     def _create_optimizer(self, optimizer_str: str, model):
         optimizer_str = optimizer_str.lower()
         if optimizer_str == OptimizerEnum.OPTIMIZER_ADAM.value:
-            return optim.Adam(model.parameters(), lr=0.001)
+            return optim.Adam(model.parameters(), lr=self.strategy_request.param_config.get('learning_rate', 0.001))
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer_str}")
 

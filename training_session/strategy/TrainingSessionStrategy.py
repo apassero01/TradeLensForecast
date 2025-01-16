@@ -104,8 +104,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                     if sequence_set.get_attribute('sequences'):
                         sequence_set.set_attribute('seq_end_dates', [sequence.end_timestamp for sequence in sequence_set.get_attribute('sequences')])
 
-                    ## TODO sending strategy request from this strategy might be wrong
-                    self.strategy_executor.execute(session_entity, self.strategy_request)
+                    self.entity_service.save_entity(sequence_set)
 
                 except Exception as e:
                     print(f"Failed to decode JSON: {e}")
@@ -132,7 +131,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
     def create_sequence_set_requests(self, session_entity): 
         child_request = StrategyRequestEntity() 
         child_request.strategy_name = CreateEntityStrategy.__name__
-        child_request.strategy_path = session_entity.path
+        child_request.target_entity_id = session_entity.entity_id
         child_request.param_config = {
                 'entity_class': "sequenceset_manager.entities.SequenceSetEntity.SequenceSetEntity",
                 'entity_uuid': None

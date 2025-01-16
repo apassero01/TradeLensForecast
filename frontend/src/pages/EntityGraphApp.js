@@ -21,14 +21,21 @@ const EntityGraphApp = () => {
         setIsLoading(true);
         try {
             const response = await entityApi.startSession();
-            entityStore.updateEntities(response.sessionData);
-            const graphData = entityStore.toGraphData();
+            console.log('Session start response:', response);
             
-            setSessionStarted(true);
-            setGraphData(graphData);
-            setError(null);
-            console.log('Session started successfully');
+            if (response.status === 'success' && response.sessionData) {
+                entityStore.updateEntities(response.sessionData);
+                const graphData = entityStore.toGraphData();
+                console.log('Processed graph data:', graphData);
+                
+                setSessionStarted(true);
+                setGraphData(graphData);
+                setError(null);
+            } else {
+                throw new Error('Invalid session data received');
+            }
         } catch (err) {
+            console.error('Session start error:', err);
             setError('Failed to start session: ' + err.message);
         } finally {
             setIsLoading(false);
@@ -55,8 +62,20 @@ const EntityGraphApp = () => {
     const saveSession = async () => {
         setIsLoading(true);
         try {
-            console.log('Save session not implemented yet');
+            const response = await entityApi.saveSession();
+            console.log('Save session response:', response);
+            
+            if (response.status === 'success') {
+                // Refresh the list of saved sessions
+                const sessionsResponse = await entityApi.getSavedSessions();
+                setSavedSessions(sessionsResponse.sessions || []);
+                console.log('Sessions updated:', sessionsResponse.sessions);
+                setError(null);
+            } else {
+                throw new Error('Failed to save session');
+            }
         } catch (err) {
+            console.error('Save session error:', err);
             setError('Failed to save session: ' + err.message);
         } finally {
             setIsLoading(false);
@@ -66,8 +85,27 @@ const EntityGraphApp = () => {
     const loadSession = async (sessionId) => {
         setIsLoading(true);
         try {
-            console.log('Load session not implemented yet');
+            console.log('Loading session:', sessionId);
+            const response = await entityApi.loadSession(sessionId);
+            
+            if (response.status === 'success') {
+                console.log('Session loaded successfully:', response);
+                
+                // Update entity store with the loaded session data
+                if (response.session_data) {
+                    entityStore.clear();
+                    entityStore.updateEntities(response.session_data);
+                    const graphData = entityStore.toGraphData();
+                    setGraphData(graphData);
+                    setSessionStarted(true);
+                }
+                
+                setError(null);
+            } else {
+                throw new Error('Failed to load session');
+            }
         } catch (err) {
+            console.error('Load session error:', err);
             setError('Failed to load session: ' + err.message);
         } finally {
             setIsLoading(false);
@@ -82,7 +120,25 @@ const EntityGraphApp = () => {
     const handleStrategyExecute = async (strategyRequest) => {
         try {
             setIsLoading(true);
-            console.log('Strategy execution not implemented yet');
+            const response = await strategyApi.executeStrategy(strategyRequest);
+            console.log('Strategy response:', response);
+            
+            if (response.entities) {
+                console.log('Updating entities from strategy response:', response.entities);
+                Object.entries(response.entities).forEach(([entityId, entityData]) => {
+                    if (entityData.deleted) {
+                        entityStore.removeEntity(entityId);
+                    } else {
+                        entityStore.updateEntities({ [entityId]: entityData });
+                    }
+                });
+                
+                const graphData = entityStore.toGraphData();
+                setGraphData(graphData);
+            }
+            
+            setError(null);
+            return response;
         } catch (err) {
             setError('Failed to execute strategy: ' + err.message);
             throw err;
@@ -94,7 +150,24 @@ const EntityGraphApp = () => {
     const handleStrategyListExecute = async (strategyRequestList) => {
         try {
             setIsLoading(true);
-            console.log('Strategy list execution not implemented yet');
+            const response = await strategyApi.executeStrategyList(strategyRequestList);
+            
+            if (response.entities) {
+                console.log('Updating entities from strategy list response:', response.entities);
+                Object.entries(response.entities).forEach(([entityId, entityData]) => {
+                    if (entityData.deleted) {
+                        entityStore.removeEntity(entityId);
+                    } else {
+                        entityStore.updateEntities({ [entityId]: entityData });
+                    }
+                });
+                
+                const graphData = entityStore.toGraphData();
+                setGraphData(graphData);
+            }
+            
+            setError(null);
+            return response;
         } catch (err) {
             setError('Failed to execute strategy list: ' + err.message);
             throw err;
@@ -105,7 +178,9 @@ const EntityGraphApp = () => {
 
     const fetchAvailableStrategies = async () => {
         try {
-            console.log('Fetch available strategies not implemented yet');
+            const response = await entityApi.getStrategyRegistry();
+            console.log('Available strategies:', response);
+            setAvailableStrategies(response);
         } catch (err) {
             setError('Failed to fetch strategies: ' + err.message);
         }
@@ -114,6 +189,23 @@ const EntityGraphApp = () => {
     useEffect(() => {
         fetchAvailableStrategies();
     }, []);
+
+    // Fetch saved sessions when component mounts
+    useEffect(() => {
+        const fetchSavedSessions = async () => {
+            try {
+                console.log('Fetching saved sessions...');
+                const response = await entityApi.getSavedSessions();
+                console.log('Received saved sessions:', response);
+                setSavedSessions(response.sessions || []);
+            } catch (err) {
+                console.error('Failed to fetch saved sessions:', err);
+                setError('Failed to fetch saved sessions: ' + err.message);
+            }
+        };
+
+        fetchSavedSessions();
+    }, []); // Empty dependency array means this runs once on mount
 
     return (
         <div className="min-h-screen bg-gray-900 flex">
@@ -140,15 +232,24 @@ const EntityGraphApp = () => {
                 )}
 
                 <div className="flex-grow">
-                    {graphData ? (
-                        <EntityGraph 
-                            data={graphData}
-                            onNodeClick={handleNodeClick}
-                            selectedEntity={selectedEntity}
-                        />
+                    {sessionStarted ? (
+                        <>
+                            {graphData.nodes.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                    No entities to display
+                                </div>
+                            ) : (
+                                <EntityGraph 
+                                    nodes={graphData.nodes}
+                                    edges={graphData.edges}
+                                    onNodeClick={handleNodeClick}
+                                    selectedEntity={selectedEntity}
+                                />
+                            )}
+                        </>
                     ) : (
                         <div className="flex items-center justify-center h-full text-gray-400">
-                            {sessionStarted ? 'Loading graph data...' : 'Start a session to view the entity graph'}
+                            Start a session to view the entity graph
                         </div>
                     )}
                 </div>

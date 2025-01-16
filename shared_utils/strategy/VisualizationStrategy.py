@@ -1,4 +1,5 @@
-from shared_utils.strategy.BaseStrategy import Strategy
+from shared_utils.models import StrategyRequest
+from shared_utils.strategy.BaseStrategy import Strategy, GetAttributesStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
@@ -30,9 +31,20 @@ class VisualizationStrategy(Strategy):
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
         return True
     
-    def get_parent_attributes(self, entity: Entity): 
-        array = entity.get_parent().get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
-        entity.set_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'), array)
+    def get_parent_attributes(self, entity: Entity):
+        parent_data_name = self.strategy_request.param_config.get('parent_data_attribute_name')
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = GetAttributesStrategy.__name__
+        strategy_request.target_entity_id = entity.get_parents()[0]
+        strategy_request.param_config = {
+            'attribute_names': [
+                parent_data_name
+            ]
+        }
+
+        strategy_request = self.executor_service.execute_request(strategy_request)
+
+        entity.set_attribute(parent_data_name, strategy_request.ret_val[parent_data_name])
 
     @staticmethod
     def get_request_config():
