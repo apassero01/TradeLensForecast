@@ -6,8 +6,8 @@ class BaseLayer(nn.Module):
     def __init__(self):
         super(BaseLayer, self).__init__()
         self.input = None
-        self.output = None
         self.traversable_layers = []
+        self.save_input = False
 
 
     def summary(self):
@@ -26,9 +26,6 @@ class BaseLayer(nn.Module):
 
     def get_input(self):
         return self.input
-
-    def get_output(self):
-        return self.output
 
     def get_traversible_layers(self):
         return self.traversable_layers

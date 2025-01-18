@@ -53,3 +53,48 @@ def gaussian_nll_loss(outputs, y_true, threshold = .5, penalty_factor = 1000):
     penalty = torch.where(mu.abs() < threshold, penalty_factor, torch.zeros_like(mu))
 
     return loss + penalty.mean()
+
+
+class MinOfNSequenceLoss(nn.Module):
+    """
+    Custom MSE-like loss:
+    - 'preds' has shape (batch, seq_length, n)
+    - 'target' has shape (batch, seq_length, 1)
+
+    We compute the squared error between each of the n predictions and the target,
+    then take the min error across n for each time step, and finally reduce over
+    the sequence and the batch.
+    """
+
+    def __init__(self, reduction='mean'):
+        super().__init__()
+        # 'reduction' can be 'mean', 'sum', or 'none'
+        self.reduction = reduction
+
+    def forward(self, preds, target):
+        """
+        :param preds:  (batch, seq_length, n)
+        :param target: (batch, seq_length, 1)
+        :return:       scalar loss by default (if reduction='mean' or 'sum'),
+                       or shape (batch, seq_length) if reduction='none'
+        """
+
+        # 1) Expand target across the n dimension for easy broadcasting
+        #    so target_expanded matches preds' shape in the last dim.
+        #    This becomes (batch, seq_length, n).
+        target_expanded = target.expand(-1, -1, preds.size(2))
+
+        # 2) Compute squared errors -> shape (batch, seq_length, n)
+        errors = (preds - target_expanded) ** 2
+
+        # 3) Take the min across the n dimension -> shape (batch, seq_length)
+        min_errors, _ = torch.min(errors, dim=2)
+
+        # 4) Reduce over sequence and batch depending on 'reduction'
+        if self.reduction == 'mean':
+            return min_errors.mean()  # average over (batch * seq_length)
+        elif self.reduction == 'sum':
+            return min_errors.sum()  # sum over (batch * seq_length)
+        else:
+            # no reduction -> return shape (batch, seq_length)
+            return min_errors

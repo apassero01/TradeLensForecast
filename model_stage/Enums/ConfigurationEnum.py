@@ -9,3 +9,4 @@ class OptimizerEnum(Enum):
 class CriterionEnum(Enum):
     # Maps strings to TF loss functions
     CRITERION_MSE = "mse"
+    MIN_SEQ = "min_seq"

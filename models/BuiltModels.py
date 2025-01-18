@@ -25,9 +25,9 @@ class Transformer(BaseLayer):
         self.input_projection = nn.Linear(self.config['encoder_input_dim'], self.config['d_model'])
 
         self.output_mechanism = EncoderToRNNWithMultiHeadAttention(
-            self.config['d_model'], 
-            self.config['d_ff'], 
-            self.config['num_heads'], 
+            self.config['d_model'],
+            self.config['d_ff'],
+            self.config['num_heads'],
             self.config['decoder_input_dim']
         )
 

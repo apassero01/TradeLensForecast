@@ -309,6 +309,7 @@ def add_to_strategy_history(session_id, strat_request):
     for i, strategy_request in enumerate(session_entity.strategy_history):
         if strategy_request.entity_id == strat_request.entity_id:
             session_entity.strategy_history[i] = strat_request
+            entity_service.save_entity(session_entity)
             return
     session_entity.add_to_strategy_history(strat_request)
     entity_service.save_entity(session_entity)

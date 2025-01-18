@@ -29,6 +29,8 @@ class EncoderToRNNWithMultiHeadAttention(BaseLayer):
         self.traversable_layers = nn.ModuleList([self.multi_head_attention])
 
     def forward(self, encoder_output):
+        if self.save_input:
+            self.input = encoder_output
         # encoder_output shape: (batch_size, input_seq_length, d_model)
         batch_size, input_seq_length, d_model = encoder_output.size()
 
@@ -40,7 +42,6 @@ class EncoderToRNNWithMultiHeadAttention(BaseLayer):
         rnn_output, (h_n, c_n) = self.rnn(encoder_output,
                                           (h_0, c_0))  # rnn_output: (batch_size, input_seq_length, dff)
 
-        self.output = rnn_output
         # Initialize an empty list to store the outputs
         outputs = []
 
@@ -195,7 +196,8 @@ class DecoderLayer(BaseLayer):
 
         # cross_attn_output = self.cross_attention(x, encoder_output, encoder_output)
         # x = self.norm2(x + self.dropout(cross_attn_output))
-        self.orig_output = x.clone()
+        if self.save_input:
+            self.input = encoder_output
 
         self_attn_output = self.self_attention(Q=self.norm1(x),
                                                   K=self.norm1(x),
@@ -217,8 +219,7 @@ class DecoderLayer(BaseLayer):
         # Feed-Forward Network
         ff_output = self.feed_forward(self.norm3(x))
         output = x + self.dropout(ff_output)  # Residual connection
-        self.output = output
-        self.cross_attention_output = cross_attn_output
+
         return output
 
     def get_attention(self):

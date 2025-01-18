@@ -82,13 +82,14 @@ class EncoderLayer(BaseLayer):
                     nn.init.zeros_(module.bias)
 
     def forward(self, x):
-        self.input = x.clone()
+        if self.save_input:
+            self.input = x.clone()
 
         # print(f"EncoderLayer {self.name} input shape: {x.shape}")
-        x_norm = self.norm1(x)  # Pre-Norm before attention
+        # x_norm = self.norm1(x)  # Pre-Norm before attention
         # print(f"EncoderLayer {self.name} norm1 shape: {x_norm.shape}")
 
-        self.attn_output = self.multi_head_attention(x_norm, x_norm, x_norm)
+        self.attn_output = self.multi_head_attention(x, x, x)
         # print(f"EncoderLayer {self.name} attn_output shape: {self.attn_output.shape}")
         x = x + self.dropout(self.attn_output)  # Residual connection
 
@@ -96,7 +97,6 @@ class EncoderLayer(BaseLayer):
         x_norm = self.norm2(x)  # Pre-Norm before feed-forward
         ff_output = self.feed_forward(x_norm)
         output = x + self.dropout(ff_output)
-        self.output = output
 
         return output
 

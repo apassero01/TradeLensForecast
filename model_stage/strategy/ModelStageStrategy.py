@@ -3,6 +3,7 @@ import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader, TensorDataset
 
+from models.loss import MinOfNSequenceLoss
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.entities.Entity import Entity
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
@@ -135,9 +136,7 @@ class FitModelStrategy(Strategy):
         num_batches = 0
 
         for batch in dataloader:
-            encoder_input, y_target = batch
-            encoder_input = encoder_input.to(device)
-            y_target = y_target.to(device)
+            encoder_input, y_target = [x.to(device) for x in batch]
 
             optimizer.zero_grad()
             predictions = model(encoder_input)
@@ -160,7 +159,7 @@ class FitModelStrategy(Strategy):
 
         with torch.no_grad():
             for batch in dataloader:
-                encoder_input, y_target = batch
+                encoder_input, y_target = [x.to(device) for x in batch]
                 encoder_input = encoder_input.to(device)
                 y_target = y_target.to(device)
 
@@ -379,6 +378,8 @@ class ConfigureModelStageStrategy(Strategy):
         criterion_str = criterion_str.lower()
         if criterion_str == CriterionEnum.CRITERION_MSE.value:
             return nn.MSELoss()
+        if criterion_str == CriterionEnum.MIN_SEQ.value:
+            return MinOfNSequenceLoss()
         else:
             raise ValueError(f"Unsupported criterion: {criterion_str}")
         

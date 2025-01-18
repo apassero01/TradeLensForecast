@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import torch
 import torch.nn as nn
 
@@ -35,6 +37,8 @@ class MultiHeadAttention(BaseLayer):
                     nn.init.zeros_(module.bias)
 
     def forward(self, Q, K, V, mask=None):
+        if self.save_input:
+            self.input = deepcopy(Q)
         batch_size = Q.size(0)
 
         Q = self.query(Q)
@@ -59,11 +63,11 @@ class MultiHeadAttention(BaseLayer):
 
         attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
 
-        self.output = self.out(attention_output)
+        output = self.out(attention_output)
 
-        self.output = self.layer_norm(self.output)
+        output = self.layer_norm(output)
 
-        return self.output
+        return output
 
 
 class ChannelWiseMultiHeadAttention(BaseLayer):
@@ -98,6 +102,9 @@ class ChannelWiseMultiHeadAttention(BaseLayer):
                     nn.init.zeros_(module.bias)
 
     def forward(self, Q, K, V, mask=None):
+        if self.save_input:
+            self.input = deepcopy(Q)
+
         batch_size = Q.size(0)
         seq_len = Q.size(1)
         num_features = Q.size(2)
@@ -135,6 +142,7 @@ class ChannelWiseMultiHeadAttention(BaseLayer):
         attention_output = attention_output.permute(0, 2, 1)
 
         # Apply final linear transformation and return output
-        self.output = self.out(attention_output)
-        self.output = self.layer_norm(self.output)
-        return self.output
+        output = self.out(attention_output)
+        output = self.layer_norm(output)
+
+        return output

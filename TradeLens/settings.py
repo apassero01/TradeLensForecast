@@ -102,14 +102,14 @@ CACHES = {
     #     'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     #     'LOCATION': 'unique',  # You can change this to any unique name
     # }
-    'default': {
-        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': os.path.join(BASE_DIR, 'cache'),  # Specify the cache directory
-        'TIMEOUT': None,  # Set to None to persist cache until manually cleared
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000,  # Adjust based on your needs
-            'CULL_FREQUENCY': 3,  # Cull when reaching max entries (removes oldest)
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
+        # Optional: default timeout for all cache operations
+        "TIMEOUT": None,
     }
 }
 
