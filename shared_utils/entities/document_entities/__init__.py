@@ -1,0 +1,1 @@
+from shared_utils.entities.document_entities.DocumentEntity import DocumentEntity

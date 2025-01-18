@@ -5,3 +5,5 @@ from .Entity import Entity
 from .StrategyRequestEntity import StrategyRequestEntity
 from .VisualizationEntity import VisualizationEntity
 from model_stage.entities.ModelStageEntity import ModelStageEntity
+from .document_entities.DocumentEntity import DocumentEntity
+from .api_model.ApiModelEntity import ApiModelEntity

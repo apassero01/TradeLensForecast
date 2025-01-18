@@ -11,4 +11,6 @@ class EntityEnum(Enum):
     DATA_BUNDLE = "data_bundle"
     STRATEGY_REQUESTS = "strategy_request"
     VISUALIZATION = "visualization"
+    DOCUMENT = "document"
+    API_MODEL = "api_model"
 

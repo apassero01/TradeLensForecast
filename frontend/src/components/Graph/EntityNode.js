@@ -1,96 +1,155 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import MetadataList from './MetadataList';
 import MetadataValue from './MetadataValue';
 import visualizationComponents from '../Visualization/visualizationComponents';
 
+const MIN_WIDTH = 250;
+const MIN_HEIGHT = 100;
+
 const EntityNode = React.memo(({ data }) => {
-  // Memoize the entire content to prevent re-renders during drag
-  const content = useMemo(() => {
-    console.log('EntityNode content being recalculated for:', data.entity_name + data.id);
-    
-    // Memoize the visualization component
-    const visualizationContent = data.visualization?.type ? (
-      (() => {
-        const VisualizationComponent = visualizationComponents[data.visualization.type.toLowerCase()];
-        if (!VisualizationComponent) {
-          console.warn(`No visualization component found for type: ${data.visualization.type}`);
-          return null;
-        }
-        return (
-          <div className="w-full p-2">
-            <VisualizationComponent visualization={data.visualization} />
-          </div>
-        );
-      })()
-    ) : null;
+  const [dimensions, setDimensions] = useState({
+    width: MIN_WIDTH,
+    // Instead of 'auto', store a numeric height so flex can size properly:
+    height: 150, // or whatever your starting height is
+  });
+  const [isResizing, setIsResizing] = useState(false);
 
-    // Get metadata from either meta_data or metaData
-    const metadata = data.meta_data || data.metaData || {};
+  // Start the resize drag
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
 
-    const renderMetadataValue = (value) => {
-      if (Array.isArray(value)) {
-        return <MetadataList items={value} />;
-      }
-      return <MetadataValue value={value} />;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const { width: startWidth, height: startHeight } = dimensions;
+
+    const handleResizeMove = (moveEvent) => {
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
+      const newWidth = Math.max(
+        MIN_WIDTH,
+        startWidth + (moveEvent.clientX - startX)
+      );
+      const newHeight = Math.max(
+        MIN_HEIGHT,
+        startHeight + (moveEvent.clientY - startY)
+      );
+      setDimensions({ width: newWidth, height: newHeight });
     };
 
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+  };
+
+  // Build your content
+  const content = useMemo(() => {
+    const { visualization } = data;
+    if (visualization?.type) {
+      const VisualizationComponent =
+        visualizationComponents[visualization.type.toLowerCase()];
+      if (!VisualizationComponent) {
+        console.warn(`No visualization found for type: ${visualization.type}`);
+        return null;
+      }
+      // Let the visualization fill its container
+      return (
+        <div className="w-full h-full">
+          <VisualizationComponent visualization={visualization} />
+        </div>
+      );
+    }
+
+    // If no visualization, fall back to metadata
+    const metadata = data.meta_data || data.metaData || {};
     return (
       <>
-        <div className="text-white font-medium mb-2">{data.entity_name}</div>
-        <div className="space-y-1.5">
-          {data.visualization ? (
-            visualizationContent
-          ) : (
-            Object.entries(metadata).map(([key, value]) => (
-              <div key={key} className="text-sm flex items-start gap-2">
-                <span className="text-gray-400">{key}:</span>
-                {renderMetadataValue(value)}
-              </div>
-            ))
-          )}
-        </div>
+        {Object.entries(metadata).map(([key, value]) => (
+          <div key={key} className="text-sm flex items-start gap-2">
+            <span className="text-gray-400">{key}:</span>
+            {Array.isArray(value) ? (
+              <MetadataList items={value} />
+            ) : (
+              <MetadataValue value={value} />
+            )}
+          </div>
+        ))}
       </>
     );
-  }, [data.entity_name, data.visualization, data.meta_data, data.metaData]); // Only re-render when these change
+  }, [data]);
 
   const handleContextMenu = (e) => {
     e.preventDefault();
-    // Copy entity ID instead of path
-    navigator.clipboard.writeText(data.id)
-      .then(() => console.log('Entity ID copied to clipboard:', data.id))
-      .catch(err => console.error('Failed to copy ID:', err));
+    navigator.clipboard.writeText(data.id).then(
+      () => console.log('Entity ID copied to clipboard:', data.id),
+      (err) => console.error('Failed to copy ID:', err),
+    );
   };
 
   return (
-    <div 
-      className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 cursor-grab active:cursor-grabbing min-w-[250px]"
+    <div
       onContextMenu={handleContextMenu}
-      title={`Right click to copy ID: ${data.id}`} // Added tooltip
+      title={`Right click to copy ID: ${data.id}`}
+      // A flex container with a set width & height that the user can resize
+      className={`
+        relative bg-gray-800 border border-gray-700 rounded-lg
+        ${isResizing ? 'cursor-nwse-resize select-none' : 'cursor-grab active:cursor-grabbing'}
+        flex flex-col
+      `}
+      style={{
+        width: dimensions.width,
+        height: dimensions.height,
+        minWidth: `${MIN_WIDTH}px`,
+        minHeight: `${MIN_HEIGHT}px`,
+      }}
     >
-      <Handle 
-        type="target" 
-        position={Position.Top} 
+      {/* React Flow handle on top */}
+      <Handle
+        type="target"
+        position={Position.Top}
         id="top"
         style={{ background: '#4b5563' }}
       />
-      {content}
-      <Handle 
-        type="source" 
-        position={Position.Bottom} 
+
+      {/* Header area */}
+      <div className="px-4 py-2 border-b border-gray-700">
+        <div className="text-white font-medium">
+          {data.entity_name}
+        </div>
+      </div>
+
+      {/* Main content flex-grow area 
+          min-h-0 is crucial in Tailwind to let this area grow/shrink. */}
+      <div className="flex-grow min-h-0 px-4 py-2">
+        {content}
+      </div>
+
+      {/* React Flow handle on bottom */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
         id="bottom"
         style={{ background: '#4b5563' }}
       />
+
+      {/* Resize corner (nodrag) */}
+      <div
+        className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize nodrag"
+        style={{
+          background: 'linear-gradient(135deg, transparent 50%, #4b5563 50%)',
+          borderBottomRightRadius: '0.5rem',
+        }}
+        onMouseDown={handleResizeStart}
+      />
     </div>
-  );
-}, (prev, next) => {
-  // Custom comparison function for React.memo
-  // Only re-render if these specific properties change
-  return (
-    prev.data.entity_name === next.data.entity_name &&
-    prev.data.meta_data === next.data.meta_data &&
-    prev.data.visualization === next.data.visualization
   );
 });
 
-export default EntityNode; 
+export default EntityNode;

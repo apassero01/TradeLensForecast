@@ -15,6 +15,7 @@ class StrategyDirectory:
                 "shared_utils.strategy.BaseStrategy.GetAttributesStrategy",
                 "shared_utils.strategy.BaseStrategy.RemoveChildStrategy",
                 "shared_utils.strategy.BaseStrategy.GetEntityStrategy",
+                "shared_utils.strategy.BaseStrategy.AddChildStrategy",
             ],
             EntityEnum.TRAINING_SESSION.value: [
                 "training_session.strategy.TrainingSessionStrategy.GetSequenceSetsStrategy",
@@ -40,6 +41,14 @@ class StrategyDirectory:
                 "model_stage.strategy.ModelStageStrategy.EvaluateModelStrategy",
                 "model_stage.strategy.ModelStageStrategy.PredictModelStrategy",
                 "model_stage.strategy.ModelStageStrategy.ComparePredictionsStrategy",
+            ],
+            EntityEnum.DOCUMENT.value: [
+                "shared_utils.entities.document_entities.strategy.FileTreeStrategies.ScrapeFilePathStrategy",
+                "shared_utils.entities.document_entities.strategy.FileTreeStrategies.RecursiveFileScrapeStrategy",
+            ],  
+            EntityEnum.API_MODEL.value: [
+                "shared_utils.entities.api_model.strategy.ApiModelStrategy.ConfigureApiModelStrategy",
+                "shared_utils.entities.api_model.strategy.ApiModelStrategy.CallApiModelStrategy",
             ],
         }
 

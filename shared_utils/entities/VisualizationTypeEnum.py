@@ -5,3 +5,5 @@ class VisualizationTypeEnum(Enum):
     LINEGRAPH = 'linegraph'
     STOCKCHART = 'stockchart'
     MULTILINE = 'multiline'
+    EDITOR = 'editor'
+    CHAT = 'chat'

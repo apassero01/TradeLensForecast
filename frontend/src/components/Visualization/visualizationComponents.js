@@ -4,15 +4,15 @@ import Line from './Line';
 import StockChart from "./StockChart";
 import MultiStockChart from "./MultiStockChart";
 import MultiLine from "./MultiLine";
-// Import other visualization components as needed
-
+import Editor from './Editor';
+import ChatScreen from './ChatScreen';
 const visualizationComponents = {
   histogram: Histogram,
   linegraph: Line,
   stockchart: MultiStockChart,
-  multiline: MultiLine
-  // MultiStockChart: MultiStockChart,
-  // Add other mappings here
+  multiline: MultiLine,
+  editor: Editor,
+  chat: ChatScreen
 };
 
 export default visualizationComponents;

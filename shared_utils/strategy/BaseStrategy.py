@@ -122,9 +122,10 @@ class CreateEntityStrategy(Strategy):
         child_request = StrategyRequestEntity()
         child_request.target_entity_id = new_entity.entity_id
         child_request.strategy_name = "FRUAD"
+        child_request.ret_val['entity'] = new_entity
         self.strategy_request.add_nested_request(child_request)
         # Add the new entity to the strategy request
-        self.strategy_request.ret_val['entity'] = new_entity
+        # self.strategy_request.ret_val['entity'] = new_entity
         
         return self.strategy_request
 
@@ -213,6 +214,27 @@ class GetAttributesStrategy(Strategy):
     def get_request_config():
         return {
             'attribute_names': []
+        }
+    
+class AddChildStrategy(Strategy):
+    """Generic strategy for adding a child entity to its parent"""
+
+    strategy_description = 'Adds a child entity to its parent'
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        child_id = self.strategy_request.param_config.get('child_id')
+        if child_id is None:
+            raise ValueError("Missing required parameter: child_id")
+        child_entity = self.entity_service.get_entity(child_id)
+        entity.add_child(child_entity)
+        self.entity_service.save_entity(entity)
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'child_id': ''
         }
 
 class RemoveChildStrategy(Strategy):
