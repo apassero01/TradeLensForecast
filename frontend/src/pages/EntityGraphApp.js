@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import EntityGraph from '../components/Graph/EntityGraph';
 import TopBar from '../components/TopBar/TopBar';
-import StrategyPanel from '../components/Strategy/StrategyPanel';
 import { entityApi } from '../services/api';
 import { strategyApi } from '../services/strategyApi';
 import EntityStore from '../stores/EntityStore';
@@ -260,17 +259,6 @@ const EntityGraphApp = () => {
           )}
         </div>
       </div>
-
-      {/* Strategy Panel */}
-      {sessionStarted && (
-        <StrategyPanel
-          selectedEntity={selectedEntity}
-          availableStrategies={availableStrategies}
-          onStrategyExecute={handleStrategyExecute}
-          onStrategyListExecute={handleStrategyListExecute}
-          fetchAvailableStrategies={fetchAvailableStrategies}
-        />
-      )}
     </div>
   );
 };
