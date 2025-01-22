@@ -117,6 +117,7 @@ class CreateEntityStrategy(Strategy):
         
         parent_entity.add_child(new_entity)
         self.entity_service.save_entity(new_entity)
+        self.strategy_request.ret_val['child_entity'] = new_entity
 
         # Workaround for the fact there needs to be a request on an entity for its updated state to be returned to whose asking so need to make a mock request that this is a new entity that exists
         child_request = StrategyRequestEntity()
@@ -125,7 +126,7 @@ class CreateEntityStrategy(Strategy):
         child_request.ret_val['entity'] = new_entity
         self.strategy_request.add_nested_request(child_request)
         # Add the new entity to the strategy request
-        # self.strategy_request.ret_val['entity'] = new_entity
+        self.strategy_request.ret_val['entity'] = parent_entity
         
         return self.strategy_request
 

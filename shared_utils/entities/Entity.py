@@ -20,7 +20,7 @@ class Entity(ABC):
         self._attributes: Dict[str, Any] = {}
         self.children_ids = []
         self.parent_ids = []
-        self.configured_strategies = []
+        self.strategy_requests = []
 
     def on_create(self, param_config: Optional[Dict[str, Any]] = None):
         pass
@@ -113,6 +113,13 @@ class Entity(ABC):
                             self.set_attribute(attribute, entity.get_attribute(attribute))
                             break
 
+    def update_strategy_requests(self, strategy_request):
+        for i, request in enumerate(self.strategy_requests):
+            if request.entity_id == strategy_request.entity_id:
+                self.strategy_requests[i] = strategy_request
+                return
+        self.strategy_requests.append(strategy_request)
+
 
     def serialize(self):
 
@@ -123,6 +130,7 @@ class Entity(ABC):
             'entity_id': self.entity_id,
             'entity_type': self.entity_name.value,
             'child_ids': self.get_children(),
+            'strategy_requests': [request.serialize() for request in self.strategy_requests],
         }
 
     def to_db(self):

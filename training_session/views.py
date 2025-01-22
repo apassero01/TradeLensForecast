@@ -295,6 +295,7 @@ def json_to_StrategyRequestEntity(json_data):
     strat_request.param_config = json_data['param_config']
     strat_request.add_to_history = json_data['add_to_history']
     strat_request.target_entity_id = json_data['target_entity_id']
+    strat_request.add_to_history = json_data['add_to_history']
 
     nested_requests = json_data['nested_requests']
     for nested_request in nested_requests:

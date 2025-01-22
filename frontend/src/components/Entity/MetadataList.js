@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-const MetadataList = ({ items }) => {
+function MetadataList({ items, onContextMenu }) {
   const [showCopyButton, setShowCopyButton] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const containerRef = useRef(null);
@@ -85,6 +85,6 @@ const MetadataList = ({ items }) => {
       )}
     </div>
   );
-};
+}
 
-export default React.memo(MetadataList); 
+export default MetadataList; 

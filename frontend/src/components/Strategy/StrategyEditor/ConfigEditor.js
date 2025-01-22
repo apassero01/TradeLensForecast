@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AceEditor from 'react-ace';
-import EntitySelector from '../inputs/EntitySelector';
-import SequenceSetSelector from '../inputs/SequenceSetSelector';
+import EntitySelector from '../../Entity/Strategy/RequestEditorComponents/EntitySelector';
+import SequenceSetSelector from '../../Entity/Strategy/RequestEditorComponents/SequenceSetSelector';
 import ace from 'ace-builds';
 
 // Import ace editor themes and modes
@@ -33,6 +33,7 @@ const ConfigEditor = ({
     try {
       const parsed = JSON.parse(editedJson);
       strategyRequest.param_config = parsed.param_config;
+      strategyRequest.add_to_history = parsed.add_to_history;
       const result = await onExecute(strategyRequest.toJSON());
       setExecutionResult(result.strategy_response);
       setError(null);

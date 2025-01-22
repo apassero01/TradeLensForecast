@@ -14,11 +14,14 @@ class StrategyExecutorService:
     def execute(self, entity, strategy_request):
         """Execute a strategy on an entity after resolving its path"""
         strat_request = self.strategy_executor.execute(entity, strategy_request)
+
         if 'entity' in strat_request.ret_val:
             entity = strat_request.ret_val['entity']
 
+        if strat_request.add_to_history:
+            entity.update_strategy_requests(strat_request)
+
         self.entity_service.save_entity(entity)
-        strategy_request.ret_val['entity'] = entity
 
         return strat_request
 

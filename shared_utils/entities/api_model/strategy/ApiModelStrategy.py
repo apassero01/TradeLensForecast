@@ -75,11 +75,11 @@ class ConfigureApiModelStrategy(Strategy):
     def get_request_config():
         return {
             'model_type': 'openai',  # Optional, defaults to openai
-            'model_name': 'gpt-3.5-turbo',  # Optional, has defaults per model_type
+            'model_name': 'gpt-4o-mini',  # Optional, has defaults per model_type
             'env_key': 'OPENAI_API_KEY',  # Required - environment variable key
             'model_config': {  # Optional - has defaults
                 'temperature': 0.7,
-                'max_tokens': 5000,
+                'max_tokens': 4000,
                 'top_p': 1.0,
                 'frequency_penalty': 0.0,
                 'presence_penalty': 0.0,

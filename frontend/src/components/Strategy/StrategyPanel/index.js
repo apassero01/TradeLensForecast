@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import StrategyList from './StrategyList';
+import StrategyList from '../../Entity/Strategy/StrategyList';
 import StrategyHistory from './StrategyHistory';
 import StrategyEditor from '../StrategyEditor';
 import { strategyApi } from '../../../services/strategyApi';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AceEditor from 'react-ace';
 
 // Import ace editor themes and modes
@@ -8,29 +8,23 @@ import 'ace-builds/src-noconflict/mode-text';
 import 'ace-builds/src-noconflict/theme-monokai';
 import 'ace-builds/src-noconflict/ext-language_tools';
 
-const Editor = ({ visualization }) => {
-  // 1) Always call Hooks at the top (unconditionally).
+const Editor = ({ visualization, onChange }) => {
   const [editorText, setEditorText] = useState('');
   const [fontSize, setFontSize] = useState(14);
   const [editorMode, setEditorMode] = useState('text');
+  const editorRef = useRef(null);
 
-  // 2) Figure out whether we have data
   const hasData = !!(visualization && visualization.data);
 
-  // 3) useEffect to load text only if we have valid data
   useEffect(() => {
     if (hasData) {
       const { data } = visualization;
-      const initialText =
-        typeof data === 'string'
-          ? data
-          : JSON.stringify(data, null, 2);
+      const initialText = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
       setEditorText(initialText);
 
       const { config = {} } = visualization;
       const type = (config.type || 'text').toLowerCase();
       
-      // Map recognized modes
       const modeMap = {
         py: 'python',
         python: 'python',
@@ -40,18 +34,15 @@ const Editor = ({ visualization }) => {
       };
       setEditorMode(modeMap[type] || 'text');
     } else {
-      // If no data, reset text/mode
       setEditorText('');
       setEditorMode('text');
     }
   }, [visualization, hasData]);
 
-  // 4) If there's no data, show a message -- AFTER the Hooks.
   if (!hasData) {
     return <div className="text-red-500">No editor data available</div>;
   }
 
-  // 5) If we do have data, render the editor
   const { config = {} } = visualization;
 
   const handleFontSize = (change) => {
@@ -62,6 +53,13 @@ const Editor = ({ visualization }) => {
     setEditorMode(e.target.value);
   };
 
+  const handleEditorChange = (newText) => {
+    setEditorText(newText);
+    if (onChange) {
+      onChange(newText);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full h-full nodrag bg-gray-800">
       <div className="flex-none border-b border-gray-700 p-2 flex justify-between items-center">
@@ -69,7 +67,6 @@ const Editor = ({ visualization }) => {
           <h2 className="text-gray-200 text-lg">
             {config.title || 'Document Editor'}
           </h2>
-          {/* Dropdown for selecting the editor mode */}
           <select
             className="bg-gray-700 text-gray-200 p-1 rounded"
             value={editorMode}
@@ -97,12 +94,13 @@ const Editor = ({ visualization }) => {
         </div>
       </div>
 
-      <div className="flex-grow min-h-0">
+      <div className="flex-grow min-h-0 relative">
         <AceEditor
+          ref={editorRef}
           mode={editorMode}
           theme="monokai"
           value={editorText}
-          onChange={setEditorText}
+          onChange={handleEditorChange}
           fontSize={fontSize}
           width="100%"
           height="100%"
@@ -120,6 +118,9 @@ const Editor = ({ visualization }) => {
             useWorker: true,
           }}
           className="w-full h-full"
+          onLoad={(editor) => {
+            editor.container.style.transform = 'none';
+          }}
         />
       </div>
     </div>

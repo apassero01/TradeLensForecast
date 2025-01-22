@@ -67,7 +67,7 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
             strat_request.strategy_name = CreateEntityStrategy.__name__
             strat_request.target_entity_id = data_bundle.entity_id
             strat_request.param_config['entity_class'] =  'data_bundle_manager.entities.FeatureSetEntity.FeatureSetEntity'
-            feature_set = self.executor_service.execute(data_bundle, strat_request).ret_val['entity']
+            feature_set = self.executor_service.execute(data_bundle, strat_request).ret_val['child_entity']
             feature_set = self.feature_set_entity_service.create_feature_set(config, feature_set)
             self.strategy_request.add_nested_request(strat_request)
             feature_sets.append(feature_set)

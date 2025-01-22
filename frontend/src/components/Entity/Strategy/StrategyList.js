@@ -14,13 +14,8 @@ const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
     strategy.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Prevent scroll propagation when mouse is over the list
-  const handleWheel = (e) => {
-    e.stopPropagation();
-  };
-
   return (
-    <div className="flex flex-col h-full" onWheel={handleWheel}>
+    <div className="flex flex-col h-full">
       <div className="flex-none px-4 py-3 border-b border-gray-700">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-sm font-medium text-white">
@@ -48,10 +43,7 @@ const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
         </div>
       </div>
 
-      <div 
-        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
-        onWheel={handleWheel}
-      >
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
         <div className="space-y-1 p-2">
           {filteredStrategies.map((strategy) => (
             <button

@@ -1,4 +1,5 @@
 from shared_utils.cache.CacheService import CacheService
+from shared_utils.entities import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
 
 

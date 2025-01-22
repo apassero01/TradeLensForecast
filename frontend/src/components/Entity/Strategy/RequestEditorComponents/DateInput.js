@@ -1,6 +1,5 @@
 // src/components/DateInput.js
 import React from 'react';
-import '../../../index.css';
 
 function DateInput({label, onDateChange, selectedDate}) {
     const handleChange = (event) => {

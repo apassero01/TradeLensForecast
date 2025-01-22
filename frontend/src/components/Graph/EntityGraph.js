@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, { 
   Background, 
   Controls,
@@ -6,7 +6,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
 } from 'reactflow';
-import EntityNode from './EntityNode';
+import EntityNode from '../Entity/EntityNode';
 
 const nodeTypes = {
   entityNode: EntityNode
@@ -22,7 +22,11 @@ const EntityGraph = React.memo(({
   edges: initialEdges = [],
   onNodeClick,
   selectedEntity,
-  onNodesChange: onExternalNodesChange 
+  onNodesChange: onExternalNodesChange,
+  onStrategyExecute,
+  onStrategyListExecute,
+  // This is newly passed from EntityGraphApp
+  availableStrategies
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -59,17 +63,31 @@ const EntityGraph = React.memo(({
     }
   }, [onNodesChange, onExternalNodesChange]);
 
+  // Inject availableStrategies into each node's data
   const styledNodes = useMemo(() => {
     if (!nodes) return [];
     return nodes.map(node => ({
       ...node,
+      data: {
+        ...node.data,
+        onStrategyExecute,
+        onStrategyListExecute,
+        // ADDED:
+        availableStrategies: availableStrategies,
+      },
       style: {
         ...node.style,
         borderColor: selectedEntity?.id === node.id ? '#3b82f6' : undefined,
         borderWidth: selectedEntity?.id === node.id ? 2 : undefined,
       },
     }));
-  }, [nodes, selectedEntity]);
+  }, [
+    nodes, 
+    selectedEntity, 
+    onStrategyExecute, 
+    onStrategyListExecute, 
+    availableStrategies
+  ]);
 
   return (
     <div className="h-screen">
@@ -92,4 +110,4 @@ const EntityGraph = React.memo(({
   );
 });
 
-export default EntityGraph; 
+export default EntityGraph;

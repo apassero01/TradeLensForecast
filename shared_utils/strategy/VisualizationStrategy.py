@@ -65,7 +65,7 @@ class HistogramStrategy(VisualizationStrategy):
         self.get_parent_attributes(entity)
         self.verify_executable(entity, self.strategy_request)
 
-        array = entity.get_attribute('data').get('array')
+        array = entity.get_attribute(self.strategy_request.param_config.get('parent_data_attribute_name'))
         num_bins = self.strategy_request.param_config.get('num_bins')
         bin_width = self.strategy_request.param_config.get('bin_width')
         x_axis_label = self.strategy_request.param_config.get('x_axis_label')

@@ -126,6 +126,11 @@ const ChatScreen = ({ visualization }) => {
     }
   };
 
+  // Add wheel event handler
+  const handleWheel = (e) => {
+    e.stopPropagation();  // Prevent ReactFlow from handling the scroll
+  };
+
   return (
     <div className="flex flex-col w-full h-full nodrag bg-gray-800">
       <div className="flex-none border-b border-gray-700 p-2 flex justify-between items-center">
@@ -161,7 +166,10 @@ const ChatScreen = ({ visualization }) => {
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 overflow-y-auto p-4">
+      <div 
+        className="flex-grow min-h-0 overflow-y-auto p-4 nowheel" 
+        onWheel={handleWheel}
+      >
         <div className="flex flex-col space-y-4" style={{ fontSize: `${fontSize}px` }}>
           {filteredMessages.map((message, index) => (
             <div 

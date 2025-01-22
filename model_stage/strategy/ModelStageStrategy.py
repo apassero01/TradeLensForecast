@@ -120,6 +120,8 @@ class FitModelStrategy(Strategy):
             val_loss = self._evaluate(model, val_dataloader, criterion, device)
             print(f"Epoch {epoch + 1} | Train Loss: {train_loss:.3f} | Val Loss: {val_loss:.3f}")
 
+        entity.set_attribute('gradients', self.get_gradients_with_names(model))
+
         self.strategy_request.ret_val['status'] = 'model_fit_completed'
         return self.strategy_request
 
@@ -169,6 +171,13 @@ class FitModelStrategy(Strategy):
                 num_batches += 1
 
         return total_loss / num_batches if num_batches > 0 else 0.0
+
+    def get_gradients_with_names(self, model):
+        gradients_with_names = []
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                gradients_with_names.append(param.grad.norm().item())
+        return gradients_with_names
 
 
 class EvaluateModelStrategy(Strategy):

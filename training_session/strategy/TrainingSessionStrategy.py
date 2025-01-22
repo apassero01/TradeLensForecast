@@ -70,7 +70,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
             # It is possible on recreating the history here, the order of the nested requests is not the same as the order of the model set configs on original creation. 
             # It could be a problem I don't think it is but again the strategy is responsible so if its broken only the strategy is responsible. 
             nested_request = self.strategy_executor.execute(session_entity, nested_request)
-            sequence_set = nested_request.ret_val['entity']
+            sequence_set = nested_request.ret_val['child_entity']
             # Set attributes directly
             sequence_set.set_attribute('dataset_type', param_config['dataset_type'])
             sequence_set.set_attribute('sequence_length', param['sequence_length'])

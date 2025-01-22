@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { entityApi } from '../../../services/api';
+import { entityApi } from '../../../../services/api';
 
 const EntitySelector = ({ value, onChange }) => {
   const [entities, setEntities] = useState({});

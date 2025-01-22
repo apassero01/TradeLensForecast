@@ -52,7 +52,7 @@ class ScrapeFilePathStrategy(Strategy):
             entity.set_document_type('directory')
             
         # Save changes
-        self.entity_service.save_entity(entity)
+        self.strategy_request.ret_val['entity'] = entity
         return self.strategy_request
 
     @staticmethod
@@ -101,7 +101,7 @@ class RecursiveFileScrapeStrategy(Strategy):
                     create_request.target_entity_id = entity.entity_id
                     
                     response = self.executor_service.execute_request(create_request)
-                    child_entity = response.ret_val['entity']
+                    child_entity = response.ret_val['child_entity']
                     self.strategy_request.add_nested_request(create_request)
                     
                     # Recursively process the child
@@ -115,7 +115,6 @@ class RecursiveFileScrapeStrategy(Strategy):
 
                     # entity.add_child(child_entity)
                     # self.entity_service.save_entity(child_entity)
-
         self.strategy_request.ret_val['entity'] = entity
 
     def apply(self, entity: DocumentEntity) -> StrategyRequestEntity:
