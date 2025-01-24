@@ -18,7 +18,7 @@ class Transformer(BaseLayer):
             self.config['d_model'], 
             self.config['num_heads'], 
             self.config['d_ff'], 
-            dropout=self.config.get('dropout', 0.1), 
+            dropout=self.config.get('dropout', 0.0),
             name="transformer_encoder"
         )
 

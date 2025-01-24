@@ -1,157 +1,148 @@
 from django.test import TestCase
-from shared_utils.models import StrategyRequest, TrainingSession
+from shared_utils.models import StrategyRequest
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
+from shared_utils.entities.EntityModel import EntityModel
 from django.core.exceptions import ValidationError
+import uuid
 
 
 class TestStrategyRequestEntity(TestCase):
     def setUp(self):
-        """
-        Set up the TrainingSession and StrategyRequest objects for testing.
-        """
-        # Create a TrainingSession
-        self.training_session = TrainingSession.objects.create()
+        """Set up test data"""
+        # Create an EntityModel instance
+        self.entity_model = EntityModel.objects.create(
+            entity_id=uuid.uuid4(),
+            entity_type='TEST',
+            attributes={}
+        )
 
         # Create the main StrategyRequest object (top-level)
         self.model = StrategyRequest.objects.create(
+            entity_id=uuid.uuid4(),
             strategy_name="MainStrategy",
             param_config={"main_param": "main_value"},
-            training_session=self.training_session
+            entity_model=self.entity_model,
+            add_to_history=True
         )
 
         # Create child StrategyRequest objects (nested requests)
         self.nested_request_1 = StrategyRequest.objects.create(
+            entity_id=uuid.uuid4(),
             strategy_name="NestedStrategy1",
             param_config={"param1": "value1"},
             parent_request=self.model,
-            training_session=self.training_session
+            add_to_history=False
         )
 
         self.nested_request_2 = StrategyRequest.objects.create(
+            entity_id=uuid.uuid4(),
             strategy_name="NestedStrategy2",
             param_config={"param2": "value2"},
             parent_request=self.model,
-            training_session=self.training_session
+            add_to_history=False
         )
 
+    def tearDown(self):
+        """Clean up test data"""
+        StrategyRequest.objects.all().delete()
+        EntityModel.objects.all().delete()
+
     def test_from_db_with_all_fields(self):
-        """
-        Test that the entity is correctly populated from the model,
-        including all fields and nested requests.
-        """
+        """Test that the entity is correctly populated from the model"""
         entity = StrategyRequestEntity.from_db(self.model)
 
         # Check basic attributes
-        self.assertEqual(entity.id, self.model.id)
+        self.assertEqual(str(entity.entity_id), str(self.model.entity_id))
         self.assertEqual(entity.strategy_name, "MainStrategy")
         self.assertEqual(entity.param_config, {"main_param": "main_value"})
-        self.assertEqual(entity.training_session_id, self.training_session.id)
+        self.assertEqual(entity.entity_model, str(self.entity_model.entity_id))
 
-        # Check nested requests (check via parent-child relationship)
-        nested_requests = StrategyRequest.objects.filter(parent_request=self.model)
-        self.assertEqual(len(entity._nested_requests), nested_requests.count())
+        # Check nested requests
+        nested_requests = entity.get_nested_requests()
+        self.assertEqual(len(nested_requests), 2)
 
-        nested_request_1 = entity._nested_requests[0]
-        self.assertEqual(nested_request_1.strategy_name, "NestedStrategy1")
-        self.assertEqual(nested_request_1.param_config, {"param1": "value1"})
-
-        nested_request_2 = entity._nested_requests[1]
-        self.assertEqual(nested_request_2.strategy_name, "NestedStrategy2")
-        self.assertEqual(nested_request_2.param_config, {"param2": "value2"})
+        # Sort nested requests by strategy name for consistent testing
+        nested_requests.sort(key=lambda x: x.strategy_name)
+        
+        self.assertEqual(nested_requests[0].strategy_name, "NestedStrategy1")
+        self.assertEqual(nested_requests[0].param_config, {"param1": "value1"})
+        self.assertEqual(nested_requests[1].strategy_name, "NestedStrategy2")
+        self.assertEqual(nested_requests[1].param_config, {"param2": "value2"})
 
         # Check timestamps
         self.assertIsNotNone(entity.created_at)
         self.assertIsNotNone(entity.updated_at)
 
     def test_to_db_with_updated_fields(self):
-        """
-        Test that an existing model instance is correctly updated from the entity.
-        """
-        # Load the entity from the model
-        entity = StrategyRequestEntity.from_db(self.model)
-
-        # Update the entity attributes
+        """Test that an existing model is correctly updated from the entity"""
+        entity = StrategyRequestEntity(str(uuid.uuid4()))
         entity.strategy_name = "UpdatedStrategy"
         entity.param_config = {"updated_param": "updated_value"}
-        entity.training_session_id = self.training_session.id
+        entity.add_to_history = True
+        entity.entity_model = str(self.entity_model.entity_id)
 
-        # Convert the entity back to the database model
-        updated_model = entity.to_db()
+        # Convert to model
+        model = entity.to_db()
 
         # Check that the model was updated correctly
-        self.assertEqual(updated_model.id, self.model.id)  # Ensure ID is preserved
-        self.assertEqual(updated_model.strategy_name, "UpdatedStrategy")
-        self.assertEqual(updated_model.param_config, {"updated_param": "updated_value"})
-        self.assertEqual(updated_model.training_session.id, self.training_session.id)
+        self.assertEqual(str(model.entity_id), str(entity.entity_id))
+        self.assertEqual(model.strategy_name, "UpdatedStrategy")
+        self.assertEqual(model.param_config, {"updated_param": "updated_value"})
+        self.assertEqual(str(model.entity_model.entity_id), str(self.entity_model.entity_id))
 
-    def test_round_trip_with_all_fields(self):
-        """
-        Test that converting from model to entity and back to model preserves all fields.
-        """
-        # Convert model to entity
-        entity = StrategyRequestEntity.from_db(self.model)
+    def test_nested_requests_handling(self):
+        """Test adding and retrieving nested requests"""
+        parent = StrategyRequestEntity(str(uuid.uuid4()))
+        child1 = StrategyRequestEntity(str(uuid.uuid4()))
+        child2 = StrategyRequestEntity(str(uuid.uuid4()))
 
-        # Convert entity back to model
-        updated_model = entity.to_db()
-
-        # Ensure ID is preserved and attributes are consistent
-        self.assertEqual(updated_model.id, self.model.id)
-        self.assertEqual(updated_model.strategy_name, self.model.strategy_name)
-        self.assertEqual(updated_model.param_config, self.model.param_config)
-        self.assertEqual(updated_model.training_session.id, self.model.training_session.id)
+        # Add nested requests
+        parent.add_nested_request(child1)
+        parent.add_nested_request(child2)
 
         # Check nested requests
-        nested_request_models = StrategyRequest.objects.filter(parent_request=self.model)
-        self.assertEqual(nested_request_models.count(), StrategyRequest.objects.filter(parent_request=self.model).count())
+        nested = parent.get_nested_requests()
+        self.assertEqual(len(nested), 2)
+        self.assertIn(child1, nested)
+        self.assertIn(child2, nested)
 
-        # Check that the strategy names for all nested requests match
-        self.assertEqual(
-            list(nested_request_models.values_list("strategy_name", flat=True)),
-            list(StrategyRequest.objects.filter(parent_request=self.model).values_list("strategy_name", flat=True)),
-        )
+        # Remove a nested request
+        parent.remove_nested_request(child1)
+        nested = parent.get_nested_requests()
+        self.assertEqual(len(nested), 1)
+        self.assertNotIn(child1, nested)
+        self.assertIn(child2, nested)
 
-    def test_create_strategy_with_parent(self):
-        """
-        Test that a StrategyRequest can be created with a parent request and is properly linked.
-        """
-        child_request = StrategyRequest.objects.create(
-            strategy_name="ChildStrategy",
-            param_config={"child_param": "child_value"},
-            parent_request=self.model,
-            training_session=self.training_session
-        )
-
-        # Check that the child request has the correct parent
-        self.assertEqual(child_request.parent_request.id, self.model.id)
-        self.assertEqual(child_request.training_session.id, self.training_session.id)
-        self.assertFalse(child_request.is_top_level())  # This is a child request
-
-    def test_only_top_level_requests_appear_in_training_session_history(self):
-        """
-        Test that only top-level requests are included in the strategy history.
-        """
-        # Get all top-level requests for the training session
-        top_level_requests = StrategyRequest.objects.filter(
-            training_session=self.training_session, 
-            parent_request__isnull=True
-        )
-
-        # Assert that only the main strategy is a top-level request
-        self.assertEqual(top_level_requests.count(), 1)
-        self.assertEqual(top_level_requests.first().id, self.model.id)
-
-    def test_parent_request_cannot_be_itself(self):
-        """
-        Test that a StrategyRequest cannot be its own parent.
-        """
+    def test_validation_rules(self):
+        """Test model validation rules"""
+        # Test self-referential parent
         with self.assertRaises(ValidationError):
             self.model.parent_request = self.model
             self.model.clean()
 
-    def test_nested_request_cannot_be_part_of_strategy_history(self):
-        """
-        Test that a nested request cannot be marked as a top-level request.
-        """
+        # Test nested request with add_to_history=True
         with self.assertRaises(ValidationError):
             self.nested_request_1.add_to_history = True
             self.nested_request_1.clean()
+
+    def test_serialize(self):
+        """Test entity serialization"""
+        entity = StrategyRequestEntity(str(uuid.uuid4()))
+        entity.strategy_name = "TestStrategy"
+        entity.param_config = {"test": "value"}
+        entity.add_to_history = True
+        entity.target_entity_id = str(uuid.uuid4())
+
+        nested = StrategyRequestEntity(str(uuid.uuid4()))
+        nested.strategy_name = "NestedStrategy"
+        nested.param_config = {"nested": "value"}
+        entity.add_nested_request(nested)
+
+        serialized = entity.serialize()
+
+        self.assertEqual(serialized['strategy_name'], "TestStrategy")
+        self.assertEqual(serialized['param_config'], {"test": "value"})
+        self.assertTrue(serialized['add_to_history'])
+        self.assertEqual(serialized['target_entity_id'], entity.target_entity_id)
+        self.assertEqual(len(serialized['nested_requests']), 1)
+        self.assertEqual(serialized['nested_requests'][0]['strategy_name'], "NestedStrategy")

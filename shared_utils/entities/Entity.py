@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Type
 from shared_utils.entities.EnityEnum import EntityEnum
 from uuid import uuid4, UUID
 import numpy as np
-class Entity(ABC):
+from django.db import models
+from shared_utils.entities.EntityModel import EntityModel
+class Entity():
     entity_name = EntityEnum.ENTITY
 
     def __init__(self, entity_id: Optional[str] = None):
@@ -133,21 +135,14 @@ class Entity(ABC):
             'strategy_requests': [request.serialize() for request in self.strategy_requests],
         }
 
-    def to_db(self):
-        """
-        Converts the entity's attributes into a dictionary for database storage.
-        Must be implemented by child classes.
-        """
-        raise NotImplementedError("Child classes must implement the 'to_db' method.")
-
+    def to_db(self, model=None):
+        """Convert entity to database model"""
+        return EntityAdapter.entity_to_model(self, model)
+    
     @classmethod
-    def from_db(cls, data):
-        """
-        Creates an entity from a database object (or dictionary).
-        Must be implemented by child classes.
-        """
-        raise NotImplementedError("Child classes must implement the 'from_db' method.")
-
+    def from_db(cls, model):
+        """Create entity from database model"""
+        return EntityAdapter.model_to_entity(model, cls)
 
     @staticmethod
     def get_maximum_members():
@@ -156,6 +151,80 @@ class Entity(ABC):
     @classmethod
     def get_class_path(cls):
         return f"{cls.__module__}.{cls.__name__}"
+
+
+class EntityAdapter:
+    """
+    Default adapter implementation for converting between Entity objects and Django models.
+    Can be used directly or inherited for custom behavior.
+    """
+
+    @classmethod
+    def model_to_entity(cls, model: models.Model, entity_class: Type['Entity'] = Entity) -> 'Entity':
+        """Convert a Django model instance to an Entity"""
+        entity = entity_class(entity_id=str(model.entity_id))
+
+        # Set attributes from JSON field
+        if hasattr(model, 'attributes'):
+            entity.set_attributes(model.attributes)
+
+        # Set relationships
+        if hasattr(model, 'children_ids'):
+            entity.children_ids = model.children_ids
+
+        if hasattr(model, 'parent_ids'):
+            entity.parent_ids = model.parent_ids
+
+        entity.strategy_requests = cls.load_strategy_requests(model)
+
+        return entity
+
+    @classmethod
+    def entity_to_model(cls, entity: 'Entity', model: Optional[models.Model] = None,
+                       model_class: Type[models.Model] = EntityModel) -> models.Model:
+        """Convert an Entity to a Django model instance"""
+        if model is None:
+            if entity.entity_id:
+                try:
+                    model = model_class.objects.get(entity_id=entity.entity_id)
+                except model_class.DoesNotExist:
+                    model = model_class(entity_id=entity.entity_id)
+            else:
+                model = model_class(entity.entity_id)
+
+        # Update core fields
+        if hasattr(model, 'attributes'):
+            model.attributes = entity.get_attributes()
+
+        if hasattr(model, 'entity_type'):
+            model.entity_type = entity.entity_name.value
+
+        if hasattr(model, 'children_ids'):
+            model.children_ids = entity.get_children()
+
+        if hasattr(model, 'parent_ids'):
+            model.parent_ids = entity.get_parents()
+
+        if hasattr(model, 'class_path'):
+            model.class_path = entity.get_class_path()
+
+        cls.save_strategy_requests(entity, model)
+
+        return model
+    
+    @classmethod
+    def load_strategy_requests(cls, model: models.Model):
+        from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
+        from shared_utils.models import StrategyRequest
+        strategy_requests = StrategyRequest.objects.filter(entity_model=model)
+        return [StrategyRequestEntity.from_db(strategy_request) for strategy_request in strategy_requests]
+
+    @classmethod
+    def save_strategy_requests(cls, entity, model: models.Model):
+        for strategy_entity in entity.strategy_requests:
+            strategy_model = strategy_entity.to_db()
+            strategy_model.entity_model = model
+            strategy_model.save()
 
 
 

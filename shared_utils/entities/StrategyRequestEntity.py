@@ -63,8 +63,9 @@ class StrategyRequestAdapter:
     @staticmethod
     def model_to_entity(model: StrategyRequest) -> StrategyRequestEntity:
         """Convert a StrategyRequest model to a StrategyRequestEntity"""
-        entity = StrategyRequestEntity()
-        entity.id = model.pk
+        entity_id = model.entity_id
+        entity = StrategyRequestEntity(str(entity_id))
+
         entity.strategy_name = model.strategy_name
         entity.param_config = model.param_config
         entity.created_at = model.created_at
@@ -74,11 +75,11 @@ class StrategyRequestAdapter:
         
         # Handle the parent request (only if it exists)
         if model.parent_request:
-            entity.parent_request_id = model.parent_request.pk
+            entity.parent_request_id = model.parent_request.entity_id
         
         # Handle training session (only if it exists)
-        if model.training_session:
-            entity.training_session_id = model.training_session.pk
+        if model.entity_model:
+            entity.entity_model = model.entity_model.entity_id
 
         # Convert nested requests using the ForeignKey relationship
         for nested_request in model.nested_requests.all():  # ForeignKey related_name='nested_requests'
@@ -91,10 +92,9 @@ class StrategyRequestAdapter:
     def entity_to_model(entity: StrategyRequestEntity, model: Optional[StrategyRequest] = None) -> StrategyRequest:
         """Convert a StrategyRequestEntity to a StrategyRequest model"""
         if model is None:
-            if entity.id is not None:
-                model = StrategyRequest.objects.get(id=entity.id)
-            else:
-                model = StrategyRequest()
+            model = StrategyRequest.objects.get(entity_id=entity.entity_id)
+        if not model:
+            model = StrategyRequest(entity_id=entity.entity_id)
 
         # Update model fields
         model.strategy_name = entity.strategy_name
@@ -107,17 +107,17 @@ class StrategyRequestAdapter:
             model.parent_request_id = entity.parent_request_id
 
         # Handle training session (if it exists)
-        if hasattr(entity, 'training_session_id') and entity.training_session_id:
-            model.training_session_id = entity.training_session_id
+        if hasattr(entity, 'entity_model_id') and entity.entity_model_id:
+            model.entity_model = entity
 
-        if not model.pk:  # If this is a new model
-            model.save()
+
+        model.save()
 
         # Handle nested requests
-        existing_nested_request_ids = set(model.nested_requests.values_list('id', flat=True))
+        existing_nested_request_ids = set(model.nested_requests.values_list('entity_id', flat=True))
         for nested_request in entity.get_nested_requests():
             nested_model = StrategyRequestAdapter.entity_to_model(nested_request)
-            if nested_model.pk not in existing_nested_request_ids:
+            if nested_model.entity_id not in existing_nested_request_ids:
                 nested_model.parent_request = model  # Set the parent for the nested request
                 nested_model.save()
 
