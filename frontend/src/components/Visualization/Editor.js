@@ -8,6 +8,8 @@ import 'ace-builds/src-noconflict/mode-text';
 import 'ace-builds/src-noconflict/theme-monokai';
 import 'ace-builds/src-noconflict/ext-language_tools';
 
+ace.config.set('workerPath', '/ace-builds')
+
 const Editor = ({ visualization, onChange }) => {
   const [editorText, setEditorText] = useState('');
   const [fontSize, setFontSize] = useState(14);
