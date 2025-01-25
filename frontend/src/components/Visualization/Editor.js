@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AceEditor from 'react-ace';
+import ace from 'ace-builds';
 
 // Import ace editor themes and modes
 import 'ace-builds/src-noconflict/mode-python';
