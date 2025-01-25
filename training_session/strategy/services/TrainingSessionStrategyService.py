@@ -1,6 +1,3 @@
-from markdown_it.rules_inline import entity
-
-
 
 class TrainingSessionStrategyService:
 

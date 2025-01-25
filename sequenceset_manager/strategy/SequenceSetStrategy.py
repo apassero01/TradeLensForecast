@@ -1,5 +1,4 @@
 import numpy as np
-from markdown_it.rules_inline import entity
 
 from data_bundle_manager.entities.DataBundleEntity import DataBundleEntity
 from data_bundle_manager.strategy.DataBundleStrategy import SplitBundleDateStrategy, \

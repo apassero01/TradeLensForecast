@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AceEditor from 'react-ace';
+import ace from 'ace-builds';
 
 // Import ace editor themes and modes
 import 'ace-builds/src-noconflict/mode-python';
@@ -7,6 +8,8 @@ import 'ace-builds/src-noconflict/mode-json';
 import 'ace-builds/src-noconflict/mode-text';
 import 'ace-builds/src-noconflict/theme-monokai';
 import 'ace-builds/src-noconflict/ext-language_tools';
+
+ace.config.set('workerPath', '/ace-builds')
 
 const Editor = ({ visualization, onChange }) => {
   const [editorText, setEditorText] = useState('');
