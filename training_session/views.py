@@ -1,11 +1,15 @@
+import importlib
 import json
+from copy import deepcopy
 
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 
+from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.Entity import Entity
+from shared_utils.entities.EntityModel import EntityModel
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.models import StrategyRequest
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
@@ -27,9 +31,9 @@ def api_start_session(request):
 
         try:
             # Create a new session with minimal initialization
-            training_session_service = TrainingSessionEntityService()
-            session = training_session_service.create_training_session_entity()
-            
+            session = TrainingSessionEntity()
+            session_db = session.to_db()
+            session_db.save()
             # Save session to cache and track current session ID
             entity_service.save_entity(session)
             entity_service.set_session_id(session.entity_id)
@@ -83,13 +87,19 @@ def api_save_session(request):
         try:
             # Convert and save to database
             session_entity = entity_service.get_entity(session_entity_id)
-            training_session_service = TrainingSessionEntityService()
-            training_session_service.set_session(session_entity)
-            session_id = training_session_service.save_session()
+
+            children = deepcopy(session_entity.get_children())
+            session_model = session_entity.to_db()
+            while children:
+                child_id = children.pop()
+                child = entity_service.get_entity(child_id)
+                children.extend(child.get_children())
+                child.to_db()
+
             
             return JsonResponse({
                 'status': 'success',
-                'session_id': session_id,
+                'session_id': session_model.entity_id,
                 'message': 'Session saved successfully'
             })
         except Exception as e:
@@ -103,7 +113,7 @@ def api_get_saved_sessions(request):
     print('api_get_saved_sessions')
     if request.method == 'GET':
         try:
-            sessions = TrainingSession.objects.all().values('id', 'created_at')
+            sessions = EntityModel.objects.filter(entity_type=EntityEnum.TRAINING_SESSION.value).values('entity_id', 'created_at')
             return JsonResponse({
                 'sessions': list(sessions)
             })
@@ -120,15 +130,25 @@ def api_load_session(request, session_id):
     if request.method == 'POST':
         try:
             # Load the session from database
-            entity_id = TrainingSession.objects.get(id=session_id).entity_id
+            entity_id = str(EntityModel.objects.get(entity_id=session_id).entity_id)
             cur_session_id = entity_service.get_session_id()
 
             if cur_session_id != entity_id:
-                session_model = TrainingSession.objects.get(id=session_id)
+                session_model = EntityModel.objects.get(entity_id=session_id)
                 session_entity = TrainingSessionEntity.from_db(session_model)
                 entity_service.cache_service.clear_all()
                 cache.set('current_session_id', session_entity.entity_id)
                 entity_service.save_entity(session_entity)
+
+                children = deepcopy(session_entity.get_children())
+                while children:
+                    child_id = children.pop()
+                    child_model = EntityModel.objects.get(entity_id=child_id)
+                    child_entity_class = child_model.class_path
+                    child = create_instance_from_path(child_entity_class).from_db(child_model)
+                    children.extend(child.get_children())
+                    entity_service.save_entity(child)
+
             serialized = serialize_entity_and_children(entity_id)
             # Store in cache
             return JsonResponse({
@@ -143,6 +163,28 @@ def api_load_session(request, session_id):
             return JsonResponse({'error': str(e)}, status=400)
     else:
         return JsonResponse({'error': 'POST method required'}, status=400)
+
+
+def create_instance_from_path(class_path, *args, **kwargs):
+    """
+    Dynamically imports and instantiates a class from its class path.
+
+    :param class_path: The dot-separated path to the class (e.g., 'my_module.MyClass').
+    :param args: Positional arguments to pass to the constructor.
+    :param kwargs: Keyword arguments to pass to the constructor.
+    :return: An instance of the class.
+    """
+    # Split the path into module and class
+    module_name, class_name = class_path.rsplit('.', 1)
+
+    # Import the module
+    module = importlib.import_module(module_name)
+
+    # Get the class from the module
+    cls = getattr(module, class_name)
+
+    # Call the constructor and return the instance
+    return cls
     
 @csrf_exempt
 def api_get_strategy_registry(request):
@@ -204,7 +246,6 @@ def api_execute_strategy(request):
 
         try:
             ret_val = strategy_executor_service.execute_request(strat_request)
-            add_to_strategy_history(session_id, ret_val)
 
             return JsonResponse({
                 'status': 'success',
@@ -259,28 +300,29 @@ def api_execute_strategy_list(request):
     else:
         return JsonResponse({'error': 'POST method required'}, status=400)
 
-@csrf_exempt
+# @csrf_exempt
 def api_get_strategy_history(request):
-    print('api_get_strategy_history')
-    if request.method == 'GET':
-        entity_service = EntityService()
-        session_id = entity_service.get_session_id()
-        if not session_id:
-            return JsonResponse({'error': 'No session in progress'}, status=400)
-
-        try:
-            session = entity_service.get_entity(session_id)
-            strategy_requests = []
-            print(session.strategy_history)
-            for strategy_request in session.strategy_history:
-                strategy_requests.append(strategy_request.serialize())
-            
-            return JsonResponse({'strategy_requests': strategy_requests})
-        except Exception as e:
-            print(str(e))
-            return JsonResponse({'error': str(e)}, status=400)
-    else:
-        return JsonResponse({'error': 'GET method required'}, status=400)
+    pass
+#     print('api_get_strategy_history')
+#     if request.method == 'GET':
+#         entity_service = EntityService()
+#         session_id = entity_service.get_session_id()
+#         if not session_id:
+#             return JsonResponse({'error': 'No session in progress'}, status=400)
+#
+#         try:
+#             session = entity_service.get_entity(session_id)
+#             strategy_requests = []
+#             print(session.strategy_history)
+#             for strategy_request in session.strategy_history:
+#                 strategy_requests.append(strategy_request.serialize())
+#
+#             return JsonResponse({'strategy_requests': strategy_requests})
+#         except Exception as e:
+#             print(str(e))
+#             return JsonResponse({'error': str(e)}, status=400)
+#     else:
+#         return JsonResponse({'error': 'GET method required'}, status=400)
 
 
 # Helper Functions

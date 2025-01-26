@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Type
 from shared_utils.entities.EnityEnum import EntityEnum
@@ -16,7 +17,7 @@ class Entity():
                 UUID(entity_id)
             except ValueError:
                 raise ValueError(f"Invalid UUID format: {entity_id}")
-        
+
         # Generate new UUID if none provided
         self.entity_id = entity_id if entity_id is not None else str(uuid4())
         self._attributes: Dict[str, Any] = {}
@@ -29,9 +30,10 @@ class Entity():
 
     def add_child(self, child):
         '''Add a child to the entity'''
-        self.children_ids.append(child.entity_id)
-        child.add_parent(self)
-    
+        if child.entity_id not in self.children_ids:
+            self.children_ids.append(child.entity_id)
+            child.add_parent(self)
+
     def remove_child(self, child: 'Entity'):
         '''Remove a child from the entity'''
         if child.entity_id in self.children_ids:
@@ -63,12 +65,12 @@ class Entity():
     def set_attribute(self, name: str, value: Any):
         '''Set an attribute on the entity'''
         self._attributes[name] = value
-    
+
     def set_attributes(self, attributes: Dict[str, Any]):
         '''Set multiple attributes on the entity'''
         for name, value in attributes.items():
             self.set_attribute(name, value)
-    
+
     def get_attributes(self) -> Dict[str, Any]:
         '''Get all attributes on the entity'''
         return self._attributes
@@ -89,7 +91,7 @@ class Entity():
     def has_attribute(self, name: str) -> bool:
         '''Check if an attribute exists on the entity'''
         return name in self._attributes
-    
+
     def get_available_attributes(self) -> List[str]:
         '''Get a list of all attributes on the entity'''
         return list(self._attributes.keys())
@@ -97,7 +99,7 @@ class Entity():
     def get_configured_strategies(self) -> List[str]:
         '''Get a list of all configured strategies on the entity'''
         return self.configured_strategies
-    
+
     def merge_entities(self, entities: List['Entity'], merge_config):
 
         entities = [self] + entities
@@ -106,10 +108,10 @@ class Entity():
             attributes = config['attributes']
 
             if merge_method == 'concatenate':
-                for attribute in attributes: 
+                for attribute in attributes:
                     self.set_attribute(attribute, np.concatenate([entity.get_attribute(attribute) for entity in entities if entity.has_attribute(attribute)]))
             if merge_method == 'take_first':
-                for attribute in attributes: 
+                for attribute in attributes:
                     for entity in entities:
                         if entity.has_attribute(attribute):
                             self.set_attribute(attribute, entity.get_attribute(attribute))
@@ -138,7 +140,7 @@ class Entity():
     def to_db(self, model=None):
         """Convert entity to database model"""
         return EntityAdapter.entity_to_model(self, model)
-    
+
     @classmethod
     def from_db(cls, model):
         """Create entity from database model"""
@@ -147,7 +149,7 @@ class Entity():
     @staticmethod
     def get_maximum_members():
         pass
-    
+
     @classmethod
     def get_class_path(cls):
         return f"{cls.__module__}.{cls.__name__}"
@@ -160,7 +162,7 @@ class EntityAdapter:
     """
 
     @classmethod
-    def model_to_entity(cls, model: models.Model, entity_class: Type['Entity'] = Entity) -> 'Entity':
+    def model_to_entity(cls, model: EntityModel, entity_class: Type['Entity'] = Entity) -> 'Entity':
         """Convert a Django model instance to an Entity"""
         entity = entity_class(entity_id=str(model.entity_id))
 
@@ -194,7 +196,19 @@ class EntityAdapter:
 
         # Update core fields
         if hasattr(model, 'attributes'):
-            model.attributes = entity.get_attributes()
+            attributes = {}
+            for key, value in entity.get_attributes().items():
+                try:
+                    # Try serializing the value
+                    json.dumps(value)
+                    # If successful, save it
+                    attributes[key] = value
+                except (TypeError, ValueError):
+                    pass
+
+            # Save the attributes to the model
+            model.attributes = attributes
+
 
         if hasattr(model, 'entity_type'):
             model.entity_type = entity.entity_name.value
@@ -208,10 +222,13 @@ class EntityAdapter:
         if hasattr(model, 'class_path'):
             model.class_path = entity.get_class_path()
 
+        model.save()
+
         cls.save_strategy_requests(entity, model)
 
+
         return model
-    
+
     @classmethod
     def load_strategy_requests(cls, model: models.Model):
         from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity

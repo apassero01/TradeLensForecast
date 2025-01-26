@@ -85,6 +85,7 @@ const EntityGraphApp = () => {
 
   const loadSession = async (sessionId) => {
     setIsLoading(true);
+    console.log('Loading session:', sessionId);
     try {
       console.log('Loading session:', sessionId);
       const response = await entityApi.loadSession(sessionId);

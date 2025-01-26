@@ -1,6 +1,7 @@
 from typing import Optional, Type
 import numpy as np
-from shared_utils.entities.EntityAdapter import EntityAdapter
+
+from shared_utils.entities.Entity import EntityAdapter
 from shared_utils.entities.document_entities.DocumentEntity import DocumentEntity
 from shared_utils.entities.document_entities.DocumentEntityModel import DocumentEntityModel
 

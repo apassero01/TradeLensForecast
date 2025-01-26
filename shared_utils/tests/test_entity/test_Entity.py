@@ -8,34 +8,14 @@ from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.models import StrategyRequest
 from django.utils import timezone
 
-class TestConcreteEntity(Entity):
-    entity_name = EntityEnum.ENTITY
-    
-    def to_db(self):
-        return {}
-        
-    @classmethod
-    def from_db(cls, data):
-        return cls()
-
-class TestChildEntity(Entity):
-    entity_name = EntityEnum.DATA_BUNDLE
-    
-    def to_db(self):
-        return {}
-        
-    @classmethod
-    def from_db(cls, data):
-        return cls()
-
 class EntityTestCase(TestCase):
     def setUp(self):
-        # Create a hierarchy of test entities
-        self.parent = TestConcreteEntity()
-        self.child1 = TestChildEntity()
-        self.child2 = TestChildEntity()
-        
-        # Set up test data
+        # Create parent and child entities
+        self.parent = Entity(str(uuid.uuid4()))
+        self.child1 = Entity(str(uuid.uuid4()))
+        self.child2 = Entity(str(uuid.uuid4()))
+
+        # Set up attributes for child entities
         self.child1.set_attribute('X_train', np.array([[1, 2], [3, 4]]))
         self.child1.set_attribute('y_train', np.array([1, 0]))
 
@@ -44,12 +24,12 @@ class EntityTestCase(TestCase):
 
     def test_set_and_get_attribute(self):
         """Test setting and getting attributes"""
-        entity = TestConcreteEntity()
-        
+        entity = Entity(str(uuid.uuid4()))
+
         # Test basic attribute setting and getting
         entity.set_attribute('test_key', 'test_value')
         self.assertEqual(entity.get_attribute('test_key'), 'test_value')
-        
+
         # Test with different types of values
         test_cases = {
             'int_value': 42,
@@ -59,40 +39,40 @@ class EntityTestCase(TestCase):
             'bool_value': True,
             'none_value': None
         }
-        
+
         for key, value in test_cases.items():
             entity.set_attribute(key, value)
             self.assertEqual(entity.get_attribute(key), value)
 
     def test_get_attribute_keyerror(self):
         """Test getting non-existent attribute raises KeyError"""
-        entity = TestConcreteEntity()
-        
+        entity = Entity(str(uuid.uuid4()))
+
         with self.assertRaises(KeyError):
             entity.get_attribute('nonexistent_key')
 
     def test_has_attribute(self):
         """Test checking if attributes exist"""
-        entity = TestConcreteEntity()
-        
+        entity = Entity(str(uuid.uuid4()))
+
         # Test with non-existent attribute
         self.assertFalse(entity.has_attribute('test_key'))
-        
+
         # Test after setting attribute
         entity.set_attribute('test_key', 'test_value')
         self.assertTrue(entity.has_attribute('test_key'))
 
     def test_get_available_attributes(self):
         """Test getting list of available attributes"""
-        entity = TestConcreteEntity()
-        
+        entity = Entity(str(uuid.uuid4()))
+
         # Test with no attributes
         self.assertEqual(entity.get_available_attributes(), [])
-        
+
         # Test with multiple attributes
         entity.set_attribute('key1', 'value1')
         entity.set_attribute('key2', 'value2')
-        
+
         available_attrs = entity.get_available_attributes()
         self.assertEqual(len(available_attrs), 2)
         self.assertIn('key1', available_attrs)
@@ -101,14 +81,12 @@ class EntityTestCase(TestCase):
     def test_parent_child_relationship(self):
         """Test parent-child relationship is correctly established"""
         self.parent.add_child(self.child1)
-        
+
         self.assertEqual(self.child1.parent_ids[0], self.parent.entity_id)
         self.assertIn(self.child1.entity_id, self.parent.children_ids)
 
     def test_merge_entities_concatenate(self):
         """Test merging entities using the concatenate method"""
-        # The parent does not have X_train or y_train set at the start
-        # We'll merge child1 and child2 into parent
         merge_config = [
             {
                 'method': 'concatenate',
@@ -118,12 +96,8 @@ class EntityTestCase(TestCase):
 
         self.parent.merge_entities([self.child1, self.child2], merge_config)
 
-        # X_train should be vertically concatenated: shape (4,2)
-        expected_X = np.array([[1, 2],
-                               [3, 4],
-                               [5, 6],
-                               [7, 8]])
-        # y_train should be concatenated: shape (4,)
+        # X_train should be vertically concatenated: shape (4, 2)
+        expected_X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
         expected_y = np.array([1, 0, 0, 1])
 
         np.testing.assert_array_equal(self.parent.get_attribute('X_train'), expected_X)
@@ -131,7 +105,6 @@ class EntityTestCase(TestCase):
 
     def test_merge_entities_take_first(self):
         """Test merging entities using the take_first method"""
-        # Let's say only child1 has an attribute 'metadata', child2 does not
         self.child1.set_attribute('metadata', {'info': 'child1_info'})
 
         merge_config = [
@@ -141,10 +114,6 @@ class EntityTestCase(TestCase):
             }
         ]
 
-        # Merge them, parent + [child1, child2]
-        # For 'metadata', parent doesn't have it, child1 does, so take from child1.
-        # For 'X_train', parent doesn't have it, child1 does, so take from child1 (ignore child2).
-        
         self.parent.merge_entities([self.child1, self.child2], merge_config)
 
         self.assertEqual(self.parent.get_attribute('metadata'), {'info': 'child1_info'})
@@ -152,31 +121,61 @@ class EntityTestCase(TestCase):
 
     def test_remove_attribute(self):
         """Test removing a single attribute from the entity"""
-        entity = TestConcreteEntity()
+        entity = Entity(str(uuid.uuid4()))
         entity.set_attribute('test_key', 'test_value')
-        self.assertTrue(entity.has_attribute('test_key'))  # Verify attribute exists
+        self.assertTrue(entity.has_attribute('test_key'))
 
-        entity.remove_attribute('test_key')  # Remove the attribute
-        self.assertFalse(entity.has_attribute('test_key'))  # Verify attribute is removed
+        entity.remove_attribute('test_key')
+        self.assertFalse(entity.has_attribute('test_key'))
 
     def test_remove_attributes(self):
         """Test removing multiple attributes from the entity"""
-        entity = TestConcreteEntity()
+        entity = Entity(str(uuid.uuid4()))
         entity.set_attribute('key1', 'value1')
         entity.set_attribute('key2', 'value2')
         entity.set_attribute('key3', 'value3')
 
-        self.assertTrue(entity.has_attribute('key1'))
-        self.assertTrue(entity.has_attribute('key2'))
-        self.assertTrue(entity.has_attribute('key3'))
-
-        # Remove multiple attributes
         entity.remove_attributes(['key1', 'key2'])
 
-        # Verify the attributes are removed
         self.assertFalse(entity.has_attribute('key1'))
         self.assertFalse(entity.has_attribute('key2'))
-        self.assertTrue(entity.has_attribute('key3'))  # key3 should still exist
+        self.assertTrue(entity.has_attribute('key3'))
+
+    def test_to_db_and_from_db(self):
+        """Test converting an Entity to a database model and back"""
+        # Create StrategyRequest objects associated with the parent entity
+        entity_model = EntityModel.objects.create(
+            entity_id=uuid.uuid4(),
+            entity_type='TEST',
+            attributes={}
+        )
+
+        strategy_request = StrategyRequest.objects.create(
+            entity_id=uuid.uuid4(),
+            strategy_name="TestStrategy",
+            param_config={"param": "value"},
+            entity_model=entity_model,
+            add_to_history=True
+        )
+
+        # Attach the StrategyRequestEntity to the Entity
+        strategy_entity = StrategyRequestEntity.from_db(strategy_request)
+        self.parent.set_attribute('strategy', strategy_entity)
+
+        # Convert Entity to database model
+        db_model = self.parent.to_db()
+
+        # Convert back from database model to Entity
+        new_entity = Entity.from_db(db_model)
+
+        # Verify the attributes match
+        original_strategy = self.parent.get_attribute('strategy')
+        new_strategy = new_entity.get_attribute('strategy')
+
+        self.assertEqual(original_strategy.strategy_name, new_strategy.strategy_name)
+        self.assertEqual(original_strategy.param_config, new_strategy.param_config)
+        self.assertEqual(original_strategy.add_to_history, new_strategy.add_to_history)
+
 
 class TestEntityAdapter(TestCase):
     def setUp(self):
@@ -197,6 +196,7 @@ class TestEntityAdapter(TestCase):
             parent_ids=self.test_parent_ids,
             class_path='shared_utils.entities.Entity.Entity'
         )
+        self.test_model.save()
 
         # Add setup for strategy request testing
         self.strategy_request = StrategyRequest.objects.create(
@@ -208,6 +208,7 @@ class TestEntityAdapter(TestCase):
             created_at=timezone.now(),
             updated_at=timezone.now()
         )
+        self.strategy_request.save()
 
         # Create a nested strategy request
         self.nested_request = StrategyRequest.objects.create(
@@ -216,6 +217,7 @@ class TestEntityAdapter(TestCase):
             parent_request=self.strategy_request,
             add_to_history=False
         )
+        self.nested_request.save()
 
     def tearDown(self):
         # Clean up test data
@@ -332,7 +334,7 @@ class TestEntityAdapter(TestCase):
     def test_save_strategy_requests(self):
         """Test saving strategy requests from an entity"""
         # Create an entity with strategy requests
-        entity = Entity(entity_id=self.test_uuid)
+        entity = Entity(entity_id=str(uuid.uuid4()))
         
         strategy_request = StrategyRequestEntity()
         strategy_request.strategy_name = "new_strategy"
@@ -350,7 +352,7 @@ class TestEntityAdapter(TestCase):
         # Save using adapter
         model = EntityAdapter.entity_to_model(entity, model_class=EntityModel)
         EntityAdapter.save_strategy_requests(entity, model)
-        
+
         # Verify requests were saved correctly
         saved_requests = StrategyRequest.objects.filter(entity_model=model)
         self.assertEqual(saved_requests.count(), 1)  # Only top-level request
@@ -389,7 +391,7 @@ class TestEntityAdapter(TestCase):
     def test_entity_to_model_with_strategy_requests(self):
         """Test that entity_to_model properly saves strategy requests"""
         # Create entity with strategy requests
-        entity = Entity(entity_id=self.test_uuid)
+        entity = Entity(entity_id=str(uuid.uuid4()))
         request = StrategyRequestEntity()
         request.strategy_name = "test_strategy"
         request.param_config = {"test": "value"}

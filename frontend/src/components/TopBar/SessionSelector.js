@@ -15,8 +15,8 @@ const SessionSelector = ({ onSessionSelect, savedSessions, isLoading }) => {
       >
         <option value="">Select Session ({savedSessions.length} available)</option>
         {savedSessions.map((session) => (
-          <option key={session.id} value={session.id}>
-            Session {session.id} ({new Date(session.created_at).toLocaleString()})
+          <option key={session.entity_id} value={session.entity_id}>
+            Session {session.entity_id} ({new Date(session.created_at).toLocaleString()})
           </option>
         ))}
       </select>

@@ -52,16 +52,16 @@ class DocumentEntity(Entity):
     def get_tokens(self) -> list:
         return self.get_attribute('tokens')
 
-    def to_db(self):
-        """Convert entity to database model using adapter"""
-        from shared_utils.entities.document_entities.DocumentEntityAdapter import DocumentEntityAdapter
-        return DocumentEntityAdapter.entity_to_model(self)
-
-    @classmethod
-    def from_db(cls, data):
-        """Create entity from database model using adapter"""
-        from shared_utils.entities.document_entities.DocumentEntityAdapter import DocumentEntityAdapter
-        return DocumentEntityAdapter.model_to_entity(data, cls)
+    # def to_db(self):
+    #     """Convert entity to database model using adapter"""
+    #     from shared_utils.entities.document_entities.DocumentEntityAdapter import DocumentEntityAdapter
+    #     return DocumentEntityAdapter.entity_to_model(self)
+    #
+    # @classmethod
+    # def from_db(cls, data):
+    #     """Create entity from database model using adapter"""
+    #     from shared_utils.entities.document_entities.DocumentEntityAdapter import DocumentEntityAdapter
+    #     return DocumentEntityAdapter.model_to_entity(data, cls)
 
     def serialize(self) -> dict:
         sup_dict = super().serialize()

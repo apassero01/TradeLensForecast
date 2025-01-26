@@ -95,18 +95,24 @@ class CreateEntityStrategy(Strategy):
         """
         config = self.strategy_request.param_config
         entity_class_path = config.get('entity_class')
+
+        entity_uuid = config.get('entity_uuid')
+        try:
+            new_entity = self.entity_service.get_entity(entity_uuid)
+        except ValueError:
+            new_entity = None
+
         
         # Import the entity class
-        try:
-            module_path, class_name = entity_class_path.rsplit('.', 1)
-            module = importlib.import_module(module_path)
-            entity_class = getattr(module, class_name)
-        except (ImportError, AttributeError) as e:
-            raise ValueError(f"Failed to import entity class: {entity_class_path}") from e
-        
-        # Create entity with UUID if provided (recreation case)
-        entity_uuid = config.get('entity_uuid')
-        new_entity = entity_class(entity_id=entity_uuid)
+        if new_entity is None:
+            try:
+                module_path, class_name = entity_class_path.rsplit('.', 1)
+                module = importlib.import_module(module_path)
+                entity_class = getattr(module, class_name)
+            except (ImportError, AttributeError) as e:
+                raise ValueError(f"Failed to import entity class: {entity_class_path}") from e
+
+            new_entity = entity_class(entity_id=entity_uuid)
         
         # Store UUID in param_config if this is a new entity
         if entity_uuid is None:

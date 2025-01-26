@@ -1,5 +1,6 @@
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.Entity import Entity
+from shared_utils.entities.EntityModel import EntityModel
 from shared_utils.models import StrategyRequest
 from typing import List, Optional
 
@@ -66,23 +67,24 @@ class StrategyRequestAdapter:
         entity_id = model.entity_id
         entity = StrategyRequestEntity(str(entity_id))
 
+        # Map basic attributes
         entity.strategy_name = model.strategy_name
         entity.param_config = model.param_config
         entity.created_at = model.created_at
         entity.updated_at = model.updated_at
         entity.add_to_history = model.add_to_history
         entity.target_entity_id = model.target_entity_id
-        
-        # Handle the parent request (only if it exists)
-        if model.parent_request:
-            entity.parent_request_id = model.parent_request.entity_id
-        
-        # Handle training session (only if it exists)
-        if model.entity_model:
-            entity.entity_model = model.entity_model.entity_id
 
-        # Convert nested requests using the ForeignKey relationship
-        for nested_request in model.nested_requests.all():  # ForeignKey related_name='nested_requests'
+        # Map parent request (if it exists)
+        if model.parent_request:
+            entity.parent_request = str(model.parent_request.entity_id)
+
+        # Map training session (entity_model as a UUID)
+        if model.entity_model:
+            entity.entity_model = str(model.entity_model.entity_id)
+
+        # Convert nested requests
+        for nested_request in model.nested_requests.all():  # related_name='nested_requests'
             nested_entity = StrategyRequestAdapter.model_to_entity(nested_request)
             entity.add_nested_request(nested_entity)
 
@@ -92,25 +94,36 @@ class StrategyRequestAdapter:
     def entity_to_model(entity: StrategyRequestEntity, model: Optional[StrategyRequest] = None) -> StrategyRequest:
         """Convert a StrategyRequestEntity to a StrategyRequest model"""
         if model is None:
-            model = StrategyRequest.objects.get(entity_id=entity.entity_id)
-        if not model:
-            model = StrategyRequest(entity_id=entity.entity_id)
+            try:
+                # Attempt to fetch the existing model
+                model = StrategyRequest.objects.get(entity_id=entity.entity_id)
+            except StrategyRequest.DoesNotExist:
+                # Create a new model instance if it does not exist
+                model = StrategyRequest(entity_id=entity.entity_id)
 
-        # Update model fields
+        # Map basic attributes
         model.strategy_name = entity.strategy_name
         model.param_config = entity.param_config
         model.add_to_history = entity.add_to_history
         model.target_entity_id = entity.target_entity_id
 
-        # Handle parent request (if parent exists)
-        if hasattr(entity, 'parent_request_id') and entity.parent_request_id:
-            model.parent_request_id = entity.parent_request_id
+        # Map parent request (if it exists)
+        if hasattr(entity, 'parent_request') and entity.parent_request:
+            try:
+                parent_request = StrategyRequest.objects.get(entity_id=entity.parent_request)
+                model.parent_request = parent_request
+            except StrategyRequest.DoesNotExist:
+                raise ValueError(f"Parent request with ID {entity.parent_request.entity_id} does not exist.")
 
-        # Handle training session (if it exists)
-        if hasattr(entity, 'entity_model_id') and entity.entity_model_id:
-            model.entity_model = entity
+        # Map training session (entity_model as a ForeignKey)
+        if hasattr(entity, 'entity_model') and entity.entity_model:
+            try:
+                entity_model = EntityModel.objects.get(entity_id=entity.entity_model)
+                model.entity_model = entity_model
+            except EntityModel.DoesNotExist:
+                raise ValueError(f"EntityModel with ID {entity.entity_model} does not exist.")
 
-
+        # Save the updated or newly created model
         model.save()
 
         # Handle nested requests
@@ -122,5 +135,4 @@ class StrategyRequestAdapter:
                 nested_model.save()
 
         return model
-
 
