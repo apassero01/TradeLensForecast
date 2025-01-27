@@ -122,7 +122,6 @@ class EntityStore {
     }
 
     removeEntity(entityId) {
-        console.log('Removing entity:', entityId);
         if (this.entities.has(entityId)) {
             this.entities.delete(entityId);
         }

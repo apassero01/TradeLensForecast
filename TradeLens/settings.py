@@ -43,9 +43,20 @@ INSTALLED_APPS = [
     'sequenceset_manager',
     'training_session',
     'shared_utils',
-    'model_stage'
+    'model_stage',
+    'channels',
 
 ]
+
+# Add Channels configuration
+ASGI_APPLICATION = 'TradeLens.routing.application'
+
+# Configure Channel Layers (using in-memory for development)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

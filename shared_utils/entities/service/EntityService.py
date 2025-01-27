@@ -1,4 +1,6 @@
 import importlib
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities import Entity
@@ -9,6 +11,7 @@ from shared_utils.entities.EntityModel import EntityModel
 class EntityService:
     def __init__(self):
         self.cache_service = CacheService()
+        self.channel_layer = get_channel_layer()
 
     def get_entity(self, entity_id):
         """Get an entity by its ID from cache or database"""
@@ -22,15 +25,123 @@ class EntityService:
         return entity
 
     def save_entity(self, entity):
-        """Save an entity to cache"""
+        """Save an entity to cache and broadcast update via WebSocket"""
         print(f"Saving entity {entity.entity_id} to cache")
+        
+        # Save to cache
         self.cache_service.set(entity.entity_id, entity)
-        print(f"Entity {entity.entity_id} saved to cache")
+        
+        # Check if entity socket exists
+        socket_exists = self._check_entity_socket_exists(entity.entity_id)
+        
+        # Broadcast update
+        if not socket_exists:
+            # No socket exists, broadcast to global to establish connection
+            print(f"No socket exists for entity {entity.entity_id}, broadcasting to global")
+            self._broadcast_to_global_socket({
+                entity.entity_id: entity.serialize()
+            })
+        else:
+            # Socket exists, send update through entity-specific socket
+            print(f"Socket exists for entity {entity.entity_id}, broadcasting to entity socket")
+            self._broadcast_to_entity_socket(entity)
+            
+        print(f"Entity {entity.entity_id} saved and broadcast")
 
-    # def save_entities(self, entities):
-    #     """Save multiple entities to cache"""
-    #     entity_dict = {entity.entity_id: entity for entity in entities}
-    #     self.cache_service.set_many(entity_dict)
+    def _check_entity_socket_exists(self, entity_id):
+        """Check if an entity-specific socket group exists"""
+        try:
+            # Get the group name for this entity
+            group_name = f"entity_{entity_id}"
+            
+            # Use the channel layer's internal group storage to check if the group exists
+            # and has any members
+            if hasattr(self.channel_layer, 'groups'):
+                # For InMemoryChannelLayer
+                return bool(self.channel_layer.groups.get(group_name))
+            elif hasattr(self.channel_layer, '_groups'):
+                # For RedisChannelLayer
+                return bool(async_to_sync(self.channel_layer._groups.group_channels)(group_name))
+            
+            # Default to False if we can't determine
+            return False
+            
+        except Exception as e:
+            print(f"Error checking socket existence: {str(e)}")
+            return False
+
+    def clear_entity(self, entity_id):
+        """Remove an entity from cache and broadcast deletion"""
+        self.cache_service.delete(entity_id)
+        
+        # Always broadcast deletion to both sockets to ensure cleanup
+        deletion_message = {
+            entity_id: {
+                'deleted': True,
+                'id': entity_id
+            }
+        }
+        
+        # Check if entity socket exists before broadcasting
+        if self._check_entity_socket_exists(entity_id):
+            self._broadcast_to_entity_socket_by_id(entity_id, deletion_message)
+        
+        # Always broadcast to global to ensure all clients know about deletion
+        self._broadcast_to_global_socket(deletion_message)
+        
+        try:
+            entity = EntityModel.objects.get(entity_id=entity_id)
+            entity.delete()
+        except EntityModel.DoesNotExist:
+            pass
+
+    def _broadcast_to_global_socket(self, entities_data):
+        """Broadcast to global WebSocket"""
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                "global_entities",
+                {
+                    "type": "entity_update",
+                    "entities": entities_data
+                }
+            )
+        except Exception as e:
+            print(f"Error broadcasting to global socket: {str(e)}")
+
+    def _broadcast_to_entity_socket(self, entity):
+        """Broadcast to entity-specific WebSocket"""
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                f"entity_{entity.entity_id}",
+                {
+                    "type": "entity_update",
+                    "entity": entity.serialize()
+                }
+            )
+        except Exception as e:
+            print(f"Error broadcasting to entity socket: {str(e)}")
+
+    def _broadcast_to_entity_socket_by_id(self, entity_id, data):
+        """Broadcast to entity-specific WebSocket using just the ID"""
+        print(f"Broadcasting to entity socket {entity_id}")
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                f"entity_{entity_id}",
+                {
+                    "type": "entity_update",
+                    "entity": data
+                }
+            )
+        except Exception as e:
+            print(f"Error broadcasting to entity socket: {str(e)}")
+
+    def entity_exists_in_db(self, entity_id):
+        """Check if entity exists in database"""
+        try:
+            EntityModel.objects.get(entity_id=entity_id)
+            return True
+        except EntityModel.DoesNotExist:
+            return False
 
     def set_session_id(self, session_id):
         """Set the session ID for the cache service"""
@@ -60,23 +171,13 @@ class EntityService:
         return children_ids
 
     def load_from_db(self, entity_id):
-        """Load an entity from database - to be implemented by subclasses"""
+        """Load an entity from database"""
         try:
             model = EntityModel.objects.get(entity_id=entity_id)
         except EntityModel.DoesNotExist:
             return None
 
         return self.create_instance_from_path(model.class_path).from_db(model)
-
-
-    def clear_entity(self, entity_id):
-        """Remove an entity from cache"""
-        self.cache_service.delete(entity_id)
-        try:
-            entity = EntityModel.objects.get(entity_id=entity_id)
-            entity.delete()
-        except EntityModel.DoesNotExist:
-            pass
 
     def clear_entities(self, entity_ids):
         """Remove multiple entities from cache"""
