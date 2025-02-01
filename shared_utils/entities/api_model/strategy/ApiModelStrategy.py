@@ -411,7 +411,6 @@ class GenerateEmbeddingsStrategy(Strategy):
         embedding = response.data[0].embedding
 
         # Store the embedding in the entity
-        entity.set_attribute('message_history', [str(embedding)])
         entity.set_attribute('embedding', str(embedding))
 
         # Update the strategy request with the result
