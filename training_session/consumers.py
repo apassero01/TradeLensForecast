@@ -75,7 +75,7 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
     async def handle_delete_session(self):
         """Handle deletion of the current session"""
         try:
-            entity_service.delete_session_db()
+            await sync_to_async(entity_service.delete_session)()
             await self.send(json.dumps({
                 'type': 'session_deleted',
                 'message': 'Session deleted'

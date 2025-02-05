@@ -133,7 +133,8 @@ function EntityGraphContent({
       setSessionStarted(false);
       setGraphData({ nodes: [], edges: [] });
       setSelectedEntity(null);
-      setSavedSessions(prev => prev.filter(session => session.id !== sessionId));
+      console.log('savedSessions', savedSessions);
+      setSavedSessions(prev => prev.filter(session => session.entity_id !== sessionId));
       setError(null);
       
       console.log('Session deleted successfully');

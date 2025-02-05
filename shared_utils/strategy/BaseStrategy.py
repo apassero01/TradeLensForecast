@@ -282,9 +282,9 @@ class RemoveEntityStrategy(Strategy):
             remove_child_request.param_config['child_id'] = entity.entity_id
             remove_child_request = self.executor_service.execute_request(remove_child_request)
             self.strategy_request.add_nested_request(remove_child_request)
-            self.entity_service.clear_entity(entity.entity_id)
 
         entity.deleted = True
+        self.strategy_request.ret_val['entity'] = entity
 
 
         return self.strategy_request

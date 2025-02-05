@@ -34,7 +34,7 @@ class EntityService:
         # Check if entity socket exists
         socket_exists = self._check_entity_socket_exists(entity.entity_id)
 
-        if hasattr(entity, 'delete') and entity.deleted:
+        if hasattr(entity, 'deleted') and entity.deleted:
             self.clear_entity(entity.entity_id)
             return
         # Broadcast update
@@ -198,7 +198,6 @@ class EntityService:
         if session_id:
             self.clear_all_entities()
             self.cache_service.delete("current_session_id")
-            self.clear_entity(session_id)
             self.delete_session_db(session_id)
         else:
             raise ValueError("No session ID set")
@@ -222,9 +221,8 @@ class EntityService:
         # Call the constructor and return the instance
         return cls
 
-    def delete_session_db(self):
+    def delete_session_db(self, session_id):
         """Delete the current session from the database"""
-        session_id = self.get_session_id()
         all_entities = self.recurse_children(session_id)
         for entity in all_entities:
             try:
@@ -242,7 +240,10 @@ class EntityService:
         entities = []
 
         # Add the current entity if it matches the type
-        if entity_type and entity.entity_name == entity_type:
+        if entity_type:
+            if entity.entity_name == entity_type:
+                entities.append(entity)
+        else:
             entities.append(entity)
 
         # If there are no children, return the current entities
