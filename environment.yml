@@ -91,12 +91,19 @@ dependencies:
       - asttokens==2.4.1
       - astunparse==1.6.3
       - attrs==24.2.0
+      - autobahn==24.4.2
+      - automat==24.8.1
       - babel==2.16.0
       - bleach==6.1.0
       - cffi==1.17.0
+      - channels==4.2.0
+      - channels-redis==4.2.1
       - comm==0.2.2
+      - constantly==23.10.4
       - contourpy==1.2.1
+      - cryptography==44.0.0
       - cycler==0.12.1
+      - daphne==4.1.2
       - dataclasses-json==0.6.7
       - debugpy==1.8.5
       - distro==1.9.0
@@ -120,6 +127,8 @@ dependencies:
       - html5lib==1.1
       - httpcore==1.0.5
       - httpx-sse==0.4.0
+      - hyperlink==21.0.0
+      - incremental==24.7.2
       - ipykernel==6.29.5
       - ipython==8.26.0
       - isoduration==20.11.0
@@ -158,6 +167,7 @@ dependencies:
       - ml-dtypes==0.4.0
       - mplfinance==0.12.10b0
       - mpmath==1.3.0
+      - msgpack==1.1.0
       - multidict==6.1.0
       - multitasking==0.0.11
       - mypy-extensions==1.0.0
@@ -190,11 +200,14 @@ dependencies:
       - psutil==6.0.0
       - psycopg2-binary==2.9.9
       - pure-eval==0.2.3
+      - pyasn1==0.6.1
+      - pyasn1-modules==0.4.1
       - pycparser==2.22
       - pydantic==2.10.5
       - pydantic-core==2.27.2
       - pydantic-settings==2.7.1
       - pygments==2.18.0
+      - pyopenssl==25.0.0
       - pyparsing==3.1.2
       - python-dotenv==1.0.1
       - pyyaml==6.0.2
@@ -209,6 +222,7 @@ dependencies:
       - scipy==1.14.1
       - seaborn==0.13.2
       - send2trash==1.8.3
+      - service-identity==24.2.0
       - sniffio==1.3.1
       - soupsieve==2.6
       - sqlalchemy==2.0.37
@@ -230,6 +244,8 @@ dependencies:
       - torchvision==0.19.0
       - tqdm==4.67.1
       - tslearn==0.6.3
+      - twisted==24.11.0
+      - txaio==23.1.1
       - types-python-dateutil==2.9.0.20240316
       - typing-extensions==4.12.2
       - typing-inspect==0.9.0
@@ -242,3 +258,4 @@ dependencies:
       - wrapt==1.16.0
       - yarl==1.18.3
       - yfinance==0.2.41
+      - zope-interface==7.2
