@@ -21,7 +21,7 @@ const StrategyIndicator = ({ request, index, total, onExecute, onEditRequest }) 
       entity_id: request.entity_id
     });
     console.log('Created strategyRequest:', strategyRequest.toJSON());
-    await onExecute(strategyRequest.toJSON());
+    await onExecute(strategyRequest);
   };
 
   return (

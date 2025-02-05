@@ -197,14 +197,15 @@ class EntityAdapter:
         # Update core fields
         if hasattr(model, 'attributes'):
             attributes = {}
-            for key, value in entity.get_attributes().items():
-                try:
-                    # Try serializing the value
-                    json.dumps(value)
-                    # If successful, save it
-                    attributes[key] = value
-                except (TypeError, ValueError):
-                    pass
+            ##TODO Somepoint need to find a safe way to do this. ran into an issue where we could serialize to db but when sending to frontend datetime was not serializzable.
+            # for key, value in entity.get_attributes().items():
+            #     try:
+            #         # Try serializing the value
+            #         json.dumps(value)
+            #         # If successful, save it
+            #         attributes[key] = value
+            #     except (TypeError, ValueError):
+            #         pass
 
             # Save the attributes to the model
             model.attributes = attributes

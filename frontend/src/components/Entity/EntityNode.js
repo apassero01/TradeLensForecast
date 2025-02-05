@@ -77,7 +77,7 @@ function EntityNode({ data }) {
       ...strategy,
       target_entity_id: data.id, 
       param_config: strategy.config || {},
-    }).toJSON();
+    });
 
     // Our state now includes both the raw text & the parsed data
     handleEditRequest(req);
@@ -118,40 +118,36 @@ function EntityNode({ data }) {
     });
   };
 
-  // Called to actually execute the strategy
-  const handleExecuteStrategy = () => {
-    if (!editingRequest) return;
+  // Unified strategy execution handler
+  const handleExecuteStrategy = useCallback((strategyRequest) => {
+    // If it's a string (from editor), parse it
+    const request = typeof strategyRequest === 'string' 
+      ? JSON.parse(strategyRequest) 
+      : strategyRequest;
 
-    try {
-      const parsed = JSON.parse(editingRequest.rawText);
-      console.log('Executing strategy:', parsed);
-      console.log('editingRequest', editingRequest)
+    console.log('Executing strategy:', request);
 
-      // First close the editor
-      setEditingRequest(null);
+    // Update local requests
+    setLocalRequests((prev) => {
+      const i = prev.findIndex(
+        (r) =>
+          r.strategy_name === request.strategy_name &&
+          r.target_entity_id === request.target_entity_id
+      );
+      if (i >= 0) {
+        const copy = [...prev];
+        copy[i] = request;
+        return copy;
+      }
+      return [...prev, request];
+    });
 
-      // Then update the requests
-      setLocalRequests((prev) => {
-        const i = prev.findIndex(
-          (r) =>
-            r.strategy_name === parsed.strategy_name &&
-            r.target_entity_id === parsed.target_entity_id
-        );
-        console.log('Found existing strategy at index:', i);
-        if (i >= 0) {
-          const copy = [...prev];
-          copy[i] = parsed;
-          return copy;
-        }
-        return [...prev, parsed];
-      });
+    // Close editor if it's open
+    setEditingRequest(null);
 
-      // Finally execute the strategy
-      data.onStrategyExecute?.(parsed);
-    } catch (err) {
-      console.error('Error parsing JSON on Execute:', err);
-    }
-  };
+    // Execute the strategy
+    data.onStrategyExecute?.(request);
+  }, [data]);
 
   // Resizing logic
   const handleResizeStart = useCallback((e) => {
@@ -199,7 +195,13 @@ function EntityNode({ data }) {
           editorText={editingRequest.rawText}
           onChangeText={handleUpdateEditingText}
           onClose={handleCloseEditor}
-          onExecute={handleExecuteStrategy}
+          onExecute={() => {
+            try {
+              handleExecuteStrategy(editingRequest.data);
+            } catch (err) {
+              console.error('Error executing strategy:', err);
+            }
+          }}
           onResize={handleResizeStart}
         />
       ) : (
@@ -217,7 +219,7 @@ function EntityNode({ data }) {
             {localRequests.length > 0 && (
               <NodeStrategyPanel
                 strategyRequests={localRequests}
-                onExecute={data.onStrategyExecute}
+                onExecute={handleExecuteStrategy}
                 onEditRequest={handleEditRequest}
               />
             )}

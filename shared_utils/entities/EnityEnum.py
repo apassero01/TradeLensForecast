@@ -9,8 +9,9 @@ class EntityEnum(Enum):
     MODEL = "model"
     SEQUENCE_SET = "sequence_set"
     DATA_BUNDLE = "data_bundle"
-    STRATEGY_REQUESTS = "strategy_request"
+    STRATEGY_REQUEST = "strategy_request"
     VISUALIZATION = "visualization"
     DOCUMENT = "document"
     API_MODEL = "api_model"
+    INPUT = "input"
 

@@ -19,7 +19,7 @@ from training_session.models import TrainingSession
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities.service.EntityService import EntityService
-
+from shared_utils.entities import discover_entities
 
 ### New API Endpoints ###
 
@@ -202,6 +202,7 @@ def api_get_strategy_registry(request):
 
 def get_available_entities(request):
     entities = {}
+    discover_entities()
     
     # Get all subclasses of Entity
     def get_all_entity_subclasses(cls):

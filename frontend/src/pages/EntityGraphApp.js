@@ -21,34 +21,15 @@ function EntityGraphContent({
   error,
   setError,
   graphData,
-  setGraphData
+  setGraphData,
+  onEntityUpdate
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [savedSessions, setSavedSessions] = useState([]);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [availableStrategies, setAvailableStrategies] = useState({});
 
-  const { executeStrategy } = useWebSocket();
-
-  const handleWebSocketEntityUpdate = useCallback((updatedEntities) => {
-    console.log('WS entity update:', updatedEntities);
-    
-    // Handle entity updates and deletions
-    Object.entries(updatedEntities).forEach(([entityId, entityData]) => {
-      if (entityData.deleted) {
-        console.log(`Removing entity: ${entityId}`);
-        entityStore.removeEntity(entityId);
-      } else {
-        console.log(`Updating entity: ${entityId}`);
-        entityStore.updateEntities({ [entityId]: entityData });
-      }
-    });
-
-    // Update graph data after all changes
-    const newGraphData = entityStore.toGraphData();
-    console.log('New graph data:', newGraphData);
-    setGraphData(newGraphData || { nodes: [], edges: [] });
-  }, []);
+  const { executeStrategy, deleteSession } = useWebSocket();
 
   const startNewSession = async () => {
     setIsLoading(true);
@@ -84,6 +65,8 @@ function EntityGraphContent({
       setSessionStarted(false);
       setGraphData({ nodes: [], edges: [] });
       setSelectedEntity(null);
+      // setEntityIds(new Set());
+      
       console.log('Session stopped successfully');
     } catch (err) {
       setError('Failed to stop session: ' + err.message);
@@ -134,6 +117,28 @@ function EntityGraphContent({
     } catch (err) {
       console.error('Load session error:', err);
       setError('Failed to load session: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    setIsLoading(true);
+    try {
+      // Send delete command via WebSocket
+      await deleteSession();
+      
+      // Clear local state
+      entityStore.clear();
+      setSessionStarted(false);
+      setGraphData({ nodes: [], edges: [] });
+      setSelectedEntity(null);
+      setSavedSessions(prev => prev.filter(session => session.id !== sessionId));
+      setError(null);
+      
+      console.log('Session deleted successfully');
+    } catch (err) {
+      setError('Failed to delete session: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -226,6 +231,7 @@ function EntityGraphContent({
           onStopSession={stopSession}
           onSaveSession={saveSession}
           onLoadSession={loadSession}
+          onDeleteSession={handleDeleteSession}
           isLoading={isLoading}
           savedSessions={savedSessions}
         />
@@ -267,11 +273,11 @@ const EntityGraphApp = () => {
   const [error, setError] = useState(null);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
+  const [entityIds, setEntityIds] = useState(new Set(entityStore.entities.keys()));
 
+  // Single, consolidated handler for WebSocket entity updates.
   const handleWebSocketEntityUpdate = useCallback((updatedEntities) => {
     console.log('WS entity update:', updatedEntities);
-    
-    // Handle entity updates and deletions
     Object.entries(updatedEntities).forEach(([entityId, entityData]) => {
       if (entityData.deleted) {
         console.log(`Removing entity: ${entityId}`);
@@ -282,10 +288,11 @@ const EntityGraphApp = () => {
       }
     });
 
-    // Update graph data after all changes
+    // Refresh graph and state.
     const newGraphData = entityStore.toGraphData();
     console.log('New graph data:', newGraphData);
     setGraphData(newGraphData || { nodes: [], edges: [] });
+    setEntityIds(new Set(entityStore.entities.keys()));
   }, []);
 
   return (
@@ -293,6 +300,7 @@ const EntityGraphApp = () => {
       sessionStarted={sessionStarted}
       onEntityUpdate={handleWebSocketEntityUpdate}
       onError={setError}
+      currentEntities={entityIds}
     >
       <EntityGraphContent 
         sessionStarted={sessionStarted}
@@ -301,7 +309,14 @@ const EntityGraphApp = () => {
         setError={setError}
         graphData={graphData}
         setGraphData={setGraphData}
+        onEntityUpdate={handleWebSocketEntityUpdate}
       />
+      {error && (
+        <ErrorDisplay 
+          message={error} 
+          onClose={() => setError(null)}
+        />
+      )}
     </WebSocketProvider>
   );
 };

@@ -194,6 +194,152 @@ class StockSequenceSetServiceTest(TestCase):
                 self.assertTrue(compare_lists_with_nan(sequence.sequence_data[:,index], np.array(df_seq[feature].values.tolist())))
 
 
+    @patch('sequenceset_manager.services.StockSequenceSetService.get_df_data')
+    def test_update_recent_no_new_data(self, mock_get_df_data):
+        """
+        Test that no updates are made when there is no new data.
+        """
+        mock_get_df_data.return_value = self.df
+
+        # Create a real sequence set (with sequences already in the DB)
+        sequence_length = 10
+        sequence_set = StockSequenceSetService.create_sequence_set(
+            sequence_length=sequence_length,
+            dataset_type='stock',
+            ticker=self.ticker,
+            interval=self.interval
+        )
+
+        # Call update_recent with the same DataFrame (no new rows)
+        StockSequenceSetService.update_recent(
+            sequence_set,
+            ticker=self.ticker,
+            interval=self.interval,
+            dataset_type='stock'
+        )
+
+        # Verify that no new sequences were created
+        self.assertEqual(
+            Sequence.objects.count(),
+            len(self.df) - sequence_length + 1
+        )
+
+    @patch('sequenceset_manager.services.StockSequenceSetService.get_df_data')
+    def test_update_recent_with_new_data(self, mock_get_df_data):
+        """
+        Test that new sequences are created when new data is added.
+        """
+        # First, mock initial data and create the set
+        mock_get_df_data.return_value = self.df
+        sequence_length = 10
+        sequence_set = StockSequenceSetService.create_sequence_set(
+            sequence_length=sequence_length,
+            dataset_type='stock',
+            ticker=self.ticker,
+            interval=self.interval
+        )
+
+        # Simulate new data being added to the DataFrame
+        new_data = {
+            '2021-01-02 00:00:00+00:00': [100, 200, 300, 400],
+            '2021-01-03 00:00:00+00:00': [110, 210, 310, 410]
+        }
+        new_df = self.df._append(pd.DataFrame(new_data).T)  # Use _append for newer pandas
+        new_df.index = pd.to_datetime(new_df.index, format='%Y-%m-%d %H:%M:%S%z')
+        mock_get_df_data.return_value = new_df
+
+        # Call update_recent with the updated DataFrame
+        StockSequenceSetService.update_recent(
+            sequence_set,
+            ticker=self.ticker,
+            interval=self.interval,
+            dataset_type='stock'
+        )
+
+        # Verify that new sequences were created
+        expected_num_sequences = len(new_df) - sequence_length + 1
+        self.assertEqual(Sequence.objects.count(), expected_num_sequences)
+
+        # Verify that the last sequence includes the new data
+        last_sequence = Sequence.objects.order_by('-end_timestamp').first()
+        self.assertEqual(
+            last_sequence.end_timestamp,
+            pd.to_datetime('2021-01-03 00:00:00+00:00')
+        )
+
+    @patch('sequenceset_manager.services.StockSequenceSetService.get_df_data')
+    def test_update_recent_timesteps_exist(self, mock_get_df_data):
+        """
+        After we append new rows and call update_recent, verify that for each
+        row i in the final DataFrame (up to len(df)-sequence_length),
+        there is exactly one Sequence whose start_timestamp and end_timestamp
+        match the DataFrame index (accounting for type/timezone differences).
+        """
+        # 1) Create the initial sequence set
+        mock_get_df_data.return_value = self.df
+        sequence_length = 10
+        sequence_set = StockSequenceSetService.create_sequence_set(
+            sequence_length=sequence_length,
+            dataset_type='stock',
+            ticker=self.ticker,
+            interval=self.interval
+        )
+
+        # 2) Create new data that extends the dataset
+        new_data = {
+            '2019-01-02 00:00:00+00:00': [100, 200, 300, 400],
+            '2019-01-03 00:00:00+00:00': [110, 210, 310, 410],
+            '2019-01-04 00:00:00+00:00': [120, 220, 320, 420],
+        }
+        new_df = self.df._append(pd.DataFrame(new_data).T)
+        new_df.index = pd.to_datetime(new_df.index)  # Pandas Timestamp index
+        mock_get_df_data.return_value = new_df
+
+        # 3) Call update_recent
+        StockSequenceSetService.update_recent(
+            sequence_set,
+            ticker=self.ticker,
+            interval=self.interval,
+            dataset_type='stock'
+        )
+
+        # 4) Sort the final DataFrame by date
+        final_df = new_df.sort_index()
+
+        # 5) For each valid "start row" i in final_df, ensure exactly one matching Sequence
+        for i in range(len(final_df)-1, len(final_df) - sequence_length + 1, -1):
+            # Pandas Timestamps
+            start_ts_pd = final_df.index[i - sequence_length + 1]
+
+            # Convert to naive Python datetimes (if DB is naive). If DB is TZ-aware (UTC),
+            # replace tzinfo=None with tzinfo=timezone.utc or unify as needed.
+            start_ts_dt = start_ts_pd.to_pydatetime().replace(tzinfo=None)
+            # 5a) Find any Sequence in the DB with that start_timestamp
+            matches = Sequence.objects.filter(
+                sequence_set=sequence_set,
+                start_timestamp=start_ts_dt
+            )
+            self.assertEqual(
+                matches.count(),
+                1,
+                msg=(
+                    f"Expected exactly one Sequence starting at {start_ts_dt}, "
+                    f"found {matches.count()}."
+                )
+            )
+
+            # 5b) Check that its end_timestamp matches the expected
+            seq_obj = matches.first()
+            db_start = seq_obj.start_timestamp.replace(tzinfo=None)
+            self.assertEqual(
+                db_start,
+                start_ts_dt,
+                msg=(
+                    f"Sequence at {start_ts_dt} has incorrect end_timestamp. "
+                    f"Expected {db_start}, got {start_ts_dt}."
+                )
+            )
+
 class GetSequencesFunctionTest(TestCase):
     def setUp(self):
         """

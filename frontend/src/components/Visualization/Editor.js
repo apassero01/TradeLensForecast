@@ -63,9 +63,20 @@ const Editor = ({ visualization, onChange }) => {
     }
   };
 
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
-    <div className="flex flex-col w-full h-full nodrag bg-gray-800">
-      <div className="flex-none border-b border-gray-700 p-2 flex justify-between items-center">
+    <div  
+      className="flex flex-col w-full h-full nodrag bg-gray-800"
+      onClick={handleClick}
+    >
+      <div 
+        className="flex-none border-b border-gray-700 p-2 flex justify-between items-center"
+        onClick={handleClick}
+      >
         <div className="flex items-center space-x-4">
           <h2 className="text-gray-200 text-lg">
             {config.title || 'Document Editor'}
@@ -74,6 +85,7 @@ const Editor = ({ visualization, onChange }) => {
             className="bg-gray-700 text-gray-200 p-1 rounded"
             value={editorMode}
             onChange={handleModeChange}
+            onClick={handleClick}
           >
             <option value="python">Python</option>
             <option value="json">JSON</option>
@@ -82,14 +94,22 @@ const Editor = ({ visualization, onChange }) => {
         </div>
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => handleFontSize(-2)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleFontSize(-2);
+            }}
             className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600"
           >
             A-
           </button>
           <span className="text-gray-300">{fontSize}px</span>
           <button
-            onClick={() => handleFontSize(2)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleFontSize(2);
+            }}
             className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600"
           >
             A+
@@ -97,7 +117,10 @@ const Editor = ({ visualization, onChange }) => {
         </div>
       </div>
 
-      <div className="flex-grow min-h-0 relative">
+      <div 
+        className="flex-grow min-h-0 relative"
+        onClick={handleClick}
+      >
         <AceEditor
           ref={editorRef}
           mode={editorMode}
@@ -108,7 +131,9 @@ const Editor = ({ visualization, onChange }) => {
           width="100%"
           height="100%"
           name="document-editor"
-          editorProps={{ $blockScrolling: true }}
+          editorProps={{ 
+            $blockScrolling: true,
+          }}
           setOptions={{
             showLineNumbers: true,
             wrap: false,
@@ -123,7 +148,9 @@ const Editor = ({ visualization, onChange }) => {
           className="w-full h-full"
           onLoad={(editor) => {
             editor.container.style.transform = 'none';
+            editor.container.addEventListener('click', handleClick);
           }}
+          onClick={handleClick}
         />
       </div>
     </div>

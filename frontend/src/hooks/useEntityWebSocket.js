@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { BACKEND_WS_URL } from '../config';
+import StrategyRequest from '../utils/StrategyRequest';
 
 export default function useEntityWebSocket({ 
   sessionStarted, 
   onEntityUpdate, 
   onError,
-  initialEntityIds = []
+  initialEntities = []
 }) {
   const globalSocketRef = useRef(null);
   const entitySocketsRef = useRef({});
@@ -13,6 +15,16 @@ export default function useEntityWebSocket({
   const [isConnected, setIsConnected] = useState(false);
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
+
+  // 1. Maintain a ref that always holds the latest entity list.
+  // This ensures we have up-to-date values even if the parent's state changes.
+  const latestEntitiesRef = useRef(initialEntities);
+  useEffect(() => {
+    latestEntitiesRef.current = initialEntities;
+  }, [initialEntities]);
+
+  // 2. Maintain a ref to store the previously subscribed entity IDs.
+  const lastSubscribedEntityIdsRef = useRef([]);
 
   const processMessageQueue = useCallback(() => {
     while (messageQueueRef.current.length > 0 && globalSocketRef.current?.readyState === WebSocket.OPEN) {
@@ -50,18 +62,19 @@ export default function useEntityWebSocket({
   const connectEntitySocket = useCallback((entityId) => {
     // Don't create new connection if one exists and is open/connecting
     if (entitySocketsRef.current[entityId]) {
-      if (entitySocketsRef.current[entityId].readyState === WebSocket.OPEN) {
+      if (
+        entitySocketsRef.current[entityId].readyState === WebSocket.OPEN ||
+        entitySocketsRef.current[entityId].readyState === WebSocket.CONNECTING
+      ) {
         return entitySocketsRef.current[entityId];
       }
-      if (entitySocketsRef.current[entityId].readyState === WebSocket.CONNECTING) {
-        return entitySocketsRef.current[entityId];
+      if (entitySocketsRef.current[entityId].readyState === WebSocket.CLOSED) {
+        entitySocketsRef.current[entityId] = null;
       }
-      // If socket exists but is closing/closed, clean it up
-      entitySocketsRef.current[entityId] = null;
     }
 
-    console.log(`Creating new WebSocket for entity ${entityId}`);
-    const socket = new WebSocket(`ws://${window.location.host}/ws/entity/${entityId}/`);
+    console.log(`Connecting to Entity WebSocket for entity ${entityId}`);
+    const socket = new WebSocket(`ws://${BACKEND_WS_URL}/ws/entity/${entityId}/`);
     entitySocketsRef.current[entityId] = socket;
 
     socket.onopen = () => {
@@ -74,7 +87,14 @@ export default function useEntityWebSocket({
         console.log(`Entity ${entityId} received WebSocket message:`, msg);
 
         if (msg.type === 'entity_update') {
+          // For a normal update, pass along the entity data.
           onEntityUpdate({ [entityId]: msg.entity });
+        } else if (msg[entityId] && msg[entityId].deleted) {
+          // Handle deletion messages.
+          // For example, if msg is: 
+          // { "entity-id": { deleted: true, id: "entity-id" } }
+          console.log(`Entity ${entityId} marked as deleted:`, msg[entityId]);
+          onEntityUpdate({ [entityId]: msg[entityId] });
         }
       } catch (error) {
         console.error(`Error processing entity ${entityId} WebSocket message:`, error);
@@ -87,7 +107,9 @@ export default function useEntityWebSocket({
 
     socket.onclose = () => {
       console.log(`Entity ${entityId} WebSocket closed`);
-      delete entitySocketsRef.current[entityId];
+      if (entitySocketsRef.current[entityId]?.readyState === WebSocket.CLOSED) {
+        delete entitySocketsRef.current[entityId];
+      }
     };
 
     return socket;
@@ -99,27 +121,26 @@ export default function useEntityWebSocket({
     }
 
     if (globalSocketRef.current) {
-      if (globalSocketRef.current.readyState === WebSocket.OPEN) {
-        processMessageQueue();  // Process any queued messages if socket is already open
+      if (globalSocketRef.current.readyState === WebSocket.OPEN || 
+          globalSocketRef.current.readyState === WebSocket.CONNECTING) {
         return globalSocketRef.current;
       }
-      if (globalSocketRef.current.readyState === WebSocket.CONNECTING) {
-        return globalSocketRef.current;
-      }
-      globalSocketRef.current = null;
     }
 
-    console.log('Creating new global WebSocket connection...');
-    const socket = new WebSocket(`ws://${window.location.host}/ws/entities/`);
+    console.log('[WS] Creating new global WebSocket connection...');
+    const socket = new WebSocket(`ws://${BACKEND_WS_URL}/ws/entities/`);
     globalSocketRef.current = socket;
 
     socket.onopen = () => {
-      console.log('Global WebSocket connected!');
+      console.log('[WS] Global WebSocket connected!', {
+        readyState: socket.readyState,
+        protocol: socket.protocol,
+        url: socket.url
+      });
       setIsConnected(true);
       reconnectAttemptsRef.current = 0;
-      // Process any queued messages after a short delay to ensure connection is ready
       setTimeout(() => {
-        console.log('Processing message queue after connection...', messageQueueRef.current);
+        console.log('[WS] Processing message queue...', messageQueueRef.current);
         processMessageQueue();
       }, 100);
     };
@@ -127,11 +148,10 @@ export default function useEntityWebSocket({
     socket.onmessage = (evt) => {
       try {
         const msg = JSON.parse(evt.data);
-        console.log('Received global WebSocket message:', msg);
+        console.log('[WS] Received message:', msg);
 
         if (msg.type === 'connected' && msg.request_subscriptions) {
-          setupEntitySubscriptions(initialEntityIds);
-          // Also process any queued messages after subscriptions are set up
+          setupEntitySubscriptions(initialEntities);
           processMessageQueue();
         } else if (msg.type === 'entity_update' && msg.entities) {
           Object.keys(msg.entities).forEach(entityId => {
@@ -142,27 +162,52 @@ export default function useEntityWebSocket({
           onEntityUpdate(msg.entities);
         } else if (msg.type === 'strategy_executed') {
           console.log('Strategy execution confirmed:', msg);
+        } else if (msg.type === 'session_deleted') {
+          console.log('[WS] Session deleted successfully');
+          // Clear local state
+          entitySocketsRef.current = {};
+          messageQueueRef.current = [];
+          setIsConnected(false);
+          
+          // Close the socket cleanly
+          if (globalSocketRef.current?.readyState === WebSocket.OPEN) {
+            globalSocketRef.current.close(1000, 'Session deleted');
+          }
+          globalSocketRef.current = null;
         } else if (msg.type === 'error') {
-          console.error('WebSocket error:', msg.message);
+          console.error('[WS] WebSocket error message:', msg.message);
           onError(msg.message);
         }
       } catch (error) {
-        console.error('Error processing global WebSocket message:', error);
+        console.error('[WS] Message processing error:', error);
       }
     };
 
     socket.onerror = (err) => {
-      console.error('Global WebSocket error:', err);
+      console.error('[WS] WebSocket error:', {
+        error: err,
+        readyState: socket.readyState,
+        url: socket.url
+      });
       setIsConnected(false);
     };
 
-    socket.onclose = () => {
-      console.log('Global WebSocket closed');
+    socket.onclose = (event) => {
+      console.log('[WS] WebSocket closed:', {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+        readyState: socket.readyState
+      });
       setIsConnected(false);
       
-      if (sessionStarted && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+      if (sessionStarted && 
+          reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS && 
+          event.code !== 1000) {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
         reconnectAttemptsRef.current += 1;
+        
+        console.log(`[WS] Scheduling reconnect attempt ${reconnectAttemptsRef.current} in ${delay}ms`);
         
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
@@ -171,6 +216,8 @@ export default function useEntityWebSocket({
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectTimeoutRef.current = null;
           if (sessionStarted) {
+            console.log('[WS] Attempting reconnection...');
+            globalSocketRef.current = null;
             connectGlobalSocket();
           }
         }, delay);
@@ -178,14 +225,20 @@ export default function useEntityWebSocket({
     };
 
     return socket;
-  }, [sessionStarted, onEntityUpdate, connectEntitySocket, initialEntityIds, processMessageQueue]);
+  }, [sessionStarted, onEntityUpdate, connectEntitySocket, initialEntities, processMessageQueue]);
 
   const setupEntitySubscriptions = useCallback((entityIds) => {
-    console.log('Setting up entity subscriptions:', entityIds);
-    entityIds.forEach(connectEntitySocket);
+    // Force the conversion to an array if it isn't one already.
+    const idsArray = Array.isArray(entityIds) ? entityIds : Array.from(entityIds);
+    console.log('Setting up entity subscriptions:', idsArray);
+
+    // For each entity id, connect its websocket
+    idsArray.forEach(connectEntitySocket);
+    
+    // Send the message with an array of IDs
     sendMessageGlobal({
       command: 'subscribe_entities',
-      entity_ids: entityIds
+      entity_ids: idsArray
     });
   }, [connectEntitySocket, sendMessageGlobal]);
 
@@ -193,13 +246,16 @@ export default function useEntityWebSocket({
     console.log('Executing strategy:', strategyRequest);
     sendMessageGlobal({
       command: 'execute_strategy',
-      strategy: {
-        strategy_name: strategyRequest.strategy_name,
-        param_config: strategyRequest.param_config,
-        target_entity_id: strategyRequest.target_entity_id,
-        add_to_history: strategyRequest.add_to_history,
-        nested_requests: strategyRequest.nested_requests || []
-      }
+      strategy: strategyRequest instanceof StrategyRequest
+        ? strategyRequest.toJSON()
+        : strategyRequest
+    });
+  }, [sendMessageGlobal]);
+
+  const deleteSession = useCallback(async () => {
+    console.log('[WS] Sending delete session command');
+    sendMessageGlobal({
+      command: 'delete_session'
     });
   }, [sendMessageGlobal]);
 
@@ -212,27 +268,30 @@ export default function useEntityWebSocket({
     }
 
     return () => {
-      messageQueueRef.current = []; // Clear message queue on cleanup
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      
-      // Clean up entity sockets
-      Object.values(entitySocketsRef.current).forEach(entitySocket => {
-        if (entitySocket?.readyState === WebSocket.OPEN) {
-          entitySocket.close(1000, 'Component unmounting');
+      // Only cleanup if component is actually unmounting
+      if (!sessionStarted) {
+        messageQueueRef.current = []; // Clear message queue on cleanup
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
         }
-      });
-      entitySocketsRef.current = {};
-      
-      // Clean up global socket
-      if (socket || globalSocketRef.current) {
-        const currentSocket = socket || globalSocketRef.current;
-        if (currentSocket.readyState === WebSocket.OPEN) {
-          currentSocket.close(1000, 'Component unmounting');
+        
+        // Clean up entity sockets
+        Object.values(entitySocketsRef.current).forEach(entitySocket => {
+          if (entitySocket?.readyState === WebSocket.OPEN) {
+            entitySocket.close(1000, 'Component unmounting');
+          }
+        });
+        entitySocketsRef.current = {};
+        
+        // Clean up global socket
+        if (socket || globalSocketRef.current) {
+          const currentSocket = socket || globalSocketRef.current;
+          if (currentSocket.readyState === WebSocket.OPEN) {
+            currentSocket.close(1000, 'Component unmounting');
+          }
+          globalSocketRef.current = null;
         }
-        globalSocketRef.current = null;
       }
     };
   }, [sessionStarted, connectGlobalSocket]);
@@ -245,11 +304,67 @@ export default function useEntityWebSocket({
     }
   }, [isConnected, processMessageQueue]);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[WS] Browser is back online. Attempting to reconnect global socket...');
+      if (!globalSocketRef.current || globalSocketRef.current.readyState === WebSocket.CLOSED) {
+        connectGlobalSocket();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [connectGlobalSocket]);
+
+  // 3. Create a function that subscribes using the latest entity list if needed.
+  const subscribeWithLatestEntities = useCallback(() => {
+    // Convert to an array in case a MapIterator was passed
+    const currentEntityIds = Array.isArray(latestEntitiesRef.current)
+      ? latestEntitiesRef.current
+      : Array.from(latestEntitiesRef.current);
+
+    if (!currentEntityIds.length) return;  // nothing to subscribe
+    // Only subscribe if the current list is different from what we had before.
+    if (JSON.stringify(currentEntityIds) === JSON.stringify(lastSubscribedEntityIdsRef.current)) {
+      return; // No change; no need to resend the subscription.
+    }
+    
+    console.log('[WS] Re-subscribing with the latest entity list:', currentEntityIds);
+    setupEntitySubscriptions(currentEntityIds);
+    lastSubscribedEntityIdsRef.current = currentEntityIds;
+  }, [setupEntitySubscriptions]);
+
+  // 4. Use an effect that triggers only when the global connection is established.
+  useEffect(() => {
+    if (isConnected) {
+      subscribeWithLatestEntities();
+    }
+  }, [isConnected, subscribeWithLatestEntities]);
+
+  useEffect(() => {
+    if (!sessionStarted) {
+      console.log('[WS] Session stopped. Clearing entity subscriptions and sockets.');
+      // Reset subscription cache so that on restart a fresh subscription occurs.
+      lastSubscribedEntityIdsRef.current = [];
+      // Close any lingering entity sockets.
+      Object.values(entitySocketsRef.current).forEach(socket => {
+        if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+          socket.close(1000, 'Session stopped');
+        }
+      });
+      // Clear the entitySockets map.
+      entitySocketsRef.current = {};
+    }
+  }, [sessionStarted]);
+
   return { 
     sendMessageGlobal,
     sendMessageEntity,
     isConnected,
     executeStrategy,
-    setupEntitySubscriptions
+    setupEntitySubscriptions,
+    deleteSession
   };
 }

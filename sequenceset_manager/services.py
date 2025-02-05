@@ -14,7 +14,7 @@ import numpy as np
 class SequenceSetService(ABC):
     @staticmethod
 
-    def get_df_data():
+    def get_df_data(**kwargs):
         '''
         Get the data for a sequence set
         '''
@@ -95,6 +95,8 @@ class SequenceSetService(ABC):
 
         sequences = SequenceSetService.create_sequence_objects(sequence_set, df)
         SequenceSetService.save_sequence_set(sequence_set, sequences)
+
+        return sequence_set
 
     @staticmethod
     def create_sequence_objects(sequence_set, df):
@@ -217,6 +219,67 @@ class SequenceSetService(ABC):
                 Sequence.objects.filter(pk=obj_id).update(
                     sequence_data=RawSQL(f"\"sequence_data\" || ARRAY[{array2d_str}]::float8[]", [])
                 )
+
+    @classmethod
+    def update_recent(cls, sequence_set, **kwargs):
+        df = cls.get_df_data(**kwargs)
+        df.index = pd.to_datetime(df.index)
+
+        # 1) Identify the last_end_date from existing sequences
+        last_sequence = Sequence.objects.filter(
+            sequence_set=sequence_set
+        ).order_by('-end_timestamp').first()
+
+        if last_sequence:
+            last_end_date = last_sequence.end_timestamp
+        else:
+            last_end_date = df.index[0]  # if no sequences
+
+        # 2) If there's no newer data in df, return
+        if last_end_date >= df.index[-1]:
+            print("Sequence set is up to date")
+            return
+
+        # 3) Figure out how many rows from the end we need to re-generate
+        sequence_length = sequence_set.sequence_length
+
+        if last_end_date in df.index:
+            last_end_idx = df.index.get_loc(last_end_date)
+        else:
+            # If the exact last_end_date not in df (weekend?), find closest
+            last_end_idx = df.index.get_indexer([last_end_date], method='ffill')[0]
+
+        start_idx_for_new = max(0, last_end_idx - (sequence_length - 1))
+        new_data = df.iloc[start_idx_for_new:]
+
+        # 4) Delete overlapping sequences
+        overlapping_start_date = df.index[start_idx_for_new]
+        overlapping_sequences = Sequence.objects.filter(
+            sequence_set=sequence_set,
+            start_timestamp__gte=overlapping_start_date
+        )
+        overlapping_sequences.delete()
+
+        # 5) Create new sequences
+        new_sequences = cls.create_sequence_objects(sequence_set, new_data)
+
+        SequenceSetService.save_sequence_set(sequence_set, new_sequences)
+
+        print(f"Updated {len(new_sequences)} sequences in the sequence set.")
+
+    @classmethod
+    def get_sequence_set(cls, dataset_type, sequence_length, **kwargs):
+        '''
+        Get a sequence set
+        '''
+        queryset = SequenceSet.objects.filter(dataset_type=dataset_type, sequence_length=sequence_length, metadata__contains=kwargs)
+        if len(queryset) > 1:
+            raise ValidationError("Multiple sequence sets found")
+        elif len(queryset) == 0:
+            raise ValidationError("No sequence sets found")
+
+        return queryset
+
 
     @staticmethod
     def save_sequence_set(sequence_set, stock_sequences):

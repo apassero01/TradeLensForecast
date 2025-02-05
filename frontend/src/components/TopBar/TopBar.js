@@ -1,6 +1,7 @@
 import React from 'react';
 import SessionStatus from './SessionStatus';
 import SessionSelector from './SessionSelector';
+import DeleteSessionButton from './DeleteSessionButton';
 
 const TopBar = ({ 
   isSessionActive, 
@@ -8,6 +9,7 @@ const TopBar = ({
   onStopSession,
   onSaveSession,
   onLoadSession,
+  onDeleteSession,
   isLoading,
   savedSessions = []
 }) => {
@@ -49,6 +51,10 @@ const TopBar = ({
           <SessionSelector 
             onSessionSelect={onLoadSession} 
             savedSessions={savedSessions}
+            isLoading={isLoading}
+          />
+          <DeleteSessionButton 
+            onDeleteSession={onDeleteSession}
             isLoading={isLoading}
           />
         </div>

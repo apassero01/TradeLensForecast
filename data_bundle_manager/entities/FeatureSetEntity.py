@@ -10,10 +10,3 @@ class FeatureSetEntity(Entity):
         self.do_fit_test = False
         self.secondary_feature_list = []
         self.feature_set_type = None
-
-    def to_db(self):
-        raise NotImplementedError("Child classes must implement the 'to_db' method.")
-
-    @classmethod
-    def from_db(cls, data):
-        raise NotImplementedError("Child classes must implement the 'from_db' method.")

@@ -50,6 +50,8 @@ class StrategyDirectory:
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.ConfigureApiModelStrategy",
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.CallApiModelStrategy",
             ],
+            EntityEnum.STRATEGY_REQUEST.value: [
+            ],
         }
 
     def get_strategy_classes(self):

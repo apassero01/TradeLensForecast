@@ -57,6 +57,8 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
                 await self.handle_start_session()
             elif command == 'stop_session':
                 await self.handle_stop_session()
+            elif command == 'delete_session':
+                await self.handle_delete_session()
             else:
                 print(f"Unknown command received: {command}")
                 await self.send(json.dumps({
@@ -70,7 +72,21 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
                 'message': str(e)
             }))
 
-    @sync_to_async
+    async def handle_delete_session(self):
+        """Handle deletion of the current session"""
+        try:
+            entity_service.delete_session_db()
+            await self.send(json.dumps({
+                'type': 'session_deleted',
+                'message': 'Session deleted'
+            }))
+        except Exception as e:
+            print(f"Error deleting session: {str(e)}")
+            await self.send(json.dumps({
+                'type': 'error',
+                'message': str(e)
+            }))
+
     def json_to_strategy_request(self, json_data):
         if 'entity_id' in json_data:
             strat_request = StrategyRequestEntity(json_data['entity_id'])
@@ -129,7 +145,7 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
                 raise Exception('No session in progress')
 
             # Convert JSON to StrategyRequestEntity
-            strat_request = await self.json_to_strategy_request(strategy_data)
+            strat_request = self.json_to_strategy_request(strategy_data)
             
             # Execute strategy - EntityService will handle WebSocket broadcasts
             await sync_to_async(strategy_executor_service.execute_request)(strat_request)
@@ -166,7 +182,6 @@ class EntityConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
         
-        # Join entity-specific group
         await self.channel_layer.group_add(
             f"entity_{self.entity_id}",
             self.channel_name

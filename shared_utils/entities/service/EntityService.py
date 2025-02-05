@@ -33,7 +33,10 @@ class EntityService:
         
         # Check if entity socket exists
         socket_exists = self._check_entity_socket_exists(entity.entity_id)
-        
+
+        if hasattr(entity, 'delete') and entity.deleted:
+            self.clear_entity(entity.entity_id)
+            return
         # Broadcast update
         if not socket_exists:
             # No socket exists, broadcast to global to establish connection
@@ -72,6 +75,7 @@ class EntityService:
 
     def clear_entity(self, entity_id):
         """Remove an entity from cache and broadcast deletion"""
+        print(f"Clearing entity {entity_id} from cache")
         self.cache_service.delete(entity_id)
         
         # Always broadcast deletion to both sockets to ensure cleanup
@@ -90,6 +94,7 @@ class EntityService:
         self._broadcast_to_global_socket(deletion_message)
         
         try:
+            print(f"Deleting entity {entity_id} from database")
             entity = EntityModel.objects.get(entity_id=entity_id)
             entity.delete()
         except EntityModel.DoesNotExist:
@@ -187,6 +192,17 @@ class EntityService:
         """Remove all entities from cache"""
         self.cache_service.clear_all()
 
+    def delete_session(self):
+        """Delete the current session"""
+        session_id = self.get_session_id()
+        if session_id:
+            self.clear_all_entities()
+            self.cache_service.delete("current_session_id")
+            self.clear_entity(session_id)
+            self.delete_session_db(session_id)
+        else:
+            raise ValueError("No session ID set")
+
     def create_instance_from_path(self, class_path):
         """
         Dynamically imports and instantiates a class from its class path.
@@ -205,3 +221,40 @@ class EntityService:
         cls = getattr(module, class_name)
         # Call the constructor and return the instance
         return cls
+
+    def delete_session_db(self):
+        """Delete the current session from the database"""
+        session_id = self.get_session_id()
+        all_entities = self.recurse_children(session_id)
+        for entity in all_entities:
+            try:
+                entity_model = EntityModel.objects.get(entity_id=entity.entity_id)
+                entity_model.delete()
+            except EntityModel.DoesNotExist:
+                pass
+
+        self.clear_all_entities()
+
+    def recurse_children(self, entity_id, entity_type = None):
+        """Recursively get all children of a specific type until no children are left."""
+        entity = self.load_from_db(entity_id)
+
+        entities = []
+
+        # Add the current entity if it matches the type
+        if entity_type and entity.entity_name == entity_type:
+            entities.append(entity)
+
+        # If there are no children, return the current entities
+        if not entity.children_ids:
+            return entities
+
+        # Recursively get children entities
+        for child_id in entity.children_ids:
+            child_entities = self.recurse_children(child_id, entity_type)
+            entities.extend(child_entities)
+
+        return entities
+
+
+

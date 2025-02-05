@@ -18,7 +18,7 @@ class Message:
             'type': self.type,
             'content': self.content
         }
-    
+
 
 class ConfigureApiModelStrategy(Strategy):
     entity_type = EntityEnum.API_MODEL

@@ -5,9 +5,8 @@ import pandas as pd
 
 from data_bundle_manager.entities.DataBundleEntity import DataBundleEntity
 from data_bundle_manager.entities.services.FeatureSetEntityService import FeatureSetEntityService
-from shared_utils.entities import StrategyRequestEntity
+from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.EnityEnum import EntityEnum
-from shared_utils.models import StrategyRequest
 from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, GetEntityStrategy
 
 

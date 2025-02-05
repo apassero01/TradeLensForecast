@@ -18,12 +18,6 @@ class SequenceSetEntity(Entity):
         self.sequences = None
 
 
-    def to_db(self):
-        raise NotImplementedError("Child classes must implement the 'to_db' method.")
-    @classmethod
-    def from_db(cls, data):
-        return SequenceSetAdapter.model_to_entity(data)
-
     @staticmethod
     def get_maximum_members():
         return {
@@ -33,11 +27,11 @@ class SequenceSetEntity(Entity):
     def serialize(self):
         sup_dict = super().serialize()
         sup_dict['meta_data'] = {
-            'ticker': self.get_attribute('metadata')['ticker'],
-            'start': self.get_attribute('start_timestamp'),
-            'sequence_length': self.get_attribute('sequence_length'),
-            'X_features': self.get_attribute('X_features'),
-            'y_features': self.get_attribute('y_features'),
+            'ticker': self.get_attribute('metadata')['ticker'] if self.has_attribute('metadata') else None,
+            'start': self.get_attribute('start_timestamp') if self.has_attribute('start_timestamp') else None,
+            'sequence_length': self.get_attribute('sequence_length') if self.has_attribute('sequence_length') else None,
+            'X_features': self.get_attribute('X_features') if self.has_attribute('X_features') else None,
+            'y_features': self.get_attribute('y_features') if self.has_attribute('y_features') else None,
         }
         return sup_dict
 

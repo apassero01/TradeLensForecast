@@ -6,13 +6,7 @@ class DataBundleEntity(Entity):
     entity_name = EntityEnum.DATA_BUNDLE
 
     def on_create(self, param_config: Optional[Dict[str, Any]] = None):
-        pass 
-
-    def to_db(self):
-        raise NotImplementedError("Child classes must implement the 'to_db' method.")
-    @classmethod
-    def from_db(cls, data):
-        raise NotImplementedError("Child classes must implement the 'from_db' method.")
+        pass
 
     def serialize(self):
         sup_dict = super().serialize()

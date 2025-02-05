@@ -13,7 +13,11 @@ const ErrorDisplay = ({ message, onClose }) => {
         </div>
         {onClose && (
           <button
-            onClick={onClose}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             className="ml-4 text-red-500 hover:text-red-700"
           >
             ×

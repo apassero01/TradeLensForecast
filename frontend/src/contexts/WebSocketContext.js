@@ -3,11 +3,12 @@ import useEntityWebSocket from '../hooks/useEntityWebSocket';
 
 const WebSocketContext = createContext(null);
 
-export function WebSocketProvider({ children, sessionStarted, onEntityUpdate, onError }) {
+export function WebSocketProvider({ children, sessionStarted, onEntityUpdate, currentEntities, onError }) {
   const webSocket = useEntityWebSocket({
     sessionStarted,
     onEntityUpdate,
     onError,
+    initialEntities: currentEntities,
   });
 
   const value = useMemo(() => webSocket, [webSocket]);
