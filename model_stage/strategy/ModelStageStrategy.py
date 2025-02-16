@@ -3,6 +3,7 @@ import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader, TensorDataset
 
+from model_stage.criterion_loss import MSLELoss
 from models.loss import MinOfNSequenceLoss
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.entities.Entity import Entity
@@ -397,6 +398,8 @@ class ConfigureModelStageStrategy(Strategy):
             return nn.MSELoss()
         if criterion_str == CriterionEnum.MIN_SEQ.value:
             return MinOfNSequenceLoss()
+        if criterion_str == CriterionEnum.EXP_MSE.value:
+            return MSLELoss()
         else:
             raise ValueError(f"Unsupported criterion: {criterion_str}")
         
