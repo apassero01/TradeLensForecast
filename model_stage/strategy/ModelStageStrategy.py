@@ -39,6 +39,8 @@ class CreateModelStrategy(ModelStageStrategy):
         model = Transformer(param_config)
         
         entity.set_attribute("model", model)
+        entity.set_attribute("train_loss", [])
+        entity.set_attribute("val_loss", [])
 
         return self.strategy_request
 
@@ -115,9 +117,16 @@ class FitModelStrategy(Strategy):
         model.to(device)
         print(next(model.parameters()).device)
 
+        if not entity.has_attribute('train_loss'):
+            entity.set_attribute('train_loss', [])
+        if not entity.has_attribute('val_loss'):
+            entity.set_attribute('val_loss', [])
+
         for epoch in range(epochs):
             train_loss = self._train_epoch(model, train_dataloader, criterion, optimizer, device, clip_value)
             val_loss = self._evaluate(model, val_dataloader, criterion, device)
+            entity.get_attribute('train_loss').append(train_loss)
+            entity.get_attribute('val_loss').append(val_loss)
             print(f"Epoch {epoch + 1} | Train Loss: {train_loss:.3f} | Val Loss: {val_loss:.3f}")
 
         entity.set_attribute('gradients', self.get_gradients_with_names(model))
@@ -153,7 +162,6 @@ class FitModelStrategy(Strategy):
             num_batches += 1
 
         return total_loss / num_batches if num_batches > 0 else 0.0
-
     def _evaluate(self, model, dataloader, criterion, device):
         model.eval()
         total_loss = 0.0
