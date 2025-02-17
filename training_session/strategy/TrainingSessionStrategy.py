@@ -54,16 +54,15 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
         self.verify_executable(session_entity, self.strategy_request)
         param_config = self.strategy_request.param_config
 
-        features = param_config['X_features'] + param_config['y_features']
+        X_features = param_config['X_features']
+        y_features = sorted(param_config["y_features"], key=lambda s: int(s.split('+')[1])) #NOTE very important only for y features does the order of the features matter because feature+1, feature+2, etc.
+        features = X_features + y_features
+
 
         nested_requests = self.strategy_request.get_nested_requests()
 
-        if len(nested_requests) == 0:
-            nested_requests = [self.create_sequence_set_requests(session_entity) for _ in param_config['model_set_configs']]
-            self.strategy_request.add_nested_requests(nested_requests)
-        else: 
-            if len(nested_requests) != len(param_config['model_set_configs']):
-                raise ValueError("Number of nested requests does not match number of model set configs")
+        nested_requests += [self.create_sequence_set_requests(session_entity) for _ in
+                            range(len(param_config['model_set_configs']) - len(nested_requests))]
 
         for i, param in enumerate(param_config['model_set_configs']):
             nested_request = nested_requests[i]
@@ -77,8 +76,8 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
             sequence_set.set_attribute('start_timestamp', param['start_timestamp'])
             sequence_set.set_attribute('sequences', [])
             sequence_set.set_attribute('metadata', param)
-            sequence_set.set_attribute('X_features', param_config['X_features'])
-            sequence_set.set_attribute('y_features', param_config['y_features'])
+            sequence_set.set_attribute('X_features', X_features)
+            sequence_set.set_attribute('y_features', y_features)
 
             param['features'] = features
 
@@ -89,8 +88,9 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                     for obj in data:
                         sequence_data = obj['sliced_data']
                         sequence_data_array = np.array(sequence_data)
+                        sequence_data = np.nan_to_num(sequence_data_array)
                         # Check if sequence_data contains NaN
-                        if not np.isnan(sequence_data_array).any():
+                        if not np.isnan(sequence_data).any():
                             sequence = Sequence(
                                 id=obj['id'],
                                 start_timestamp=obj['start_timestamp'],
@@ -99,6 +99,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                                 sequence_data=sequence_data
                             )
                             sequence_set.get_attribute('sequences').append(sequence)
+
 
                     # Only add sequence set if it has sequences
                     if sequence_set.get_attribute('sequences'):

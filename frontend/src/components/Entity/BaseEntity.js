@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import MetadataList from './MetadataList';
 import MetadataValue from './MetadataValue';
 import visualizationComponents from '../Visualization/visualizationComponents';
+import VisualizationErrorBoundary from './VisualizationErrorBoundary';
 
 function BaseEntity({ entityData }) {
   const handleContextMenu = (e, value) => {
@@ -27,9 +28,11 @@ function BaseEntity({ entityData }) {
         return null;
       }
       return (
-        <div className="w-full h-full p-4 relative z-10">
-          <VisualizationComponent visualization={visualization} />
-        </div>
+        <VisualizationErrorBoundary>
+          <div className="w-full h-full p-4 relative z-10">
+            <VisualizationComponent visualization={visualization} />
+          </div>
+        </VisualizationErrorBoundary>
       );
     }
 

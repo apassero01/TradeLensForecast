@@ -13,7 +13,7 @@ class ModelStageEntity(Entity):
                 # 'model': self.get_attribute("model").config if self.has_attribute("model") else None,
                 'optimizer': self.get_attribute("optimizer_name") if self.has_attribute("optimizer_name") else None,
                 'criterion': self.get_attribute("criterion_name") if self.has_attribute("criterion_name") else None,
-                'val_loss': self.get_attribute("val_loss") if self.has_attribute("val_loss") else None,
+                'val_loss': self.get_attribute("val_loss")if self.has_attribute("val_loss") else None,
             'predictions': self.get_attribute("predictions").shape if self.has_attribute("predictions") else None,
             'results': self.get_attribute("results").shape if self.has_attribute("results") else None,
         }

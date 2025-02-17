@@ -49,6 +49,24 @@ class TestStrategyRequestEntity(TestCase):
         self.assertIn(self.nested_request_2, nested_requests)
         self.assertNotIn(self.nested_request_1, nested_requests)
 
+    def test_add_nested_request_when_nested_request_already_exists(self):
+        """Test adding a nested request when it already exists should replace old request with the new request"""
+        # Create a new nested request
+        new_nested_request = StrategyRequestEntity(self.nested_request_1.entity_id)
+        new_nested_request.strategy_name = "Nested1NEW"
+        new_nested_request.param_config = {"nested_param1": "nested_value1"}
+
+        # Add the new nested request
+        self.strategy_entity.add_nested_request(new_nested_request)
+
+        # Verify the old nested request was replaced
+        nested_requests = self.strategy_entity.get_nested_requests()
+        self.assertEqual(len(nested_requests), 2)
+        self.assertIn(new_nested_request, nested_requests)
+        self.assertNotIn(self.nested_request_1, nested_requests)
+        self.assertEqual(nested_requests[1].strategy_name, "Nested1NEW")
+
+
     def test_serialize(self):
         """Test serialization of StrategyRequestEntity"""
         serialized = self.strategy_entity.serialize()

@@ -90,11 +90,18 @@ def api_save_session(request):
 
             children = deepcopy(session_entity.get_children())
             session_model = session_entity.to_db()
+            traversed_children = []
             while children:
                 child_id = children.pop()
-                child = entity_service.get_entity(child_id)
+                if child_id in traversed_children:
+                    continue
+                try:
+                    child  = entity_service.get_entity(child_id)
+                except Exception as e:
+                    continue
                 children.extend(child.get_children())
                 child.to_db()
+                traversed_children.append(child_id)
 
             
             return JsonResponse({
@@ -141,13 +148,20 @@ def api_load_session(request, session_id):
                 entity_service.save_entity(session_entity)
 
                 children = deepcopy(session_entity.get_children())
+                traversed_children = []
                 while children:
                     child_id = children.pop()
-                    child_model = EntityModel.objects.get(entity_id=child_id)
+                    if child_id in traversed_children:
+                        continue
+                    try:
+                        child_model = EntityModel.objects.get(entity_id=child_id)
+                    except EntityModel.DoesNotExist:
+                        continue
                     child_entity_class = child_model.class_path
                     child = create_instance_from_path(child_entity_class).from_db(child_model)
                     children.extend(child.get_children())
                     entity_service.save_entity(child)
+                    traversed_children.append(child_id)
 
             serialized = serialize_entity_and_children(entity_id)
             # Store in cache
@@ -383,13 +397,19 @@ def get_updated_entities(strat_request):
 
 def serialize_entity_and_children(entity_id, return_dict = None):
     entity_service = EntityService()
-    entity = entity_service.get_entity(entity_id)
+    try:
+        entity = entity_service.get_entity(entity_id)
+    except Exception as e:
+        return return_dict
     if not entity:
         return None
     entity_dict = entity.serialize()
     children = entity.get_children()
     if return_dict is None:
         return_dict = {}
+
+    if entity_id in return_dict:
+        return return_dict
     return_dict[entity_id] = entity_dict
 
     for child_id in children:

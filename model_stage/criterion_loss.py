@@ -225,8 +225,107 @@ def criterion_cauchy_loss(y_true, y_pred, gamma=1.0, penalty_weight=1.0):
 
 
 class MSLELoss(nn.Module):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, penalty_weight=1.0, reduction='mean'):
+        """
+        Mean Squared Logarithmic Error (MSLE) Loss.
+
+        Args:
+            penalty_weight (float): Weight to scale the loss.
+            reduction (str): 'mean', 'sum', or 'none' to specify the reduction method.
+        """
+        super(MSLELoss, self).__init__()
+        self.penalty_weight = penalty_weight
+        self.reduction = reduction
 
     def forward(self, preds, target):
-        return criterion_MSLE_loss(preds, target)
+        """
+        Args:
+            preds (torch.Tensor): Predicted values.
+            target (torch.Tensor): Ground truth values.
+
+        Returns:
+            torch.Tensor: The computed MSLE loss.
+        """
+        # Avoid log(0) by clamping to a small positive value.
+        preds = torch.clamp(preds, min=1e-7)
+        target = torch.clamp(target, min=1e-7)
+
+        # Compute squared logarithmic errors.
+        # Note: Using the same order as in your original function:
+        # loss = (log(target + 1) - log(preds + 1))^2
+        squared_log_errors = (torch.log(target + 1) - torch.log(preds + 1)) ** 2
+
+        # Apply reduction.
+        if self.reduction == 'mean':
+            loss = squared_log_errors.mean()
+        elif self.reduction == 'sum':
+            loss = squared_log_errors.sum()
+        else:
+            loss = squared_log_errors  # No reduction
+
+        return self.penalty_weight * loss
+
+class GuissLoss(nn.Module):
+    def __init__(self, threshold=0.5, penalty_weight=1.0, reduction='mean'):
+        """
+        Gaussian Uncertainty-Informed Scoring Loss (GuissLoss).
+
+        This loss computes the Gaussian negative log-likelihood assuming that the model
+        outputs a predicted mean and a log variance for each forecast step.
+        An additional penalty is added if the predicted variance is below a threshold,
+        to discourage overconfident (too low variance) predictions.
+
+        Args:
+            threshold (float): The minimum allowable variance. If predicted variance is below this,
+                               a penalty is added.
+            penalty_weight (float): Weight to scale the penalty term.
+            reduction (str): Specifies the reduction to apply to the output:
+                             'mean', 'sum', or 'none'.
+        """
+        super(GuissLoss, self).__init__()
+        self.threshold = threshold
+        self.penalty_weight = penalty_weight
+        self.reduction = reduction
+
+    def forward(self, outputs, y_true):
+        """
+        Args:
+            outputs (torch.Tensor): Model outputs of shape (batch_size, output_steps, 2).
+                                    outputs[:, :, 0] should be the predicted means (μ).
+                                    outputs[:, :, 1] should be the predicted log variances (log(σ²)).
+            y_true (torch.Tensor): True target values of shape (batch_size, output_steps, 1)
+                                   or (batch_size, output_steps).
+
+        Returns:
+            torch.Tensor: The computed loss.
+        """
+        # Extract predicted mean (mu) and log variance (log_var)
+        mu = outputs[:, :, 0]       # shape: (batch_size, output_steps)
+        log_var = outputs[:, :, 1]  # shape: (batch_size, output_steps)
+
+        # Ensure y_true is the same shape as mu
+        if y_true.dim() == 3 and y_true.size(-1) == 1:
+            y_true = y_true.squeeze(-1)  # shape: (batch_size, output_steps)
+
+        # Compute variance from log variance, with a small epsilon for numerical stability
+        sigma_sq = torch.exp(log_var) + 1e-6
+
+        # Compute the Gaussian negative log-likelihood
+        # Formula: 0.5 * log(2πσ²) + (y - μ)² / (2σ²)
+        nll = 0.5 * torch.log(2 * math.pi * sigma_sq) + ((y_true - mu) ** 2) / (2 * sigma_sq)
+
+        # Apply a penalty if the predicted variance is below the threshold.
+        # This can help discourage the model from being overconfident.
+        penalty_mask = (sigma_sq < self.threshold).float()
+        penalty_term = self.penalty_weight * penalty_mask * torch.clamp(self.threshold - sigma_sq, min=0)
+        nll = nll + penalty_term
+
+        # Apply the specified reduction
+        if self.reduction == 'mean':
+            loss = nll.mean()
+        elif self.reduction == 'sum':
+            loss = nll.sum()
+        else:
+            loss = nll  # no reduction
+
+        return loss

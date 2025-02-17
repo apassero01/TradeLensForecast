@@ -16,7 +16,7 @@ def custom_loss_with_zero_penalty(y_true, y_pred, penalty_weight=1.0):
 
 
 
-def gaussian_nll_loss(outputs, y_true, threshold = .5, penalty_factor = 1000):
+def gaussian_nll_loss(outputs, y_true, threshold = .5):
     """
     Computes the Gaussian negative log-likelihood loss.
 
@@ -49,10 +49,8 @@ def gaussian_nll_loss(outputs, y_true, threshold = .5, penalty_factor = 1000):
     # Step 5: Compute the mean loss over all elements
     loss = torch.mean(nll)
 
-    # if mu is close to zero, add a penalty term
-    penalty = torch.where(mu.abs() < threshold, penalty_factor, torch.zeros_like(mu))
 
-    return loss + penalty.mean()
+    return loss
 
 
 class MinOfNSequenceLoss(nn.Module):

@@ -191,18 +191,17 @@ function EntityGraphContent({
     }
   };
 
+  const fetchAvailableStrategies = async () => {
+    try {
+      const response = await entityApi.getStrategyRegistry();
+      console.log('Available strategies:', response);
+      setAvailableStrategies(response);
+    } catch (err) {
+      setError('Failed to fetch strategies: ' + err.message);
+    }
+  };
   // Fetch strategies once when component mounts
   useEffect(() => {
-    const fetchAvailableStrategies = async () => {
-      try {
-        const response = await entityApi.getStrategyRegistry();
-        console.log('Available strategies:', response);
-        setAvailableStrategies(response);
-      } catch (err) {
-        setError('Failed to fetch strategies: ' + err.message);
-      }
-    };
-
     fetchAvailableStrategies();
   }, []);
 
@@ -256,6 +255,7 @@ function EntityGraphContent({
                   onStrategyExecute={handleStrategyExecute}
                   onStrategyListExecute={handleStrategyListExecute}
                   availableStrategies={availableStrategies}
+                  getAvailableStrategies={fetchAvailableStrategies}
                 />
               )}
             </>

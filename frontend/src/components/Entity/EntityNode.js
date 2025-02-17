@@ -243,7 +243,7 @@ function EntityNode({ data }) {
         strategies={data.availableStrategies || {}}
         entityType={data.entity_type || 'entity'}
         onSelectStrategy={handleSelectStrategy}
-        onRefresh={data.fetchAvailableStrategies}
+        onRefresh={data.getAvailableStrategies}
       />
     </div>
   );

@@ -253,15 +253,13 @@ class SequenceSetService(ABC):
         new_data = df.iloc[start_idx_for_new:]
 
         # 4) Delete overlapping sequences
-        overlapping_start_date = df.index[start_idx_for_new]
-        overlapping_sequences = Sequence.objects.filter(
-            sequence_set=sequence_set,
-            start_timestamp__gte=overlapping_start_date
-        )
-        overlapping_sequences.delete()
+        new_sequences = cls.create_sequence_objects(sequence_set, new_data)
+        for sequence in new_sequences:
+            db_sequence = Sequence.objects.filter(sequence_set=sequence_set, start_timestamp=sequence.start_timestamp)
+            if db_sequence.exists():
+                db_sequence.delete()
 
         # 5) Create new sequences
-        new_sequences = cls.create_sequence_objects(sequence_set, new_data)
 
         SequenceSetService.save_sequence_set(sequence_set, new_sequences)
 

@@ -24,6 +24,11 @@ class StrategyRequestEntity(Entity):
         """Add a nested strategy request"""
         if not isinstance(request, StrategyRequestEntity):
             raise ValueError("Nested request must be a StrategyRequestEntity")
+
+        nested_request_ids = [nested.entity_id for nested in self._nested_requests]
+        if request.entity_id in nested_request_ids:
+            old_request = self._nested_requests[nested_request_ids.index(request.entity_id)]
+            self._nested_requests.remove(old_request)
         self._nested_requests.append(request)
 
     def add_nested_requests(self, requests: List['StrategyRequestEntity']):

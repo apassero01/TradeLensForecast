@@ -5,6 +5,7 @@ import pandas as pd
 
 from data_bundle_manager.entities.DataBundleEntity import DataBundleEntity
 from data_bundle_manager.entities.services.FeatureSetEntityService import FeatureSetEntityService
+from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, GetEntityStrategy
@@ -60,19 +61,37 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
 
     def apply(self, data_bundle):
         param_config = self.strategy_request.param_config
-        feature_sets = []
-        for config in param_config['feature_set_configs']:
-            strat_request = StrategyRequestEntity()
-            strat_request.strategy_name = CreateEntityStrategy.__name__
-            strat_request.target_entity_id = data_bundle.entity_id
-            strat_request.param_config['entity_class'] =  'data_bundle_manager.entities.FeatureSetEntity.FeatureSetEntity'
-            feature_set = self.executor_service.execute(data_bundle, strat_request).ret_val['child_entity']
+        feature_sets = self.get_child_feature_sets(len(param_config['feature_set_configs']), data_bundle)
+        if len(feature_sets) != len(param_config['feature_set_configs']):
+            raise ValueError("Number of feature sets created does not match number of feature set configs")
+
+        for feature_set, config in zip(feature_sets, param_config['feature_set_configs']):
             feature_set = self.feature_set_entity_service.create_feature_set(config, feature_set)
-            self.strategy_request.add_nested_request(strat_request)
-            feature_sets.append(feature_set)
+            feature_set.set_attribute('X_feature_dict', data_bundle.get_attribute('X_feature_dict'))
+            feature_set.set_attribute('y_feature_dict', data_bundle.get_attribute('y_feature_dict'))
             self.entity_service.save_entity(feature_set)
 
         return self.strategy_request
+
+    def get_child_feature_sets(self, num_feature_sets, data_bundle):
+        feature_sets = []
+        nested_requests = deepcopy(self.strategy_request.get_nested_requests())
+
+        if len(nested_requests) != num_feature_sets:
+            nested_requests = []
+            for i in range(num_feature_sets):
+                strat_request = StrategyRequestEntity()
+                strat_request.strategy_name = CreateEntityStrategy.__name__
+                strat_request.target_entity_id = data_bundle.entity_id
+                strat_request.param_config['entity_class'] =  'data_bundle_manager.entities.FeatureSetEntity.FeatureSetEntity'
+                nested_requests.append(strat_request)
+
+        for strat_request in nested_requests:
+            feature_set = self.executor_service.execute(data_bundle, strat_request).ret_val['child_entity']
+            feature_sets.append(feature_set)
+            self.strategy_request.add_nested_request(strat_request)
+
+        return feature_sets
 
 
     def verify_executable(self, entity, strategy_request):
@@ -138,18 +157,25 @@ class SplitBundleDateStrategy(DataBundleStrategy):
         date_list = data_bundle.get_attribute('seq_end_dates')
         date_list = [pd.to_datetime(date).tz_localize(None) for date in date_list]
 
-        if split_date not in date_list:
-            split_date = min(date_list, key=lambda x: abs(x - split_date))
+        X_train_list, X_test_list = [], []
+        y_train_list, y_test_list = [], []
+        train_row_ids, test_row_ids = [], []
 
-        if len(date_list) != len(X):
-            raise ValueError("Dates and X must be the same")
+        for i, date in enumerate(date_list):
+            if date > split_date:
+                X_test_list.append(X[i])
+                y_test_list.append(y[i])
+                test_row_ids.append(row_ids[i])
+            else:
+                X_train_list.append(X[i])
+                y_train_list.append(y[i])
+                train_row_ids.append(row_ids[i])
 
-        split_index = date_list.index(split_date)
-
-        X_train, X_test = X[:split_index], X[split_index:]
-        train_row_ids = row_ids[:split_index]
-        test_row_ids = row_ids[split_index:]
-        y_train, y_test = y[:split_index], y[split_index:]
+        # Convert lists to numpy arrays
+        X_train = np.array(X_train_list)
+        X_test = np.array(X_test_list)
+        y_train = np.array(y_train_list)
+        y_test = np.array(y_test_list)
 
         return X_train, X_test, y_train, y_test, train_row_ids, test_row_ids
 
@@ -320,6 +346,139 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
             'strategy_name': ScaleByFeatureSetsStrategy.__name__,
             'strategy_path': None,
             'param_config': {}
+        }
+
+class InverseScaleByFeatureSetsStrategy(Strategy):
+    name = "InverseScaleByFeatureSets"
+
+    def __init__(self, strategy_executor, strategy_request):
+        super().__init__(strategy_executor, strategy_request)
+
+    def apply(self, entity):
+        # Verify that the entity has the required target attribute.
+        self.verify_executable(entity, self.strategy_request)
+        param_config = self.strategy_request.param_config
+
+        # Get the name of the attribute that holds the array to inverse transform.
+        target_array_attribute = param_config.get("target_array_attribute")
+        # Optionally allow an output attribute name; otherwise default to "inversed_{target_array_attribute}".
+        output_attribute = param_config.get("output_attribute", f"inversed_{target_array_attribute}")
+
+        # Retrieve the array from the entity (assumed to be shape (batch, seq_length, 1)).
+        arr = entity.get_attribute(target_array_attribute)
+
+        # Retrieve feature sets from the children of the parent entity.
+        feature_set_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.FEATURE_SET)
+        feature_sets = [self.get_feature_set(fs_id) for fs_id in feature_set_ids]
+
+        if not feature_sets:
+            raise ValueError("No feature sets found.")
+
+        # Assume the y feature dictionary is stored in the first feature set.
+        y_feature_dict = feature_sets[0].get_attribute('y_feature_dict')
+
+        # Only consider y and Xy feature sets.
+        y_feature_sets = [fs for fs in feature_sets if fs.feature_set_type == 'y']
+        Xy_feature_sets = [fs for fs in feature_sets if fs.feature_set_type == 'Xy']
+
+        # Make a working copy of the array to apply inverse transformation.
+        inverse_transformed_array = np.copy(arr)
+
+        # Inverse transform for y feature sets.
+        if y_feature_sets:
+            self.inverse_scale_y_by_features(y_feature_sets, inverse_transformed_array, y_feature_dict)
+
+        # Inverse transform for Xy feature sets.
+        if Xy_feature_sets:
+            self.inverse_scale_Xy_by_features(Xy_feature_sets, inverse_transformed_array, y_feature_dict)
+
+        # Save the new, inverse-transformed array into the entity.
+        entity.set_attribute(output_attribute, inverse_transformed_array)
+
+        # Optionally, persist any changes to the feature set entities.
+        for fs in feature_sets:
+            self.entity_service.save_entity(fs)
+
+        return self.strategy_request
+
+    def inverse_scale_y_by_features(self, feature_sets, arr, feature_dict):
+        """
+        For each y feature set, extract the slice of the y array corresponding to the features (via the feature dict)
+        and perform the inverse transformation using the stored scaler.
+        Now the feature dimension is assumed to be along the second axis (i.e. arr has shape (batch, features, seq_length)).
+        """
+        for fs in feature_sets:
+            scaler = fs.scaler
+            # Get the feature indices from the y feature dictionary.
+            feature_indices = [feature_dict[feature] for feature in fs.feature_list if feature in feature_dict]
+            if not feature_indices:
+                continue
+            # Process along the second dimension (features).
+            slice_ = arr[:, feature_indices, :]  # Shape: (batch, num_features, seq_length)
+            # Apply inverse transformation (reshape if necessary depending on scaler's requirements).
+            inv_slice = scaler.inverse_transform(slice_)
+            # Replace the original slice with the inverse-transformed data.
+            arr[:, feature_indices, :] = inv_slice
+
+    def inverse_scale_Xy_by_features(self, feature_sets, arr, feature_dict):
+        """
+        For each Xy feature set, extract the corresponding slice from the y array and apply inverse transformation.
+        Because the forward transformation may have reshaped the data, we reshape to 2D, inverse transform, then reshape back.
+        Now we assume the feature dimension is along the second axis.
+        """
+        fs = feature_sets[0]  # Assume only one Xy feature set.
+        # for fs in feature_sets:
+        scaler = fs.scaler
+        # For y arrays, we use the y_feature_dict exclusively.
+        indices = [feature_dict[feature] for feature in fs.feature_list if feature in feature_dict]
+
+        # Extract the slice along the feature dimension.
+        slice_ = arr[:, indices, :]  # Expected shape: (batch, num_features, seq_length)
+        orig_shape = slice_.shape
+        # Reshape to 2D: (batch, num_features * seq_length)
+        slice_2d = slice_.reshape(slice_.shape[0], -1)
+        inv_slice_2d = scaler.inverse_transform(slice_2d)
+        # Reshape back to the original 3D shape.
+        inv_slice = inv_slice_2d.reshape(orig_shape)
+        # Update the working array.
+        arr[:, indices, :] = inv_slice
+
+    def verify_executable(self, entity, strategy_request):
+        """
+        Ensure that the entity contains the target array attribute.
+        """
+        param_config = strategy_request.param_config
+        target_attr = param_config.get("target_array_attribute")
+        if not target_attr:
+            raise ValueError("Parameter config must include 'target_array_attribute'.")
+        if not entity.has_attribute(target_attr):
+            raise ValueError(f"Missing {target_attr} in dataset.")
+
+    def get_feature_set(self, entity_id):
+        """
+        Retrieve a feature set entity using its entity id.
+        This implementation assumes you have a strategy (e.g., GetEntityStrategy) to do so.
+        """
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = GetEntityStrategy.__name__
+        strategy_request.target_entity_id = entity_id
+
+        strategy_request = self.executor_service.execute_request(strategy_request)
+        self.strategy_request.add_nested_request(strategy_request)
+
+        return strategy_request.ret_val['entity']
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'strategy_name': InverseScaleByFeatureSetsStrategy.__name__,
+            'strategy_path': None,
+            'param_config': {
+                # Default target array attribute (name of the attribute holding the scaled y array)
+                "target_array_attribute": "scaled_array",
+                # Default output attribute for the inverse-transformed array
+                "output_attribute": "inversed_scaled_array"
+            }
         }
 
 

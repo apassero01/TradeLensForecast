@@ -321,6 +321,8 @@ class MergeEntitiesStrategy(Strategy):
         ]
         combined_attributes = { attribute: None for attribute in all_attributes_list}
 
+        target_ids = [entity.entity_id] + target_ids
+
         for id in target_ids:
             strategy_request = self.create_get_attributes(id, all_attributes_list)
             strategy_request = self.executor_service.execute_request(strategy_request)
@@ -334,7 +336,10 @@ class MergeEntitiesStrategy(Strategy):
                             if combined_attributes[attribute] is None:
                                 combined_attributes[attribute] = strategy_request.ret_val[attribute]
                             else:
-                                combined_attributes[attribute] = np.concatenate((combined_attributes[attribute], strategy_request.ret_val[attribute]), axis=0)
+                                if isinstance(combined_attributes[attribute], np.ndarray):
+                                    combined_attributes[attribute] = np.concatenate((combined_attributes[attribute], strategy_request.ret_val[attribute]), axis=0)
+                                if isinstance(combined_attributes[attribute], list):
+                                    combined_attributes[attribute] = combined_attributes[attribute] + strategy_request.ret_val[attribute]
 
         for attribute, value in combined_attributes.items():
             entity.set_attribute(attribute, value)
@@ -601,7 +606,7 @@ class ExecuteCodeStrategy(Strategy):
             "strategy_name": "ExecuteCodeStrategy",
             "strategy_path": None,
             "param_config": {
-                "code": "result = entity.get_attribute('X') + entity.get_attribute('y')",
+                "code": "result = np.concatenate([entity.get_attribute('predictions') ,entity.get_attribute('y_test_scaled')],axis=-1)",
                 "result_attribute": "code_result"
             }
         }

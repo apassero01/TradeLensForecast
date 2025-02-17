@@ -38,6 +38,7 @@ export default function useEntityWebSocket({
       }
     }
   }, [onError]);
+  
 
   const sendMessageGlobal = useCallback((message) => {
     if (globalSocketRef.current?.readyState === WebSocket.OPEN) {

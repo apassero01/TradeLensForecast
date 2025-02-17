@@ -10,6 +10,7 @@ from data_bundle_manager.strategy.DataBundleStrategy import CreateFeatureSetsStr
     SplitBundleDateStrategy, ScaleByFeatureSetsStrategy, CombineDataBundlesStrategy
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.EnityEnum import EntityEnum
+from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 
 
@@ -17,6 +18,7 @@ class CreateFeatureSetsStrategyTestCase(TestCase):
     def setUp(self):
         # Mock strategy request with configuration
         self.strategy_request = StrategyRequestEntity()
+        self.entity_service = EntityService()
         self.strategy_request.param_config = {
             'feature_set_configs': [
                 {
@@ -46,13 +48,16 @@ class CreateFeatureSetsStrategyTestCase(TestCase):
             self.strategy_request
         )
         self.data_bundle = DataBundleEntity()
+        self.data_bundle.set_attribute("X_feature_dict", {'open': 0, 'high': 1})
+        self.data_bundle.set_attribute("y_feature_dict", {'close+1': 0})
 
     def test_apply_creates_feature_sets(self):
         # Apply the strategy
         self.create_feature_sets_strategy.apply(self.data_bundle)
 
         # Get the feature sets from the data bundle
-        feature_sets = self.data_bundle.get_children_by_type(EntityEnum.FEATURE_SET)
+        feature_set_ids = self.entity_service.get_children_ids_by_type(self.data_bundle, EntityEnum.FEATURE_SET)
+        feature_sets = [self.entity_service.get_entity(fs_id) for fs_id in feature_set_ids]
 
         # Verify the correct number of feature sets were created
         self.assertEqual(len(feature_sets), 2)
@@ -70,6 +75,19 @@ class CreateFeatureSetsStrategyTestCase(TestCase):
         self.assertEqual(feature_set_2.feature_list, ['close+1'])
         self.assertEqual(feature_set_2.feature_set_type, 'y')
         self.assertEqual(feature_set_2.do_fit_test, False)
+
+    def test_recreate_feature_sets_should_have_same_ids(self):
+        self.create_feature_sets_strategy.apply(self.data_bundle)
+
+        # Get the feature sets from the data bundle
+        feature_set_ids = self.entity_service.get_children_ids_by_type(self.data_bundle, EntityEnum.FEATURE_SET)
+
+        # Apply the strategy again
+        self.create_feature_sets_strategy.apply(self.data_bundle)
+        new_feature_set_ids = self.entity_service.get_children_ids_by_type(self.data_bundle, EntityEnum.FEATURE_SET)
+
+        # Verify that the feature set IDs are the same
+        self.assertListEqual(feature_set_ids, new_feature_set_ids)
 
     def test_verify_executable_raises_error_on_invalid_config(self):
         # Test missing `feature_set_configs`
@@ -130,7 +148,7 @@ class SplitBundleDateStrategyTestCase(TestCase):
 
         self.strategy_request = StrategyRequestEntity()
         self.strategy_request.param_config = {
-            'split_date': pd.Timestamp('2020-01-04'),
+            'split_date': pd.Timestamp('2020-01-03'),
         }
 
         self.data_bundle.set_attribute('seq_end_dates', self.dates)

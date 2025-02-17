@@ -16,6 +16,7 @@ class StrategyDirectory:
                 "shared_utils.strategy.BaseStrategy.RemoveChildStrategy",
                 "shared_utils.strategy.BaseStrategy.GetEntityStrategy",
                 "shared_utils.strategy.BaseStrategy.AddChildStrategy",
+                "data_bundle_manager.strategy.DataBundleStrategy.InverseScaleByFeatureSetsStrategy",
             ],
             EntityEnum.TRAINING_SESSION.value: [
                 "training_session.strategy.TrainingSessionStrategy.GetSequenceSetsStrategy",

@@ -51,14 +51,37 @@ const Line = ({ visualization }) => {
 
   // 5. Build the ApexCharts series with optional labeling & rounding
   const series = lines.map((lineObj) => {
+    // Decide whether or not to show the label based on the number of lines
     const label = showLabels ? lineObj.label : '';
-    const roundedValues = lineObj.values.map((val) =>
-      // Round each y-value to 2 decimal places
-      parseFloat(val.toFixed(2))
-    );
+
+    // 1. Convert each value to its absolute value
+    const absoluteValues = lineObj.values.map((val) => Math.abs(val));
+
+    // 2. Compute the mean for the current time series using absolute values
+    const mean =
+      absoluteValues.reduce((sum, val) => sum + val, 0) / absoluteValues.length;
+
+    // 3. Define thresholds:
+    //    - magnitudeThreshold: if the absolute difference between the mean and a value is at least 10% of the mean, treat it as an outlier.
+    //    - largeMagnitudeCutoff: perform replacement only if the mean is above this value.
+    const magnitudeThreshold = mean * 0.1; // Adjust this factor as needed
+    const largeMagnitudeCutoff = 100;       // Adjust this cutoff based on your data's scale
+
+    // 4. For each value:
+    //    - Round it to 2 decimals.
+    //    - If the mean is greater than our large magnitude cutoff and the absolute difference from the mean is at least the threshold,
+    //      then replace the value with the (rounded) mean.
+    const adjustedValues = absoluteValues.map((val) => {
+      let rounded = parseFloat(val.toFixed(2));
+      if (mean > largeMagnitudeCutoff && Math.abs(mean - rounded) >= magnitudeThreshold) {
+        rounded = parseFloat(mean.toFixed(2));
+      }
+      return rounded;
+    });
+
     return {
       name: label,
-      data: roundedValues,
+      data: adjustedValues,
     };
   });
 
@@ -78,6 +101,7 @@ const Line = ({ visualization }) => {
     colors: colorSet,
     xaxis: {
       categories: xAxisCategories,
+      tickAmount: 10, // Limits the number of tick marks on the x-axis
       labels: {
         rotate: -45,
         style: { colors: '#9E9E9E' },

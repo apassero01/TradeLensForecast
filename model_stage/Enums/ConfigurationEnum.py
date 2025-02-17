@@ -11,3 +11,4 @@ class CriterionEnum(Enum):
     CRITERION_MSE = "mse"
     MIN_SEQ = "min_seq"
     EXP_MSE = "exp_mse"
+    GUISS = "guiss"
