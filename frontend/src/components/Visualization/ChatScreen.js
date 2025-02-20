@@ -11,8 +11,8 @@ const ChatScreen = ({ visualization }) => {
   const [copiedMessageId, setCopiedMessageId] = useState(null);
 
   // 2) Check if we have data
-  const hasData = !!(visualization && visualization.data);
-  const messages = hasData ? visualization.data : [];
+  const hasData = !!(visualization && visualization.data && visualization.data.response);
+  const messages = hasData ? visualization.data.response : [];
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
