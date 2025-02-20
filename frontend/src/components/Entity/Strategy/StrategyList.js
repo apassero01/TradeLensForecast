@@ -14,6 +14,9 @@ const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
     strategy.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  console.log("filteredStrategies", filteredStrategies);
+  
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-none px-4 py-3 border-b border-gray-700">

@@ -255,7 +255,7 @@ function EntityGraphContent({
                   onStrategyExecute={handleStrategyExecute}
                   onStrategyListExecute={handleStrategyListExecute}
                   availableStrategies={availableStrategies}
-                  getAvailableStrategies={fetchAvailableStrategies}
+                  fetchAvailableStrategies={fetchAvailableStrategies}
                 />
               )}
             </>

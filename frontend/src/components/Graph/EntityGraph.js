@@ -7,7 +7,7 @@ import ReactFlow, {
   useEdgesState,
 } from 'reactflow';
 import EntityNode from '../Entity/EntityNode';
-
+import StrategyRequest from '../../utils/StrategyRequest';
 const nodeTypes = {
   entityNode: EntityNode
 };
@@ -26,7 +26,8 @@ const EntityGraph = React.memo(({
   onStrategyExecute,
   onStrategyListExecute,
   // This is newly passed from EntityGraphApp
-  availableStrategies
+  availableStrategies,
+  fetchAvailableStrategies
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -48,6 +49,21 @@ const EntityGraph = React.memo(({
       setEdges(initialEdges);
     }
   }, [initialNodes, initialEdges]);
+
+  const handleNodeDragStop = useCallback((event, node) => {
+    console.log('Node dragged:', node);
+    const strategyRequest = new StrategyRequest({
+      name: "SetAttributesStrategy",
+      config: {
+        attribute_map: {
+          "position": node.position
+        }
+      },
+      target_entity_id: node.id,
+      add_to_history: false,
+    })
+    onStrategyExecute(strategyRequest);
+  }, []);
 
   const handleNodesChange = useCallback((changes) => {
     const positionChanges = changes.filter(change => 
@@ -74,6 +90,7 @@ const EntityGraph = React.memo(({
         onStrategyListExecute,
         // ADDED:
         availableStrategies: availableStrategies,
+        getAvailableStrategies: fetchAvailableStrategies
       },
       style: {
         ...node.style,
@@ -101,6 +118,7 @@ const EntityGraph = React.memo(({
         deleteKeyCode={null}
         fitView
         defaultEdgeOptions={defaultEdgeOptions}
+        onNodeDragStop={handleNodeDragStop}
       >
         <Background />
         <Controls />

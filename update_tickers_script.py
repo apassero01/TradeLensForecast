@@ -16,7 +16,7 @@ from sequenceset_manager.services import StockSequenceSetService, SequenceSetSer
 #            "JPM", "BAC", "LLY", "NKE", "WMT", "PEP", 'M', 'KODK',
 #            'BA', 'DIS']
 # sequences_lengths = [10, 20, 50, 75]
-tickers = ["MSFT", "SPY", "QQQ", "TSLA"]
+tickers = ["SPY", "VST", "DAVE", "MSFT", "QQQ"]
 sequences_lengths = [20, 50]
 
 for ticker in tickers:

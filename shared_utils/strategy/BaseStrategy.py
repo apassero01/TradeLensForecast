@@ -222,6 +222,39 @@ class GetAttributesStrategy(Strategy):
         return {
             'attribute_names': []
         }
+
+class SetAttributesStrategy(Strategy):
+    """Generic strategy for setting attributes on an entity"""
+
+    strategy_description = 'Sets attributes on an entity'
+
+
+    def verify_executable(self, entity, strategy_request):
+        return 'attribute_map' in strategy_request.param_config
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        """
+        Sets attributes on an entity
+
+        param_config requirements:
+        - attribute_map: dict mapping attribute names to values
+        """
+        config = self.strategy_request.param_config
+        attribute_map = config.get('attribute_map', {})
+
+        # Set attributes
+        for name, value in attribute_map.items():
+            entity.set_attribute(name, value)
+
+        self.entity_service.save_entity(entity)
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'attribute_map': {"attribute_name": "attribute_value"}
+        }
     
 class AddChildStrategy(Strategy):
     """Generic strategy for adding a child entity to its parent"""

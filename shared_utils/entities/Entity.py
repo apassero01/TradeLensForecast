@@ -8,6 +8,7 @@ from django.db import models
 from shared_utils.entities.EntityModel import EntityModel
 class Entity():
     entity_name = EntityEnum.ENTITY
+    db_attributes = []
 
     def __init__(self, entity_id: Optional[str] = None):
         # Validate entity_id if provided
@@ -135,6 +136,7 @@ class Entity():
             'entity_type': self.entity_name.value,
             'child_ids': self.get_children(),
             'strategy_requests': [request.serialize() for request in self.strategy_requests],
+            'position': self.get_attribute('position') if self.has_attribute('position') else None,
         }
 
     def to_db(self, model=None):
@@ -206,8 +208,14 @@ class EntityAdapter:
             #         attributes[key] = value
             #     except (TypeError, ValueError):
             #         pass
+            if hasattr(entity, 'db_attributes'):
+                for key in entity.db_attributes:
+                    if entity.has_attribute(key):
+                        attributes[key] = entity.get_attribute(key)
 
             # Save the attributes to the model
+            if entity.has_attribute('position'):
+                attributes['position'] = entity.get_attribute('position')
             model.attributes = attributes
 
 

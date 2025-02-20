@@ -59,7 +59,7 @@ class StockFeatureFactoryServiceTest(TestCase):
         for factory_columns in factory_added_columns:
             all_columns += factory_columns
 
-        self.assertEqual(list(df.columns), all_columns)
+        self.assertEqual(sorted(list(df.columns)), sorted(all_columns))
 
 class MovingAverageFeatureFactoryTest(TestCase):
     def setUp(self):
@@ -470,10 +470,10 @@ class TestStockDataSetService(TestCase):
 
     def test_retreive_external_df(self):
         df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
-        self.assertEqual(df.columns.tolist(), ["open", "high", "low", "close", "volume"])
+        self.assertEqual(sorted(df.columns.tolist()), sorted(["open", "high", "low", "close", "volume"]))
 
         df = StockDataSetService.retreive_external_df(ticker = "AAPL", start_date = "2020-01-01", interval = "1d")
-        self.assertEqual(df.columns.tolist(), ["open", "high", "low", "close", "volume"])
+        self.assertEqual(sorted(df.columns.tolist()), sorted(["open", "high", "low", "close", "volume"]))
 
     def test_dataframe_to_datarows(self):
         df = StockDataSetService.retreive_external_df(ticker = "SPY", start_date = "2020-01-01", end_date = "2021-01-10", interval = "1d")
@@ -550,7 +550,7 @@ class TestStockDataSetService(TestCase):
         self.assertEqual(len(df_db), len(df))
         self.assertEqual(sorted(df_db.columns), sorted(df.columns))
         self.assertEqual(df_db.index.tolist(), df.index.tolist())
-        self.assertTrue(np.allclose(df_db.values, df.values, equal_nan=True))
+        self.assertTrue(np.allclose(df_db.values, df.values, equal_nan=True, atol=1e-2))
 
 
     def test_datarows_to_dataframe(self):

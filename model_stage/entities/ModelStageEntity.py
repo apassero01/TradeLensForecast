@@ -4,6 +4,7 @@ from typing import Optional
 
 class ModelStageEntity(Entity):
     entity_name = EntityEnum.MODEL_STAGE
+    db_attributes = ['model_path']
     def __init__(self, entity_id: Optional[str] = None):
         super().__init__(entity_id)
 

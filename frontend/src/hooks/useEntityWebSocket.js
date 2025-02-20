@@ -26,6 +26,7 @@ export default function useEntityWebSocket({
   // 2. Maintain a ref to store the previously subscribed entity IDs.
   const lastSubscribedEntityIdsRef = useRef([]);
 
+  
   const processMessageQueue = useCallback(() => {
     while (messageQueueRef.current.length > 0 && globalSocketRef.current?.readyState === WebSocket.OPEN) {
       const message = messageQueueRef.current.shift();

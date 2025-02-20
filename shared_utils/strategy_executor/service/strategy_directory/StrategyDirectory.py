@@ -16,6 +16,7 @@ class StrategyDirectory:
                 "shared_utils.strategy.BaseStrategy.RemoveChildStrategy",
                 "shared_utils.strategy.BaseStrategy.GetEntityStrategy",
                 "shared_utils.strategy.BaseStrategy.AddChildStrategy",
+                "shared_utils.strategy.BaseStrategy.SetAttributesStrategy",
                 "data_bundle_manager.strategy.DataBundleStrategy.InverseScaleByFeatureSetsStrategy",
             ],
             EntityEnum.TRAINING_SESSION.value: [
@@ -42,6 +43,8 @@ class StrategyDirectory:
                 "model_stage.strategy.ModelStageStrategy.EvaluateModelStrategy",
                 "model_stage.strategy.ModelStageStrategy.PredictModelStrategy",
                 "model_stage.strategy.ModelStageStrategy.ComparePredictionsStrategy",
+                "model_stage.strategy.ModelStageStrategy.SaveModelWeightsStrategy",
+                "model_stage.strategy.ModelStageStrategy.LoadModelWeightsStrategy",
             ],
             EntityEnum.DOCUMENT.value: [
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.ScrapeFilePathStrategy",

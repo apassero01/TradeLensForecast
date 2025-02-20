@@ -13,6 +13,7 @@ from model_stage.entities.ModelStageEntity import ModelStageEntity
 from shared_utils.entities.EnityEnum import EntityEnum
 from models.BuiltModels import Transformer
 from model_stage.Enums.ConfigurationEnum import CriterionEnum, OptimizerEnum
+from django.conf import settings
 
 class ModelStageStrategy(Strategy):
     entity_type = EntityEnum.MODEL_STAGE
@@ -475,4 +476,49 @@ class ComparePredictionsStrategy(ModelStageStrategy):
                 'predicted_attribute_name': 'predictions',
                 'actual_attribute_name': 'y_test_scaled'
             }
+        }
+
+class SaveModelWeightsStrategy(ModelStageStrategy):
+    """
+    Strategy that saves the weights of the model to a file.
+    """
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        if not entity.has_attribute('model'):
+            raise ValueError('Model not found in entity.')
+        if 'save_name' not in strategy_request.param_config:
+            raise ValueError('Save path not found in strategy request.')
+
+    def apply(self, entity: ModelStageEntity):
+        model = entity.get_attribute('model')
+        save_name = self.strategy_request.param_config['save_name']
+        save_path = f"{settings.BASE_DIR}/saved_models/{save_name}.pt"
+        torch.save(model.state_dict(), save_path)
+        entity.set_attribute('model_path', save_path)
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'save_name': "Model1"
+        }
+
+class LoadModelWeightsStrategy(ModelStageStrategy):
+    """
+    Strategy that loads the weights of the model from a file.
+    """
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        if not entity.has_attribute('model'):
+            raise ValueError('Model not found in entity.')
+        if not entity.has_attribute('model_path'):
+            raise ValueError('Load path not found in strategy request.')
+
+    def apply(self, entity: ModelStageEntity):
+        model = entity.get_attribute('model')
+        load_path = entity.get_attribute('model_path')
+        model.load_state_dict(torch.load(load_path))
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
         }

@@ -316,11 +316,10 @@ class StockDataSetService(DataSetService):
 
         df = pd.DataFrame()
         if end_date:
-            df = yf.download([ticker], start=start_date, end=end_date, interval=interval)
+            df = yf.download([ticker], start=start_date, end=end_date, interval=interval, multi_level_index=False)
         else:
-            df = yf.download([ticker], start=start_date, interval=interval)
+            df = yf.download([ticker], start=start_date, interval=interval, multi_level_index=False)
 
-        df = df.drop(columns="Adj Close")
         print(df.head())
         if df.index.tzinfo is None:
             df.index = pd.to_datetime(df.index).tz_localize('UTC')
