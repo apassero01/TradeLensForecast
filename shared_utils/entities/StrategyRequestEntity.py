@@ -19,7 +19,7 @@ class StrategyRequestEntity(Entity):
         self.ret_val = {}
         self.is_applied = False  # Flag to indicate if the strategy has been applied
         self.add_to_history = False  # Flag to indicate if the strategy should be added to the history
-        self.target_entity_id = None
+        self.target_entity_id = self.parent_ids[0] if self.parent_ids else None
     def add_nested_request(self, request: 'StrategyRequestEntity'):
         """Add a nested strategy request"""
         if not isinstance(request, StrategyRequestEntity):
@@ -53,16 +53,19 @@ class StrategyRequestEntity(Entity):
         return StrategyRequestAdapter.model_to_entity(data)
 
     def serialize(self):
-        return {
+
+        sup_dict = super().serialize()
+        sup_dict.update({
             'strategy_name': self.strategy_name,
             'param_config': self.param_config,
             'nested_requests': [nested_request.serialize() for nested_request in self._nested_requests],
-            # 'created_at': self.created_at,
-            # 'updated_at': self.updated_at,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
             'add_to_history': self.add_to_history,
             'entity_id': self.entity_id,
-            'target_entity_id': self.target_entity_id
-        }
+            'target_entity_id': self.parent_ids[0] if len(self.parent_ids) > 0 else None
+        })
+        return sup_dict
 
 
 class StrategyRequestAdapter:

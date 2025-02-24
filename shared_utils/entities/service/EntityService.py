@@ -38,16 +38,16 @@ class EntityService:
             self.clear_entity(entity.entity_id)
             return
         # Broadcast update
-        if not socket_exists:
-            # No socket exists, broadcast to global to establish connection
-            print(f"No socket exists for entity {entity.entity_id}, broadcasting to global")
-            self._broadcast_to_global_socket({
-                entity.entity_id: entity.serialize()
-            })
-        else:
+        # if not socket_exists:
+        # No socket exists, broadcast to global to establish connection
+        # print(f"No socket exists for entity {entity.entity_id}, broadcasting to global")
+        self._broadcast_to_global_socket({
+            entity.entity_id: entity.serialize()
+        })
+        # else:
             # Socket exists, send update through entity-specific socket
-            print(f"Socket exists for entity {entity.entity_id}, broadcasting to entity socket")
-            self._broadcast_to_entity_socket(entity)
+        print(f"Socket exists for entity {entity.entity_id}, broadcasting to entity socket")
+        self._broadcast_to_entity_socket(entity)
             
         print(f"Entity {entity.entity_id} saved and broadcast")
 

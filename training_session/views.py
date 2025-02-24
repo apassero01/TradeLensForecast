@@ -178,6 +178,26 @@ def api_load_session(request, session_id):
     else:
         return JsonResponse({'error': 'POST method required'}, status=400)
 
+@csrf_exempt
+def api_delete_session(request):
+    print('api_delete_session')
+    if request.method == 'POST':
+        entity_service = EntityService()
+        session_id = entity_service.get_session_id()
+        if not session_id:
+            return JsonResponse({'error': 'No session in progress'}, status=400)
+
+        try:
+            entity_service.delete_session()
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Session deleted successfully'
+            })
+        except Exception as e:
+            print(str(e))
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'POST method required'}, status=400)
 
 def create_instance_from_path(class_path, *args, **kwargs):
     """

@@ -52,7 +52,6 @@ class EntityApi {
       throw new Error(error.error || 'Failed to fetch saved sessions');
     }
     const data = await response.json();
-    console.log('Parsed response:', data);
     return data;
   }
 
@@ -66,6 +65,20 @@ class EntityApi {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to load session');
+    }
+    return response.json();
+  }
+
+  async deleteSession(sessionId){
+    const response = await fetch(`${API_BASE_URL}/training_session/api/delete_session/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete session');
     }
     return response.json();
   }
