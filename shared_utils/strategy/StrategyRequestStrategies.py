@@ -3,8 +3,7 @@ from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
-import numpy as np
-from shared_utils.entities.InputEntity import InputEntity
+from shared_utils.entities.input_entity.InputEntity import InputEntity
 from shared_utils.strategy.BaseStrategy import GetAttributesStrategy
 
 

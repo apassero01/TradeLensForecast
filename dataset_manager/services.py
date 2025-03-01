@@ -221,17 +221,19 @@ class DataSetService(ABC):
         Update the most recent data in the database
         '''
         last_data_point = DataRow.objects.filter(dataset=dataset).order_by('-timestamp').first()
+        first_data_point = DataRow.objects.filter(dataset=dataset).order_by('timestamp').first()
         try:
             # add start_timestamp to meta_data with key 'start_date'
 
-            new_data = cls.retreive_external_df(start_date = last_data_point.timestamp, **dataset.metadata)
+            new_data = cls.retreive_external_df(start_date = first_data_point.timestamp, **dataset.metadata)
         except Exception as e:
             print(f"Error fetching data for {dataset.dataset_type}: {e}")
             return
 
-        historical_df = DataSetService.datarows_to_dataframe(dataset)
-
-        combined_df = pd.concat([historical_df[:-1][new_data.columns], new_data])
+        # historical_df = DataSetService.datarows_to_dataframe(dataset)
+        #
+        # combined_df = pd.concat([historical_df[:-1][new_data.columns], new_data])
+        combined_df = new_data
 
         df = cls.get_feature_factory_service().apply_feature_factories(combined_df)
         dataset.end_timestamp = df.index[-1]

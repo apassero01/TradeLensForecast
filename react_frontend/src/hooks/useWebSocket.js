@@ -92,7 +92,7 @@ export function useWebSocket() {
                 newWs.close(1000, 'Component unmounting');
             }
         };
-    }, [isActive, ws?.readyState]); // Only depend on connection state changes
+    }, [isActive]); // Only depend on connection state changes
 
     const sendStrategyRequest = (strategyRequest) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) {

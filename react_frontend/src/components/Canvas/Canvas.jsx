@@ -1,11 +1,13 @@
 // src/components/Canvas/Canvas.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { ReactFlow, Background, BackgroundVariant } from '@xyflow/react';
 import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { flowNodesSelector, flowEdgesSelector } from '../../state/entitiesSelectors';
 import { entityFamily } from '../../state/entityFamily';
-import EntityNode from './EntityNode';
-import StrategyRequestEntity from './StrategyRequestEntity';
+import EntityNode from './Entity/EntityNode';
+import StrategyRequestEntity from './Entity/StrategyRequestEntity';
+import InputEntity from './Entity/InputEntity';
+import VisualizationEntity from './Entity/VisualizationEntity/VisualizationEntity';
 import '@xyflow/react/dist/style.css';
 
 function Canvas() {
@@ -99,7 +101,9 @@ function Canvas() {
         edges={edges}
         nodeTypes={{ 
           entityNode: EntityNode, 
-          strategyRequestEntity: StrategyRequestEntity 
+          strategyRequestEntity: StrategyRequestEntity,
+          inputEntity: InputEntity,
+          visualizationEntity: VisualizationEntity
         }}
         onNodesChange={onNodesChange}
         fitView

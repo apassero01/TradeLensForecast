@@ -38,6 +38,7 @@ export const useSession = () => {
             await entityApi.stopSession();
             resetSession();
             clearEntities();
+            fetchSavedSessions();
         } catch (error) {
             setSession(prev => ({ ...prev, isLoading: false, error: error.message}));
         }

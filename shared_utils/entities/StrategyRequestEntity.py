@@ -59,11 +59,9 @@ class StrategyRequestEntity(Entity):
             'strategy_name': self.strategy_name,
             'param_config': self.param_config,
             'nested_requests': [nested_request.serialize() for nested_request in self._nested_requests],
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
             'add_to_history': self.add_to_history,
             'entity_id': self.entity_id,
-            'target_entity_id': self.parent_ids[0] if len(self.parent_ids) > 0 else None
+            'target_entity_id': self.parent_ids[0] if len(self.parent_ids) > 0 else self.target_entity_id
         })
         return sup_dict
 

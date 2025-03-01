@@ -135,6 +135,7 @@ class Entity():
             'entity_id': self.entity_id,
             'entity_type': self.entity_name.value,
             'child_ids': self.get_children(),
+            'parent_ids': self.get_parents(),
             'strategy_requests': [request.serialize() for request in self.strategy_requests],
             'position': self.get_attribute('position') if self.has_attribute('position') else None,
         }

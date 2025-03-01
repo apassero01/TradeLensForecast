@@ -141,8 +141,6 @@ const Editor = ({ visualization, onChange }) => {
             useSoftTabs: true,
             showPrintMargin: false,
             highlightActiveLine: false,
-            enableBasicAutocompletion: false,
-            enableLiveAutocompletion: false,
             useWorker: true,
           }}
           className="w-full h-full"
