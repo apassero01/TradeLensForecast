@@ -3,15 +3,29 @@ import { entityIdsAtom } from './entityIdsAtom';
 import { entityFamily } from './entityFamily';
 import { EntityTypes, NodeTypes } from '../components/Canvas/Entity/EntityEnum';
 import { selectorFamily } from 'recoil';
+
+const entityCache = new Map();
+
 export const flowNodesSelector = selector({
   key: 'flowNodesSelector',
   get: ({ get }) => {
     const entityIds = get(entityIdsAtom);
+    // Using a simple cache
 
     return entityIds.map(id => {
       const entity = get(entityFamily(id));
-      let nodeType;
+      const cached = entityCache.get(id);
+      // Shallow compare stable properties (ignoring transient ones)
+      if (cached) {
+        const { position, width, height, ...stableEntity } = entity;
+        const { position: cachedPosition, width: cachedWidth, height: cachedHeight, ...cachedStable } = cached;
+        if (JSON.stringify(cachedStable) === JSON.stringify(stableEntity)) {
+          return cached;
+        }
+      }
 
+      console.log('COMPUTING NODE SELECTOR FOR ENTITY', entity.entity_type)
+      let nodeType;
       switch (entity.entity_type) {
         case EntityTypes.STRATEGY_REQUEST:
           nodeType = NodeTypes.STRATEGY_REQUEST_ENTITY;
@@ -25,8 +39,7 @@ export const flowNodesSelector = selector({
         default:
           nodeType = NodeTypes.ENTITY_NODE;
       }
-
-      return {
+      const nodeData = {
         id,
         type: nodeType,
         position: entity.position || { x: 0, y: 0 },
@@ -36,6 +49,8 @@ export const flowNodesSelector = selector({
         },
         hidden: entity.hidden || false,
       };
+      entityCache.set(id, nodeData);
+      return nodeData;
     });
   },
 });
@@ -81,5 +96,16 @@ export const flowNodesSelector = selector({
       // 3. Filter for the ones that are strategy requests
       //    (Adjust this check to match your actual type, e.g. 'STRATEGY_REQUEST')
       return children.filter((child) => child.entity_type === EntityTypes.STRATEGY_REQUEST);
+    },
+  });
+
+
+  export const nonTransientEntitySelector = selectorFamily({
+    key: 'nonTransientEntitySelector',
+    get: (entityId) => ({ get }) => {
+      const entity = get(entityFamily(entityId));
+      // Destructure to remove transient properties
+      const { position, width, height, ...stableData } = entity;
+      return stableData;
     },
   });

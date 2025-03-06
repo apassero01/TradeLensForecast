@@ -6,13 +6,16 @@ import MultiStockChart from "./MultiStockChart";
 import MultiLine from "./MultiLine";
 import Editor from '../../../../Input/Editor';
 import ChatScreen from './ChatScreen';
+import PhotoDisplay from './PhotoDisplay';
+
 const visualizationComponents = {
   histogram: Histogram,
   linegraph: Line,
   stockchart: MultiStockChart,
   multiline: MultiLine,
   editor: Editor,
-  chat: ChatScreen
+  chat: ChatScreen,
+  photo: PhotoDisplay
 };
 
 export default visualizationComponents;

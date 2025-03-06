@@ -7,3 +7,4 @@ class VisualizationTypeEnum(Enum):
     MULTILINE = 'multiline'
     EDITOR = 'editor'
     CHAT = 'chat'
+    PHOTO = 'photo'

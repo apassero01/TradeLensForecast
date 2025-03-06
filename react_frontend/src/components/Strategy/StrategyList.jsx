@@ -6,15 +6,16 @@ const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
   const [selectedStrategy, setSelectedStrategy] = useState(null);
   const listRef = useRef(null);
 
-  // Get entity-specific and generic strategies
-  const entityTypeKey = entityType?.toLowerCase();
-  const genericStrategies = strategies['entity'] || [];
-  const entityStrategies = entityTypeKey ? (strategies[entityTypeKey] || []) : [];
-  const allStrategies = [...genericStrategies, ...entityStrategies];
+  // Get all strategies from all keys
+  // const entityStrategies = Object.values(strategies).flat().filter(strategy => 
+  //   strategy && Array.isArray(strategy)
+  // ).flat();
+    
+  const allStrategies = [...strategies];
 
   // Filter strategies based on search term
   const filteredStrategies = allStrategies.filter(strategy => 
-    strategy.name.toLowerCase().includes(searchTerm.toLowerCase())
+     strategy && strategy.name && strategy.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleStrategySelect = (strategy) => {

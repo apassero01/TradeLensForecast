@@ -8,15 +8,15 @@ import RecoilizeDebugger from 'recoilize';
 function App() {
   return (
     <RecoilRoot>
-
-      <div className="min-h-screen bg-gray-900">
-        <TopBar />
-        <div className="flex flex-col items-center justify-center h-screen">
+      <div className="flex flex-col h-screen overflow-hidden bg-gray-900">
+        <div className="w-full">
+          <TopBar />
+        </div>
+        <div className="flex-1 overflow-hidden">
           <Canvas />
         </div>
-          <Notification />
-        </div>
-        {/* <RecoilizeDebugger /> */}
+        <Notification />
+      </div>
     </RecoilRoot>
   );
 }

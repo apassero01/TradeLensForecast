@@ -89,7 +89,11 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
 
     def json_to_strategy_request(self, json_data):
         if 'entity_id' in json_data:
-            strat_request = StrategyRequestEntity(json_data['entity_id'])
+            try:
+                strat_request = entity_service.get_entity(json_data['entity_id'])
+            except Exception as e:
+                print(f"Error getting entity {json_data['entity_id']}: {str(e)}")
+                strat_request = StrategyRequestEntity(json_data['entity_id'])
         else:
             strat_request = StrategyRequestEntity()
 
@@ -97,7 +101,6 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
         strat_request.param_config = json_data['param_config']
         strat_request.add_to_history = json_data['add_to_history']
         strat_request.target_entity_id = json_data['target_entity_id']
-        strat_request.add_to_history = json_data['add_to_history']
 
         nested_requests = json_data['nested_requests']
         for nested_request in nested_requests:

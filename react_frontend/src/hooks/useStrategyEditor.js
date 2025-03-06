@@ -15,6 +15,7 @@ export function useStrategyEditor(existingRequest) {
       // target_entity_id might already be set in existingRequest if needed
       add_to_history: false,
       nested_requests: [],
+      entity_id: '',
     };
   });
 
@@ -26,6 +27,7 @@ export function useStrategyEditor(existingRequest) {
         setRequestObj((prev) => ({
           ...prev,
           param_config: { ...example },
+          entity_id: existingRequest.entity_id,
         }));
       }
     }

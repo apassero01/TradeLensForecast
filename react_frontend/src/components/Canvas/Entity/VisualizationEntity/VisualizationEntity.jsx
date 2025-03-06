@@ -1,8 +1,11 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import EntityNodeBase from '../EntityNodeBase';
 import visualizationComponents from './Visualization/visualizationComponents';
+import { useRecoilValue } from 'recoil';
 
-function VisualizationEntity({ data }) {
+function VisualizationEntity({ data, sendStrategyRequest }) {
+    
+
     const VisualizationComponent = data.visualization?.type 
         ? visualizationComponents[data.visualization.type]
         : null;
@@ -12,10 +15,14 @@ function VisualizationEntity({ data }) {
             data={data}
         >
             {({ entity }) => (
-        <div className="flex-grow h-full w-full my-4 -mx-6 overflow-hidden">
-          <div className="h-full w-full px-6 overflow-hidden">
+                <div className="flex-grow h-full w-full my-4 -mx-6 overflow-hidden">
+                    <div className="h-full w-full px-6 overflow-hidden">
                         {VisualizationComponent ? (
-                            <VisualizationComponent visualization={data.visualization} />
+                            <VisualizationComponent 
+                                visualization={data.visualization} 
+                                sendStrategyRequest={sendStrategyRequest}
+                                entityId={data.entityId}
+                            />
                         ) : (
                             <div className="text-gray-400 text-sm">No visualization available</div>
                         )}

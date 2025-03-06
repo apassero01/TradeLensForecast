@@ -1,59 +1,68 @@
 // src/components/Canvas/EntityNodeBase.jsx
-import React, { useState, useCallback, useEffect } from 'react';
-import { useRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { entityFamily } from '../../../state/entityFamily';
 import { NodeResizeControl, Handle, Position } from '@xyflow/react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { strategyRequestChildrenSelector } from '../../../state/entitiesSelectors';
-import { EntityTypes } from './EntityEnum';
+import { strategyRequestChildrenSelector, nonTransientEntitySelector } from '../../../state/entitiesSelectors';
+import StrategyRequestList from '../../Strategy/StrategyRequestList';
+import { FaPlus } from 'react-icons/fa';
 
-const NodeContent = React.memo(
-    ({ localEntity, updateLocalField, handleCreateChild, children }) => {
-      return (
-        <div className="h-full w-full">
-          {children({ entity: localEntity, updateLocalField, handleCreateChild })}
-        </div>
-      );
-    },
-    (prevProps, nextProps) => {
-      // Ignore position and size changes, but re-render for all other changes
-      const prevEntityWithoutPosition = { ...prevProps.localEntity };
-      const nextEntityWithoutPosition = { ...nextProps.localEntity };
-      
-      // Remove position and size properties that change during drag/resize
-      delete prevEntityWithoutPosition.position;
-      delete nextEntityWithoutPosition.position;
-      delete prevEntityWithoutPosition.width;
-      delete nextEntityWithoutPosition.width;
-      delete prevEntityWithoutPosition.height;
-      delete nextEntityWithoutPosition.height;
+// Memoized content for the node, ignoring transient properties
+const MemoizedNodeContent = React.memo(
+  ({ entity, updateLocalField, handleCreateChild, updateEntity, sendStrategyRequest, children }) => {
+    return (
+      <div className="h-full w-full">
+        {children({
+          entity,
+          updateLocalField,
+          handleCreateChild,
+          updateEntity,
+          sendStrategyRequest,
+        })}
+      </div>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Create shallow copies to remove transient properties (if any)
+    const prevEntity = { ...prevProps.entity };
+    const nextEntity = { ...nextProps.entity };
 
-      const sameEntity = JSON.stringify(prevEntityWithoutPosition) === JSON.stringify(nextEntityWithoutPosition);
-      const sameUpdateLocalField = prevProps.updateLocalField === nextProps.updateLocalField;
-      const sameHandleCreateChild = prevProps.handleCreateChild === nextProps.handleCreateChild;
-      
-      // Deep compare the remaining properties
-      return sameEntity &&
-        sameUpdateLocalField &&
-        sameHandleCreateChild;
-    }
-  );
+    const sameEntity = JSON.stringify(prevEntity) === JSON.stringify(nextEntity);
+    const sameUpdateLocalField = prevProps.updateLocalField === nextProps.updateLocalField;
+    const sameHandleCreateChild = prevProps.handleCreateChild === nextProps.handleCreateChild;
+
+    return sameEntity && sameUpdateLocalField && sameHandleCreateChild;
+  }
+);
+
+// Memoize the StrategyRequestList separately so that it only re-renders when its props change.
+const MemoizedStrategyRequestList = React.memo(StrategyRequestList);
 
 function EntityNodeBase({ data, children }) {
-  // Get the global entity from Recoil (this state is read-only here)
-  const [entity] = useRecoilState(entityFamily(data.entityId));
+  // Subscribe only to the stable (non-transient) properties of the entity
+  const stableEntity = useRecoilValue(nonTransientEntitySelector(data.entityId));
   const { sendStrategyRequest } = useWebSocket();
-  // Initialize local state from the global entity only once
-  const [localEntity, setLocalEntity] = useState(entity);
 
-  // Memoize the updater so its identity stays the same between renders
+  // console.log('stableEntity', stableEntity);
+
+  // Separate visual state for transient properties (position, width, height)
+  const [visualState, setVisualState] = useState({
+    width: stableEntity.width || 200,
+    height: stableEntity.height || 100,
+  });
+
+  // Keep local state for the stable data if needed; here we directly use stableEntity
+
+  // Memoize updater for visual state changes
   const updateLocalField = useCallback((field, value) => {
-    setLocalEntity(prev => ({
+    setVisualState((prev) => ({
       ...prev,
       [field]: value,
     }));
   }, []);
 
+  // Callback to update an entity atom (or its child)
   const updateEntity = useRecoilCallback(({ set }) => (childId, updatedFields) => {
     set(entityFamily(childId), (prev) => ({
       ...prev,
@@ -62,32 +71,20 @@ function EntityNodeBase({ data, children }) {
     console.log('Updated entity:', childId, updatedFields);
   }, []);
 
+  // Get the strategy request children from recoil
   const strategyRequestChildren = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
 
-  // Update localEntity when the global entity changes
-  useEffect(() => {
-    setLocalEntity(entity);
-  }, [entity]);
-
-  // Use a ref to track if we've already processed these children
-  const processedChildrenRef = React.useRef({});
-  
-  // Update with proper dependency array to re-run when children change
+  // Process strategy request children only once per child using a ref
+  const processedChildrenRef = useRef({});
   useEffect(() => {
     if (strategyRequestChildren.length > 0) {
-      // Create a batch of updates to avoid multiple re-renders
       const updatesToMake = [];
-      
       strategyRequestChildren.forEach((child) => {
-        // Only update children we haven't processed yet
         if (!processedChildrenRef.current[child.entity_id]) {
           updatesToMake.push(child);
-          // Mark this child as processed
           processedChildrenRef.current[child.entity_id] = true;
         }
       });
-      
-      // If we have new updates to make, do them all at once
       if (updatesToMake.length > 0) {
         updatesToMake.forEach((child) => {
           updateEntity(child.entity_id, {
@@ -99,7 +96,7 @@ function EntityNodeBase({ data, children }) {
     }
   }, [strategyRequestChildren, updateEntity]);
 
-  // Memoize handleCreateChild as well
+  // Memoized callback for creating a child strategy request
   const handleCreateChild = useCallback(() => {
     const request = {
       strategy_name: 'CreateEntityStrategy',
@@ -107,14 +104,24 @@ function EntityNodeBase({ data, children }) {
       param_config: {
         entity_class: 'shared_utils.entities.StrategyRequestEntity.StrategyRequestEntity',
       },
-      add_to_history: true,
+      add_to_history: false,
       nested_requests: [],
     };
     sendStrategyRequest(request);
   }, [data.entityId, sendStrategyRequest]);
 
-  // Use the size from the global entity for layout
-  const { width = 200, height = 100 } = entity;
+  // Memoized callback for removing a child
+  const handleRemoveChild = useCallback((child_id) => {
+    sendStrategyRequest({
+      strategy_name: 'RemoveChildStrategy',
+      target_entity_id: data.entityId,
+      param_config: { child_id },
+      add_to_history: false,
+      nested_requests: [],
+    });
+  }, [data.entityId, sendStrategyRequest]);
+
+  const { width, height } = visualState;
 
   return (
     <div
@@ -126,7 +133,7 @@ function EntityNodeBase({ data, children }) {
         border: '1px solid #374151',
         borderRadius: 4,
         color: 'white',
-        overflow: 'hidden',
+        overflow: 'visible', // Allow overflow for the strategy list
       }}
     >
       <NodeResizeControl minWidth={100} minHeight={50}>
@@ -135,33 +142,80 @@ function EntityNodeBase({ data, children }) {
 
       <Handle type="target" position={Position.Top} />
 
-      {/* The container for node content is wrapped in our memoized NodeContent.
-          This prevents the text input from re-rendering on every node position update. */}
-      <div className="flex-grow h-full w-full p-4 m-4 flex items-center justify-center">
-        <NodeContent
-          localEntity={localEntity}
+      {/* Use memoized node content for stable data */}
+      <div
+        className="flex-grow h-full w-full p-4 flex items-center justify-center"
+        style={{ paddingBottom: strategyRequestChildren.length > 0 ? '40px' : '4px' }}
+      >
+        <MemoizedNodeContent
+          entity={stableEntity}
           updateLocalField={updateLocalField}
           handleCreateChild={handleCreateChild}
+          updateEntity={updateEntity}
+          sendStrategyRequest={sendStrategyRequest}
         >
           {children}
-        </NodeContent>
+        </MemoizedNodeContent>
       </div>
 
+      {/* Create Strategy Button */}
+      <button
+        onClick={handleCreateChild}
+        style={{
+          position: 'absolute',
+          bottom: '8px',
+          right: '8px',
+          backgroundColor: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          padding: '4px 8px',
+          display: 'flex',
+          alignItems: 'center',
+          fontSize: '12px',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+        title="Create Strategy Request"
+      >
+        <FaPlus size={10} style={{ marginRight: '4px' }} />
+      </button>
+
       <Handle type="source" position={Position.Bottom} />
+
+      {/* Memoized Strategy Request List positioned to the right */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: '100%',
+          height: '100%',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <MemoizedStrategyRequestList
+          childrenRequests={strategyRequestChildren}
+          updateEntity={updateEntity}
+          sendStrategyRequest={sendStrategyRequest}
+          onRemoveRequest={handleRemoveChild}
+        />
+      </div>
     </div>
   );
 }
 
 function ResizeIcon() {
   return (
-    <div 
-      style={{ 
-        position: 'absolute', 
-        right: 5, 
+    <div
+      style={{
+        position: 'absolute',
+        right: 5,
         bottom: 5,
         padding: '2px',
-        backgroundColor: '#1f2937', // Dark gray background
-        border: '1px solid #4b5563', // Gray border
+        backgroundColor: '#1f2937',
+        border: '1px solid #4b5563',
         borderRadius: '4px',
       }}
     >
@@ -171,7 +225,7 @@ function ResizeIcon() {
         height="20"
         viewBox="0 0 24 24"
         strokeWidth="2"
-        stroke="#9ca3af" // Gray color
+        stroke="#9ca3af"
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -186,4 +240,4 @@ function ResizeIcon() {
   );
 }
 
-export default EntityNodeBase;
+export default React.memo(EntityNodeBase);

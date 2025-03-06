@@ -1,10 +1,11 @@
 // src/components/StrategyEditor.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStrategyEditor } from '../../hooks/useStrategyEditor';
 import StrategyList from './StrategyList';
 import EntitySelector from './RequestEditorComponents/EntitySelector';
 import Editor from '../Input/Editor';
 // Possibly import other custom forms if you have them
+import { entityApi } from '../../api/entityApi';
 
 function StrategyEditor({ existingRequest, entityType }) {
   const {
@@ -18,37 +19,78 @@ function StrategyEditor({ existingRequest, entityType }) {
 
   const { strategy_name, param_config } = requestObj;
 
+  const [localRegistry, setLocalRegistry] = useState([registry]);
+
+  // Use a separate state for editor content
+  const [editorContent, setEditorContent] = useState(
+    JSON.stringify(requestObj, null, 2)
+  );
+
+  useEffect(() => {
+    handleRefresh();
+  }, []);
+
+  // Add a useEffect to update editorContent when requestObj changes
+  useEffect(() => {
+    setEditorContent(JSON.stringify(requestObj, null, 2));
+  }, [requestObj]);
+
   // 1. When the user picks a strategy from StrategyList
   function handleStrategySelect(selectedStrat) {
-    setRequestObj((prev) => ({
-      ...prev,
+    console.log(selectedStrat);
+    
+    // Create the updated request object
+    const updatedRequest = {
+      ...requestObj,
       strategy_name: selectedStrat.name,
-    }));
+      param_config: selectedStrat.config ? selectedStrat.config : {},
+    };
+    
+    // Update the request object state
+    setRequestObj(updatedRequest);
+    
+    // Update the editor content to match
+    setEditorContent(JSON.stringify(updatedRequest, null, 2));
   }
 
   // 2. If this is "CreateEntityStrategy," we show EntitySelector
   //    and store the selected entity_class in param_config.entity_class
   function handleEntityClassSelect(selected) {
-    // Suppose selected = { entity_class: 'MyCustomClass', ... }
-    setRequestObj((prev) => ({
-      ...prev,
+    // Create the updated request object with the selected entity_class
+    const updatedRequest = {
+      ...requestObj,
       param_config: {
-        ...prev.param_config,
+        ...requestObj.param_config,
         entity_class: selected.entity_class,
       },
-    }));
+    };
+    
+    // Update both states
+    setRequestObj(updatedRequest);
+    setEditorContent(JSON.stringify(updatedRequest, null, 2));
   }
 
   // 3. For param_config editing, we can show a JSON Editor or custom forms
-  function handleParamConfigChange(newJson) {
+  function handleTextChange(newText) {
+    setEditorContent(newText);
+    
     try {
-      const parsed = JSON.parse(newJson);
-      setRequestObj((prev) => ({
-        ...prev,
-        parsed,
-      }));
+      const parsed = JSON.parse(newText);
+      setRequestObj(parsed);
     } catch (err) {
-      console.error('Invalid JSON in param config');
+      // Only log when debugging, not on every keystroke
+      // console.error('Invalid JSON in param config');
+    }
+  }
+
+  async function handleRefresh() {
+    try {
+      const newRegistry = await entityApi.getStrategyRegistry();
+      const flattenedRegistry = Object.values(newRegistry).flat();
+      setLocalRegistry(flattenedRegistry);
+    } catch (error) {
+      console.error('Failed to refresh strategy registry:', error);
+      // Optionally set an error state here if you want to display it to the user
     }
   }
 
@@ -65,10 +107,10 @@ function StrategyEditor({ existingRequest, entityType }) {
   
       <div className="flex-none w-full border border-gray-700 rounded mt-4">
         <StrategyList
-          strategies={registry}
+          strategies={localRegistry}
           entityType={entityType}
           onSelect={handleStrategySelect}
-          onRefresh={() => {/* optional refetch if needed */}}
+          onRefresh={handleRefresh}
         />
       </div>
   
@@ -86,8 +128,11 @@ function StrategyEditor({ existingRequest, entityType }) {
         <p className="text-sm text-gray-400 mb-2">Param Config (JSON)</p>
         <div className="h-full w-full">
           <Editor
-            visualization={{ data: JSON.stringify(requestObj, null, 2), config: { type: 'json' } }}
-            onChange={handleParamConfigChange}
+            visualization={{ 
+              data: editorContent, 
+              config: { type: 'json' } 
+            }}
+            onChange={handleTextChange}
           />
         </div>
       </div>

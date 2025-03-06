@@ -163,7 +163,12 @@ class CallApiModelStrategy(Strategy):
         
         # Get user input and system prompt from config
         config = self.strategy_request.param_config
-        user_input = config.get('user_input', '')
+
+        if entity.has_attribute('user_input'):
+            user_input = entity.get_attribute('user_input')
+        else:
+            user_input = config.get('user_input', '')
+
         system_prompt = config.get('system_prompt', '')
         context_prefix = config.get('context_prefix', 'Here is the relevant context:')
         

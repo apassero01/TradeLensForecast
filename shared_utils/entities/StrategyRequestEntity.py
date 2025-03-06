@@ -10,7 +10,7 @@ class StrategyRequestEntity(Entity):
 
     def __init__(self, entity_id: Optional[str] = None):
         super().__init__(entity_id)
-        self.strategy_name = None
+        self.strategy_name = "None"
         self.param_config = {}  # Initialize as empty dict instead of None
         self._nested_requests: List[StrategyRequestEntity] = []  # Store nested requests
         self.created_at = None
@@ -112,6 +112,9 @@ class StrategyRequestAdapter:
         model.param_config = entity.param_config
         model.add_to_history = entity.add_to_history
         model.target_entity_id = entity.target_entity_id
+
+        if model.strategy_name == None:
+            model.strategy_name = "None"
 
         # Map parent request (if it exists)
         if hasattr(entity, 'parent_request') and entity.parent_request:

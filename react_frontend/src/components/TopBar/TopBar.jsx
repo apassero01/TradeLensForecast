@@ -4,6 +4,7 @@ import SessionStatus from './SessionStatus';
 import SessionSelector from './SessionSelector';
 import DeleteSessionButton from './DeleteSessionButton';
 import { useEffect } from 'react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 const TopBar = () => {
     const {
         sessionId,
@@ -23,6 +24,8 @@ const TopBar = () => {
     useEffect(() => {
         fetchSavedSessions();
     }, [sessionId]);
+
+    useWebSocket();
 
     React.useEffect(() => {
         if (error) {

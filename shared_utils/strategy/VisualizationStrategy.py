@@ -84,7 +84,7 @@ class VisualizationStrategy(Strategy):
             parent_attrs = [param_config['parent_data_attribute_name']]
 
         if not parent_attrs:
-            return  # Nothing to retrieve.
+            return []  # Nothing to retrieve.
 
         # Create a request to retrieve all the attributes from the parent.
         parent_request = StrategyRequestEntity()

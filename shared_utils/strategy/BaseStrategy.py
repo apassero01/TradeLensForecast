@@ -288,6 +288,8 @@ class RemoveChildStrategy(Strategy):
         if child_id is None:
             raise ValueError("Missing required parameter: child_id")
         entity.remove_child_by_id(child_id)
+        child_entity = self.entity_service.get_entity(child_id)
+        child_entity.remove_parent(entity)
 
         return self.strategy_request
 

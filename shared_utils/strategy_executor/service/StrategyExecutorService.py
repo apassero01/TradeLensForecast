@@ -20,6 +20,8 @@ class StrategyExecutorService:
 
         if strat_request.add_to_history:
             entity.update_strategy_requests(strat_request)
+            self.entity_service.save_entity(strat_request)
+
 
         self.entity_service.save_entity(entity)
 

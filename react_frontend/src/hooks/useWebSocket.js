@@ -1,4 +1,4 @@
-import { useEffect } from 'react'; 
+import { useEffect, useCallback } from 'react'; 
 import { useRecoilState, useSetRecoilState } from 'recoil';
 import { webSocketAtom } from '../state/webSocketAtom';
 import { notificationAtom } from '../state/notificationAtom';
@@ -92,9 +92,9 @@ export function useWebSocket() {
                 newWs.close(1000, 'Component unmounting');
             }
         };
-    }, [isActive]); // Only depend on connection state changes
+    }, [isActive, mergeEntities, setNotification, ws, setWs]); // Only depend on connection state changes
 
-    const sendStrategyRequest = (strategyRequest) => {
+    const sendStrategyRequest = useCallback((strategyRequest) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             console.error('No active WebSocket connection', ws?.readyState);
             setNotification({
@@ -119,10 +119,11 @@ export function useWebSocket() {
                 type: 'error'
             });
         }
-    };
+    }, [ws, setNotification]);
 
     return { 
         sendStrategyRequest,
         isConnected: ws?.readyState === WebSocket.OPEN 
+        
     };
 }

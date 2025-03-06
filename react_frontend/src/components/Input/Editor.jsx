@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AceEditor from 'react-ace';
 
 // Import ace-builds correctly
@@ -18,6 +18,27 @@ const Editor = ({ visualization, onChange }) => {
   const editorRef = useRef(null);
 
   const hasData = !!(visualization && visualization.data);
+
+  // Define all callbacks at the top level, before any conditional returns
+  const handleFontSize = useCallback((change) => {
+    setFontSize((prev) => Math.max(8, Math.min(24, prev + change)));
+  }, []);
+
+  const handleModeChange = useCallback((e) => {
+    setEditorMode(e.target.value);
+  }, []);
+
+  const handleEditorChange = useCallback((newText) => {
+    setEditorText(newText);
+    if (onChange) {
+      onChange(newText);
+    }
+  }, [onChange]);
+
+  const handleClick = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   useEffect(() => {
     if (hasData) {
@@ -47,26 +68,6 @@ const Editor = ({ visualization, onChange }) => {
   }
 
   const { config = {} } = visualization;
-
-  const handleFontSize = (change) => {
-    setFontSize((prev) => Math.max(8, Math.min(24, prev + change)));
-  };
-
-  const handleModeChange = (e) => {
-    setEditorMode(e.target.value);
-  };
-
-  const handleEditorChange = (newText) => {
-    setEditorText(newText);
-    if (onChange) {
-      onChange(newText);
-    }
-  };
-
-  const handleClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
 
   return (
     <div  
