@@ -108,6 +108,7 @@ export function useWebSocket() {
             command: 'execute_strategy',
             strategy: strategyRequest, // Fixed property name
         };
+        console.log('Sending strategy request:', payload);
 
         try {
             console.log('Sending strategy request:', payload);

@@ -13,16 +13,15 @@ function InputEntity({ data }) {
     console.log('Strategy requests for this input:', strategyRequests);
   }, [strategyRequests]);
 
-  const handleChange = (e, updateLocalField) => {
+  const handleChange = (e) => {
     const newValue = e.target.value;
     // Update both the local state and the parent's local field.
     setText(newValue);
-    updateLocalField('visualization', newValue);
   };
 
   return (
     <EntityNodeBase data={data}>
-      {({ updateLocalField, sendStrategyRequest }) => {
+      {({ sendStrategyRequest }) => {
         // This function executes all attached strategy requests
         const executeStrategyRequests = async () => {
           console.log('Executing strategy requests:', strategyRequests);
@@ -64,7 +63,7 @@ function InputEntity({ data }) {
           <form onSubmit={handleSubmit} className="w-full nodrag">
             <textarea
               value={text}
-              onChange={(e) => handleChange(e, updateLocalField)}
+              onChange={(e) => handleChange(e)}
               placeholder="Enter text..."
               className="w-full h-24 p-2 bg-gray-700 text-white rounded nodrag"
               style={{ resize: 'none' }}

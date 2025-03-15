@@ -14,7 +14,7 @@ function VisualizationEntity({ data, sendStrategyRequest }) {
         <EntityNodeBase 
             data={data}
         >
-            {({ entity }) => (
+            {({ sendStrategyRequest }) => (
                 <div className="flex-grow h-full w-full my-4 -mx-6 overflow-hidden">
                     <div className="h-full w-full px-6 overflow-hidden">
                         {VisualizationComponent ? (
@@ -22,6 +22,7 @@ function VisualizationEntity({ data, sendStrategyRequest }) {
                                 visualization={data.visualization} 
                                 sendStrategyRequest={sendStrategyRequest}
                                 entityId={data.entityId}
+                                parent_ids={data.parent_ids}
                             />
                         ) : (
                             <div className="text-gray-400 text-sm">No visualization available</div>

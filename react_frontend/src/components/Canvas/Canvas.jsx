@@ -1,6 +1,6 @@
 // src/components/Canvas/Canvas.jsx
-import React, { useMemo, useEffect, useCallback } from 'react';
-import { ReactFlow, Background, BackgroundVariant } from '@xyflow/react';
+import React, { useMemo, useEffect, useCallback, useState } from 'react';
+import { ReactFlow, Background, BackgroundVariant, applyNodeChanges, Controls } from '@xyflow/react';
 import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { flowNodesSelector, flowEdgesSelector } from '../../state/entitiesSelectors';
 import { entityFamily } from '../../state/entityFamily';
@@ -15,18 +15,35 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 
 function Canvas() {
   // 1. Read the nodes & edges from Recoil
-  const nodes = useRecoilValue(flowNodesSelector);
-  const edges = useRecoilValue(flowEdgesSelector);
+  const recoilNodes = useRecoilValue(flowNodesSelector);
+  const recoilEdges = useRecoilValue(flowEdgesSelector);
   const { sendStrategyRequest } = useWebSocket();
+  const [nodes, setNodes] = useState(recoilNodes);
 
   const nodeTypes = useMemo(() => {
     return {
       entityNode: EntityNode, 
       strategyRequestEntity: StrategyRequestEntity,
       inputEntity: InputEntity,
-      visualizationEntity: VisualizationEntity
+      visualizationEntity: VisualizationEntity,
     }
   }, []);
+
+
+  useEffect(() => {
+    setNodes((prevNodes) => 
+      recoilNodes.map((recoilNode) => {
+        const existingNode = prevNodes.find((n) => n.id === recoilNode.id);
+        return {
+          ...recoilNode,
+          position: existingNode?.position || recoilNode.position,
+          width: existingNode?.width || recoilNode.width,
+          height: existingNode?.height || recoilNode.height,
+        }
+      })
+    )
+  }, [recoilNodes]);
+
 
   const onDragEnd = useCallback((event, node) => {
     console.log('onDragEnd', event, node);
@@ -49,97 +66,40 @@ function Canvas() {
     })
   }, [sendStrategyRequest]);
 
-  const onNodesChange = useRecoilCallback(
-    ({ set }) =>
-      (changes) => {
-        changes.forEach((change) => {
-          // Filter out 'select' or other event types we don't need
-          const request = {
+  const onNodesChange = useCallback((changes) => {
+    // Update nodes based on the changes
+    setNodes((prevNodes) => {
+      // Use applyNodeChanges to handle updates efficiently
+      const updatedNodes = applyNodeChanges(changes, prevNodes);
+      
+      // Handle dimension changes inside the setter function where we have the latest nodes
+      if (changes.length > 0 && changes[0].type === 'dimensions' && changes[0].resizing === false) {
+        const entity = updatedNodes.find((node) => node.id === changes[0].id);
+        if (entity) {
+          sendStrategyRequest({
             strategy_name: 'SetAttributesStrategy',
             param_config: {
               attribute_map: {
+                'width': entity.width,
+                'height': entity.height,
               }
-            }
-          }
-          if (change.type === 'select') {
-            return;
-          }
-  
-          // 1. Dimensions changes (resizing)
-          if (change.type === 'dimensions' && change.dimensions) {
-            const { id, dimensions } = change;
-            const { width: newWidth, height: newHeight } = dimensions;
-  
-            // If newWidth or newHeight is NaN, skip
-            if (
-              Number.isNaN(newWidth) ||
-              Number.isNaN(newHeight)
-            ) {
-              return;
-            }
-  
-            set(entityFamily(id), (prev) => {
-              // Compare old vs. new
-              if (prev.width === newWidth && prev.height === newHeight) {
-                return prev; // No change
-              }
-              return {
-                ...prev,
-                width: newWidth,
-                height: newHeight,
-              };
-            });
-          }
-
-          // 2. Position changes (dragging/moving)
-          else if (change.type === 'position' && change.position) {
-            const { id, position } = change;
-            const { x: newX, y: newY } = position;
-  
-            // If newX or newY is NaN, skip
-            if (
-              Number.isNaN(newX) ||
-              Number.isNaN(newY)
-            ) {
-              return;
-            }
-  
-            set(entityFamily(id), (prev) => {
-              // Compare old vs. new
-              if (
-                prev.position?.x === newX &&
-                prev.position?.y === newY
-              ) {
-                return prev; // No change
-              }
-              return {
-                ...prev,
-                position: { x: newX, y: newY },
-              };
-            });
-          }
-        });
-      },
-    []
-  );
-
-  // // 3. Optionally augment each node's data
-  // const nodesWithData = useMemo(() => {
-  //   return nodes.map((node) => ({
-  //     ...node,
-  //     position: node.position || { x: 0, y: 0 },
-  //     data: {
-  //       ...node.data,
-  //       entityId: node.id, // So EntityNode can read from Recoil
-  //     },
-  //   }));
-  // }, [nodes]);
+            },
+            target_entity_id: entity.data.entityId,
+            add_to_history: false,
+            nested_requests: [],
+          });
+        }
+      }
+      
+      return updatedNodes;
+    });
+  }, [sendStrategyRequest]);
 
   return (
     <div style={{ width: '100%', height: '100vh', flex: 1 }}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={recoilEdges}
         nodeTypes = {nodeTypes}
         onNodesChange={onNodesChange}
         fitView
@@ -155,6 +115,7 @@ function Canvas() {
           color="#ccc"
           variant={BackgroundVariant.Cross}
         />
+        <Controls />
       </ReactFlow>
     </div>
   );

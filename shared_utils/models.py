@@ -2,11 +2,10 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from shared_utils.entities.EntityModel import EntityModel
 import uuid
-class StrategyRequest(models.Model):
+class StrategyRequest(EntityModel):
     """
     A request for a strategy to be applied to an entity.
     """
-    entity_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     strategy_name = models.CharField(max_length=255)  # The name of the strategy
     param_config = models.JSONField(default=dict)  # Parameters for the strategy
     target_entity_id = models.CharField(max_length=255, null=True, blank=True)  # The id of the target entity

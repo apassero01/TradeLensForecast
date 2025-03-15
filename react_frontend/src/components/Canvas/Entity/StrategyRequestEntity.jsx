@@ -57,7 +57,7 @@ function StrategyRequestEntity({ data }) {
                   nested_requests: data.nested_requests,
                   entity_id: data.entity_id,
                 }}
-                entityType={entity.entity_type}
+                entityType={data.entity_type}
                 updateEntity={updateEntity}
                 sendStrategyRequest={sendStrategyRequest}
               />

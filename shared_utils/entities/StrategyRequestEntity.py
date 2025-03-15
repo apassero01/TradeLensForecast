@@ -20,6 +20,8 @@ class StrategyRequestEntity(Entity):
         self.is_applied = False  # Flag to indicate if the strategy has been applied
         self.add_to_history = False  # Flag to indicate if the strategy should be added to the history
         self.target_entity_id = self.parent_ids[0] if self.parent_ids else None
+        self.set_attribute('width', 700)
+        self.set_attribute('height', 500)
     def add_nested_request(self, request: 'StrategyRequestEntity'):
         """Add a nested strategy request"""
         if not isinstance(request, StrategyRequestEntity):

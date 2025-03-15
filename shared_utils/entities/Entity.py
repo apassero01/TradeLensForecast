@@ -138,6 +138,8 @@ class Entity():
             'parent_ids': self.get_parents(),
             'strategy_requests': [request.serialize() for request in self.strategy_requests],
             'position': self.get_attribute('position') if self.has_attribute('position') else None,
+            'width': self.get_attribute('width') if self.has_attribute('width') else None,
+            'height': self.get_attribute('height') if self.has_attribute('height') else None,
         }
 
     def to_db(self, model=None):
@@ -215,8 +217,18 @@ class EntityAdapter:
                         attributes[key] = entity.get_attribute(key)
 
             # Save the attributes to the model
+            #TODO need to loop through all attributes and check if they are serializable instead of hardcoding
             if entity.has_attribute('position'):
                 attributes['position'] = entity.get_attribute('position')
+
+            if entity.has_attribute('text'):
+                attributes['text'] = entity.get_attribute('text')
+
+            if entity.has_attribute('width'):
+                attributes['width'] = entity.get_attribute('width')
+
+            if entity.has_attribute('height'):
+                attributes['height'] = entity.get_attribute('height')
             model.attributes = attributes
 
 
