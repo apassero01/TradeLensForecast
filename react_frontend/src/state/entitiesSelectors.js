@@ -183,7 +183,7 @@ const calculateNewPosition = (entity, get) => {
   if (parent_ids && parent_ids.length > 0) {
     const parent = get(nodeSelectorFamily(parent_ids[0]));
     const parentPosition = parent.position;
-    return {x: parentPosition.x, y: parentPosition.y + 400}
+    return {x: parentPosition.x, y: parentPosition.y}
   }
   return {x: 0, y: 0}
 }

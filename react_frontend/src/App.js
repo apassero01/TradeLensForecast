@@ -1,13 +1,13 @@
-import logo from './logo.svg';
 import './App.css';
 import TopBar from './components/TopBar/TopBar';
 import Canvas from './components/Canvas/Canvas';
 import { RecoilRoot } from 'recoil';
 import { Notification } from './components/Notification/Notification';
-import RecoilizeDebugger from 'recoilize';
+import { WebSocketProvider } from './providers/WebSocketProvider';
 function App() {
   return (
     <RecoilRoot>
+      <WebSocketProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-gray-900">
         <div className="w-full">
           <TopBar />
@@ -15,8 +15,9 @@ function App() {
         <div className="flex-1 overflow-hidden">
           <Canvas />
         </div>
-        <Notification />
-      </div>
+          <Notification />
+        </div>
+      </WebSocketProvider>
     </RecoilRoot>
   );
 }

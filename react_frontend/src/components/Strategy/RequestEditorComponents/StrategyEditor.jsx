@@ -1,9 +1,8 @@
 // src/components/StrategyEditor.jsx
 import React, { useEffect, useState } from 'react';
 import { useStrategyEditor } from '../../hooks/useStrategyEditor';
-import StrategyList from './StrategyList';  
+import StrategyList from './StrategyList';
 import EntitySelector from './RequestEditorComponents/EntitySelector';
-import SequenceSetSelector from './RequestEditorComponents/SequenceSetSelector';
 import Editor from '../Input/Editor';
 // Possibly import other custom forms if you have them
 import { entityApi } from '../../api/entityApi';
@@ -70,27 +69,6 @@ function StrategyEditor({ existingRequest, entityType }) {
     setRequestObj(updatedRequest);
     setEditorContent(JSON.stringify(updatedRequest, null, 2));
   }
-
-  const handleSequenceSetSelect = (sequenceConfig) => {
-    try {
-      const parsed = JSON.parse(editorContent);
-      const updated = {
-        ...parsed,
-        param_config: {
-          ...parsed.param_config,
-          X_features: sequenceConfig.X_features,
-          y_features: sequenceConfig.y_features,
-          model_set_configs: sequenceConfig.model_set_configs,
-          dataset_type: sequenceConfig.dataset_type,
-        }
-      };
-
-      setEditorContent(JSON.stringify(updated, null, 2));
-      setRequestObj(updated);
-    } catch (err) {
-      console.error('Error updating sequence set:', err);
-    }
-  };
 
   // 3. For param_config editing, we can show a JSON Editor or custom forms
   function handleTextChange(newText) {

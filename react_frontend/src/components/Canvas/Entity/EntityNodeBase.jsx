@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { NodeResizeControl, Handle, Position } from '@xyflow/react';
-import { useWebSocket } from '../../../hooks/useWebSocket';
+import { useWebSocketConsumer } from '../../../hooks/useWebSocketConsumer';
 import { entityFamily } from '../../../state/entityFamily';
 import { strategyRequestChildrenSelector } from '../../../state/entitiesSelectors';
 import StrategyRequestList from '../../Strategy/StrategyRequestList';
@@ -9,7 +9,7 @@ import { FaPlus } from 'react-icons/fa';
 
 function EntityNodeBase({ data, children }) {
   // const entity = useRecoilValue(entityFamily(data.entityId)); // Use full entity from Recoil
-  const { sendStrategyRequest } = useWebSocket();
+  const { sendStrategyRequest } = useWebSocketConsumer();
   const strategyRequestChildren = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
 
   // Callback to update an entity atom
@@ -141,6 +141,7 @@ function EntityNodeBase({ data, children }) {
       updateEntity={updateEntity}
       sendStrategyRequest={sendStrategyRequest}
       onRemoveRequest={handleRemoveChild}
+      data={data}
     />
   </div>
     </div>

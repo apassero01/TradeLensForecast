@@ -73,6 +73,8 @@ class StrategyRequestAdapter:
     def model_to_entity(model: StrategyRequest) -> StrategyRequestEntity:
         """Convert a StrategyRequest model to a StrategyRequestEntity"""
         entity_id = model.entity_id
+        if type(model) != StrategyRequest:
+            model = StrategyRequest.objects.get(entity_id=entity_id)
         entity = StrategyRequestEntity(str(entity_id))
 
         # Map basic attributes
@@ -113,7 +115,8 @@ class StrategyRequestAdapter:
         model.strategy_name = entity.strategy_name
         model.param_config = entity.param_config
         model.add_to_history = entity.add_to_history
-        model.target_entity_id = entity.target_entity_id
+        model.target_entity_id = entity.target_entity_id if entity.target_entity_id else entity.parent_ids[0]
+        model.class_path = entity.get_class_path()
 
         if model.strategy_name == None:
             model.strategy_name = "None"

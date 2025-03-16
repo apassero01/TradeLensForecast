@@ -22,11 +22,20 @@ function InputEntity({ data }) {
   return (
     <EntityNodeBase data={data}>
       {({ sendStrategyRequest }) => {
-        // This function executes all attached strategy requests
-        const executeStrategyRequests = async () => {
-          console.log('Executing strategy requests:', strategyRequests);
-          
-          // First set the user input value
+                  
+        const execute_request = {
+          strategy_name: 'ExecuteRequestChildren',
+          param_config: {
+          },
+          target_entity_id: data.entityId,
+          add_to_history: false,
+          nested_requests: [],
+        }
+        
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          console.log('Submitting with text:', text);
+
           await sendStrategyRequest({
             strategy_name: 'SetAttributesStrategy',
             param_config: {
@@ -39,24 +48,8 @@ function InputEntity({ data }) {
             nested_requests: [],
           });
           
-          // Then execute each strategy in the StrategyRequestList
-          for (const strategy of strategyRequests) {
-              
-              try {
-                await sendStrategyRequest(strategy);
-                console.log('Strategy executed successfully');
-              } catch (error) {
-                console.error('Failed to execute strategy:', error);
-              }
-            }
-        };
-        
-        const handleSubmit = async (e) => {
-          e.preventDefault();
-          console.log('Submitting with text:', text);
-          
           // Execute all the strategy requests
-          await executeStrategyRequests();
+          await sendStrategyRequest(execute_request);
         };
         
         return (

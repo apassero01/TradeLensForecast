@@ -299,6 +299,48 @@ class RemoveChildStrategy(Strategy):
             'child_id': ''
         }
 
+class UpdateChildrenStrategy(Strategy):
+    """Generic strategy for updating all children of an entity"""
+
+    strategy_description = 'Updates all children of an entity'
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        child_ids = self.strategy_request.param_config.get('child_ids', [])
+        entity.children_ids = child_ids
+
+        return self.strategy_request
+
+    def verify_executable(self, entity, strategy_request):
+        if 'child_ids' not in strategy_request.param_config:
+            raise ValueError('Missing required parameter: child_ids')
+
+class ExecuteRequestChildren(Strategy):
+    """Generic strategy for executing another strategy request"""
+
+    strategy_description = 'Executes another strategy request'
+
+    def verify_executable(self, entity, strategy_request):
+        return 'request' in strategy_request.param_config
+
+    def apply(self, entity: Entity) -> StrategyRequestEntity:
+        children = entity.get_children()
+        request_child_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.STRATEGY_REQUEST)
+
+        for child in children:
+            if child in request_child_ids:
+                request = self.entity_service.get_entity(child)
+                request = self.executor_service.execute_request(request)
+                self.entity_service.save_entity(request)
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'request': None
+        }
+
+
 
 
 class RemoveEntityStrategy(Strategy):

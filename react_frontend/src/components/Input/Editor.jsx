@@ -12,14 +12,14 @@ ace.config.set('basePath', '/ace-builds');
 ace.config.set('workerPath', '/ace-builds');
 
 const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, entityId }) => {
-  const [editorText, setEditorText] = useState('');
+  const [editorText, setEditorText] = useState(null);
   const [fontSize, setFontSize] = useState(14);
   const [editorMode, setEditorMode] = useState('text');
+  const [isInitialized, setIsInitialized] = useState(false);
   const editorRef = useRef(null);
 
   const hasData = !!(visualization && visualization.data);
 
-  console.log(editorText)
 
   // Define all callbacks at the top level, before any conditional returns
   const handleFontSize = useCallback((change) => {
@@ -82,58 +82,66 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, enti
     }
   }, [visualization, editorText, sendStrategyRequest, entityId, parent_ids]);
 
+  // Only initialize the editor content once or when visualization.data changes
   useEffect(() => {
-    if (hasData) {
-      console.log("visualization.data", visualization.data);
-      
-      let initialText = '';
-      
-      // Check if visualization.data is a string or an object
-      if (typeof visualization.data === 'string') {
-        // If it's a string, use it directly
-        initialText = visualization.data;
-      } else if (typeof visualization.data === 'object' && visualization.data !== null) {
-        // If it's an object, check for text property
-        if (visualization.data.text !== undefined) {
-          initialText = visualization.data.text;
-        } else {
-          // Otherwise stringify the object
-          try {
-            initialText = JSON.stringify(visualization.data, null, 2);
-          } catch (e) {
-            console.error('Failed to stringify visualization data:', e);
-            initialText = '';
-          }
+    // Skip if already initialized or no data available
+    if (isInitialized || !hasData) return;
+    
+    let initialText = '';
+    
+    // Check if visualization.data is a string or an object
+    if (typeof visualization.data === 'string') {
+      initialText = visualization.data;
+    } else if (typeof visualization.data === 'object' && visualization.data !== null) {
+      if (visualization.data.text !== undefined) {
+        initialText = visualization.data.text;
+      } else {
+        try {
+          initialText = JSON.stringify(visualization.data, null, 2);
+        } catch (e) {
+          console.error('Failed to stringify visualization data:', e);
+          initialText = '';
         }
       }
-      
-      console.log('Setting initial editor text:', initialText);
-      setEditorText(initialText);
-
-      const { config = {} } = visualization;
-      const type = (config.type || 'text').toLowerCase();
-      
-      const modeMap = {
-        py: 'python',
-        python: 'python',
-        json: 'json',
-        txt: 'text',
-        text: 'text',
-      };
-      setEditorMode(modeMap[type] || 'text');
-      
-      // Special handling for text editor with object data that has a text attribute
-      if (modeMap[type] === 'text' && 
-          typeof visualization.data === 'object' && 
-          visualization.data !== null &&
-          visualization.data.text !== undefined) {
-        setEditorText(visualization.data.text);
-      }
-    } else {
-      setEditorText(''); // Initialize with empty string instead of undefined
-      setEditorMode('text');
     }
-  }, [visualization, hasData]);
+    
+    console.log('Setting initial editor text:', initialText);
+    setEditorText(initialText);
+
+    const { config = {} } = visualization;
+    const type = (config.type || 'text').toLowerCase();
+    
+    const modeMap = {
+      py: 'python',
+      python: 'python',
+      json: 'json',
+      txt: 'text',
+      text: 'text',
+    };
+    setEditorMode(modeMap[type] || 'text');
+    
+    // Special handling for text editor with object data that has a text attribute
+    if (modeMap[type] === 'text' && 
+        typeof visualization.data === 'object' && 
+        visualization.data !== null &&
+        visualization.data.text !== undefined) {
+      setEditorText(visualization.data.text);
+    }
+    
+    setIsInitialized(true);  // Mark as initialized
+  }, [visualization, hasData, isInitialized]);
+
+  // Only reset the editor when visualization.data actually changes
+  // We use JSON.stringify to detect actual data changes
+  const dataSignature = JSON.stringify(visualization?.data);
+  
+  useEffect(() => {
+    // Skip if not initialized yet (let the initialization effect handle it)
+    if (!isInitialized) return;
+    
+    // Reset the editor only when visualization.data actually changes
+    setIsInitialized(false);  // Force re-initialization
+  }, [dataSignature]);  // Only run when the data signature changes
 
   if (!hasData) {
     return <div className="text-red-500">No editor data available</div>;

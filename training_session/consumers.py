@@ -59,6 +59,11 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
                 await self.handle_stop_session()
             elif command == 'delete_session':
                 await self.handle_delete_session()
+            elif command == 'ping':
+                await self.send(json.dumps({
+                    'type': 'pong',
+                    'message': 'Pong'
+                }))
             else:
                 print(f"Unknown command received: {command}")
                 await self.send(json.dumps({

@@ -1,11 +1,11 @@
 // src/hooks/useStrategyEditor.js
 import { useState, useEffect } from 'react';
 import { useStrategyRegistry } from './useStrategyRegistry';
-import { useWebSocket } from './useWebSocket';
+import { useWebSocketConsumer } from './useWebSocketConsumer';
 
 export function useStrategyEditor(existingRequest) {
   const { registry, loading: registryLoading, error: registryError } = useStrategyRegistry();
-  const { sendStrategyRequest } = useWebSocket();
+  const { sendStrategyRequest } = useWebSocketConsumer();
 
   const [requestObj, setRequestObj] = useState(() => {
     if (existingRequest) return { ...existingRequest };
@@ -31,7 +31,7 @@ export function useStrategyEditor(existingRequest) {
         }));
       }
     }
-  }, [requestObj.strategy_name, registry, requestObj.param_config]);
+  }, [requestObj.strategy_name, registry, requestObj.param_config, existingRequest]);
 
   function executeStrategy() {
     if (!requestObj.strategy_name) {

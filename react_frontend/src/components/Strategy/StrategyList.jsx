@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 
 const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');

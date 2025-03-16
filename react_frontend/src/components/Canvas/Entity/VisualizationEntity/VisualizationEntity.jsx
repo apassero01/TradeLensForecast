@@ -1,7 +1,6 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo } from 'react';
 import EntityNodeBase from '../EntityNodeBase';
 import visualizationComponents from './Visualization/visualizationComponents';
-import { useRecoilValue } from 'recoil';
 
 function VisualizationEntity({ data, sendStrategyRequest }) {
     
