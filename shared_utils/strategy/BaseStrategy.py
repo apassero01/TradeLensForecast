@@ -9,6 +9,7 @@ from tslearn.clustering import TimeSeriesKMeans
 import requests
 from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
+import inspect
 
 
 class Strategy(ABC):
@@ -40,7 +41,8 @@ class Strategy(ABC):
         return {
             'name': cls.__name__,
             'entity_type': cls.entity_type.value,
-            'config': cls.get_request_config()
+            'config': cls.get_request_config(),
+            'source': inspect.getsource(cls)
         }
 
 class GetEntityStrategy(Strategy):
@@ -685,6 +687,59 @@ class ExecuteCodeStrategy(Strategy):
             "param_config": {
                 "code": "result = np.concatenate([entity.get_attribute('predictions') ,entity.get_attribute('y_test_scaled')],axis=-1)",
                 "result_attribute": "code_result"
+            }
+        }
+
+class HTTPGetRequestStrategy(Strategy):
+    """
+    Executes an HTTP GET request to the specified URL.
+    The response is stored in the entity under 'response_attribute'.
+    """
+
+    entity_type = EntityEnum.ENTITY  # Adjust if necessary
+
+    def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
+        super().__init__(strategy_executor, strategy_request)
+
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        """
+        Validate we have the URL to fetch
+        """
+        pass
+
+    def apply(self, entity):
+        """
+        Execute the HTTP GET request to the URL provided in the strategy request.
+        """
+        url = self.strategy_request.param_config.get('url')
+        response_attribute = self.strategy_request.param_config.get('response_attribute', 'http_response')
+
+        response = requests.get(url)
+        if not response.ok:
+            raise ValueError(
+                f"Request to {url} failed "
+                f"with status {response.status_code}: {response.text}"
+            )
+
+        # Store the response in the entity
+        entity.set_attribute(response_attribute, response.json())
+        self.strategy_request.ret_val[response_attribute] = response.json()
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        """
+        Default config for HTTPGetRequestStrategy.
+         - 'url': The URL to fetch.
+         - 'response_attribute': The attribute under which we store the response.
+        """
+        return {
+            "strategy_name": "HTTPGetRequestStrategy",
+            "strategy_path": None,
+            "param_config": {
+                "url": "https://jsonplaceholder.typicode.com/todos/1",
+                "response_attribute": "http_response"
             }
         }
 

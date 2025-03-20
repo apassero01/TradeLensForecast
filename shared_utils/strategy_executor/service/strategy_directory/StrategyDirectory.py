@@ -19,7 +19,8 @@ class StrategyDirectory:
                 "shared_utils.strategy.BaseStrategy.SetAttributesStrategy",
                 "data_bundle_manager.strategy.DataBundleStrategy.InverseScaleByFeatureSetsStrategy",
                 "shared_utils.strategy.BaseStrategy.UpdateChildrenStrategy",
-                "shared_utils.strategy.BaseStrategy.ExecuteRequestChildren"
+                "shared_utils.strategy.BaseStrategy.ExecuteRequestChildren",
+                "shared_utils.strategy.BaseStrategy.HTTPGetRequestStrategy"
             ],
             EntityEnum.TRAINING_SESSION.value: [
                 "training_session.strategy.TrainingSessionStrategy.GetSequenceSetsStrategy",

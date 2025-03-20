@@ -44,7 +44,7 @@ function StrategyEditor({ existingRequest, entityType }) {
     const updatedRequest = {
       ...requestObj,
       strategy_name: selectedStrat.name,
-      param_config: selectedStrat.config ? selectedStrat.config : {},
+      param_config: selectedStrat.config.param_config ? selectedStrat.config.param_config : selectedStrat.config ,
     };
     
     // Update the request object state

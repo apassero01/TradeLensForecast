@@ -12,6 +12,8 @@ function EntityNodeBase({ data, children }) {
   const { sendStrategyRequest } = useWebSocketConsumer();
   const strategyRequestChildren = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
 
+  console.log('EntityNodeBase rendered ', data.entityId);
+
   // Callback to update an entity atom
   const updateEntity = useRecoilCallback(
     ({ set }) =>

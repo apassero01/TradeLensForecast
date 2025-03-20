@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useWebSocketConsumer } from '../../hooks/useWebSocketConsumer';
 import { FaCopy, FaCheck } from 'react-icons/fa';
+import ConfirmationModal from '../Modal/ConfirmationModal';
 
 export default function ContextMenu({
   id,
@@ -13,6 +14,7 @@ export default function ContextMenu({
 }) {
   const { sendStrategyRequest } = useWebSocketConsumer();
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Create shortened preview of entity ID
   const shortenedId = entityId?.length > 8 ? `${entityId.substring(0, 8)}...` : entityId;
@@ -31,37 +33,37 @@ export default function ContextMenu({
     });
   }, [entityId, sendStrategyRequest, onClick]);
 
+  const copyEntityId = useCallback(() => {
+    // Copy entity ID to clipboard
+    navigator.clipboard.writeText(entityId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [entityId]);
+
   const deleteNode = useCallback(() => {
+    // Show confirmation modal instead of immediate deletion
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    // Perform deletion after confirmation
     // Close the context menu
     onClick();
     
     // Send strategy request to delete the entity
     sendStrategyRequest({
-      strategy_name: 'DeleteEntityStrategy',
-      target_entity_id: entityId,
+      strategy_name: 'RemoveEntityStrategy',
       param_config: {},
-      add_to_history: true,
+      target_entity_id: entityId,
+      add_to_history: false,
       nested_requests: [],
     });
-  }, [entityId, sendStrategyRequest, onClick]);
-  
-  const copyIdToClipboard = useCallback((e) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(entityId);
-    
-    // Show copied feedback briefly before closing
-    setCopied(true);
-    
-    // Close the menu after a short delay to show the feedback
-    setTimeout(() => {
-      onClick();
-    }, 300);
-  }, [entityId, onClick]);
+  }, [onClick, sendStrategyRequest, entityId]);
 
   return (
     <>
-      {/* Transparent overlay to capture clicks outside the menu */}
-      <div 
+      {/* Overlay to capture clicks outside the menu */}
+      <div
         style={{
           position: 'fixed',
           top: 0,
@@ -76,6 +78,8 @@ export default function ContextMenu({
           onClick();
         }}
       />
+      
+      {/* The context menu */}
       <div
         style={{
           position: 'absolute',
@@ -86,51 +90,36 @@ export default function ContextMenu({
           zIndex: 1000,
           backgroundColor: '#1f2937',
           borderRadius: '4px',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-          border: '1px solid #374151',
-        }}
-        className="context-menu"
-        onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onClick();
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+          minWidth: '180px',
         }}
       >
-        <div style={{ 
-          margin: '0.5em', 
-          color: 'white', 
-          padding: '5px 10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <small title={entityId}>{shortenedId}</small>
-          <div style={{ position: 'relative' }}>
-            <button 
-              onClick={copyIdToClipboard}
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid #374151' }}>
+          <div 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <span style={{ fontSize: '12px', color: 'white' }}>{shortenedId}</span>
+            <button
+              onClick={copyEntityId}
               style={{
-                background: 'transparent',
+                background: 'none',
                 border: 'none',
-                color: copied ? '#4ade80' : '#9ca3af',
+                color: '#9ca3af',
                 cursor: 'pointer',
                 padding: '2px',
-                marginLeft: '5px',
                 display: 'flex',
                 alignItems: 'center',
-                transition: 'color 0.2s'
+                justifyContent: 'center',
               }}
-              title="Copy ID to clipboard"
             >
-              {copied ? <FaCheck size={12} /> : <FaCopy size={12} />}
+              {copied ? <FaCheck size={12} color="#10b981" /> : <FaCopy size={12} />}
             </button>
             {copied && (
               <div style={{
                 position: 'absolute',
+                right: 10,
                 top: '100%',
-                right: 0,
-                backgroundColor: '#4ade80',
-                color: 'white',
+                backgroundColor: '#10b981',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 fontSize: '10px',
@@ -142,6 +131,7 @@ export default function ContextMenu({
             )}
           </div>
         </div>
+        
         <button 
           onClick={duplicateNode}
           style={{
@@ -153,14 +143,14 @@ export default function ContextMenu({
             border: 'none',
             color: 'white',
             cursor: 'pointer',
-            borderTop: '1px solid #374151',
           }}
           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
           onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           Duplicate
         </button>
-        <button 
+        
+        <button
           onClick={deleteNode}
           style={{
             display: 'block',
@@ -179,6 +169,17 @@ export default function ContextMenu({
           Delete
         </button>
       </div>
+
+      {/* Delete confirmation modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Confirm Delete"
+        message={`Are you sure you want to delete this entity (${shortenedId})?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </>
   );
 } 

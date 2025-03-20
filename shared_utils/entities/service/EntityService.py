@@ -28,7 +28,7 @@ class EntityService:
         """Save an entity to cache and broadcast update via WebSocket"""
         print(f"Saving entity {entity.entity_id} to cache")
         
-        # Save to cache
+        # Save to cacheC
         self.cache_service.set(entity.entity_id, entity)
         
         # Check if entity socket exists
