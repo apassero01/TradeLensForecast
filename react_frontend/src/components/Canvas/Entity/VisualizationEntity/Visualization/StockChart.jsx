@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactApexChart from 'react-apexcharts';
 
 /**
@@ -38,6 +38,39 @@ const MetaInformation = ({ ticker, startTimestamp, endTimestamp }) => {
 const StockChart = ({ visualization, metaData = {} }) => {
   const [showPredictions, setShowPredictions] = useState(true);
   const [showActual, setShowActual] = useState(true);
+  const chartContainerRef = useRef(null);
+  
+  // Extract drag handlers from metaData
+  const dragHandlers = metaData.dragHandlers || {};
+
+  // Add event handlers to stop propagation
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    // Function to stop event propagation
+    const stopPropagation = (e) => {
+      e.stopPropagation();
+    };
+
+    // Attach listeners for all relevant events that might trigger React Flow dragging
+    const events = [
+      'mousedown', 'mousemove', 'mouseup', 
+      'touchstart', 'touchmove', 'touchend',
+      'pointerdown', 'pointermove', 'pointerup'
+    ];
+    
+    events.forEach(event => {
+      container.addEventListener(event, stopPropagation, { capture: true });
+    });
+
+    // Clean up
+    return () => {
+      events.forEach(event => {
+        container.removeEventListener(event, stopPropagation, { capture: true });
+      });
+    };
+  }, []);
 
   console.log('visualization', visualization);
   if (!visualization || !visualization.data) {
@@ -76,15 +109,53 @@ const StockChart = ({ visualization, metaData = {} }) => {
   // Build extra series using the checkboxes to decide if we should render them.
   let extraSeries = [];
   if (showPredictions && visualization.predictions && Array.isArray(visualization.predictions)) {
-    const predictionsData = visualization.predictions.map((value, i) => ({
-      x: baseLength + i,
-      y: parseFloat(value[0].toFixed(2)),
-    }));
-    extraSeries.push({
-      name: 'Predictions',
-      type: 'line',
-      data: predictionsData,
-    });
+    // Check if predictions have multiple dimensions
+    const firstPrediction = visualization.predictions[0];
+    const isMultiDimensional = Array.isArray(firstPrediction) && firstPrediction.length > 1;
+    
+    if (isMultiDimensional) {
+      // Handle multi-dimensional predictions - create a series for each dimension
+      const dimensions = firstPrediction.length;
+      
+      // Generate distinct colors for each dimension
+      const predictionColors = [
+        'rgba(0, 176, 255, 0.5)',    // Light blue with opacity
+        'rgba(255, 173, 0, 0.5)',    // Orange with opacity
+        'rgba(124, 207, 0, 0.5)',    // Green with opacity
+        'rgba(255, 102, 255, 0.5)',  // Pink with opacity
+        'rgba(255, 236, 0, 0.5)',    // Yellow with opacity
+      ];
+      
+      for (let dim = 0; dim < dimensions; dim++) {
+        const dimensionData = visualization.predictions.map((value, i) => ({
+          x: baseLength + i,
+          y: parseFloat(value[dim].toFixed(2)),
+        }));
+        
+        extraSeries.push({
+          name: `Prediction ${dim + 1}`,
+          type: 'line',
+          data: dimensionData,
+          opacity: 0.6, // Reduced opacity for predictions
+          color: predictionColors[dim % predictionColors.length], // Cycle through colors
+          dashArray: 4, // Add dashed line style for predictions
+        });
+      }
+    } else {
+      // Original single-dimension handling
+      const predictionsData = visualization.predictions.map((value, i) => ({
+        x: baseLength + i,
+        y: parseFloat(value[0].toFixed(2)),
+      }));
+      extraSeries.push({
+        name: 'Predictions',
+        type: 'line',
+        data: predictionsData,
+        opacity: 0.6, // Reduced opacity for predictions
+        color: 'rgba(0, 176, 255, 0.5)', // Light blue with opacity
+        dashArray: 4, // Add dashed line style for predictions
+      });
+    }
   }
   if (showActual && visualization.actual && Array.isArray(visualization.actual)) {
     const actualData = visualization.actual.map((value, i) => ({
@@ -95,6 +166,8 @@ const StockChart = ({ visualization, metaData = {} }) => {
       name: 'Actual',
       type: 'line',
       data: actualData,
+      color: '#00ff00', // Bright green for actual values
+      lineWidth: 2, // Slightly thicker line for actual values
     });
   }
 
@@ -145,6 +218,27 @@ const StockChart = ({ visualization, metaData = {} }) => {
         type: 'x',
         autoScaleYaxis: true,
       },
+      events: {
+        // Disable ApexCharts built-in selection by stopping event propagation
+        mouseDown: function(event) {
+          event.stopPropagation();
+        },
+        mouseMove: function(event) {
+          event.stopPropagation();
+        },
+        mouseUp: function(event) {
+          event.stopPropagation();
+        },
+        touchStart: function(event) {
+          event.stopPropagation();
+        },
+        touchMove: function(event) {
+          event.stopPropagation(); 
+        },
+        touchEnd: function(event) {
+          event.stopPropagation();
+        }
+      }
     },
     title: {
       text: title,
@@ -172,6 +266,20 @@ const StockChart = ({ visualization, metaData = {} }) => {
       position: 'top',
       labels: { colors: '#9E9E9E' },
     },
+    selection: {
+      enabled: true,
+      type: 'x',
+      fill: {
+        color: '#24292e',
+        opacity: 0.1
+      },
+      stroke: {
+        width: 1,
+        dashArray: 3,
+        color: '#24292e',
+        opacity: 0.4
+      },
+    },
   };
 
   return (
@@ -181,34 +289,56 @@ const StockChart = ({ visualization, metaData = {} }) => {
 
       {/* Control Panel to toggle extra series */}
       <div style={{ marginBottom: '1rem', color: '#fff' }}>
-        <label style={{ marginRight: '1rem' }}>
+        <label style={{ marginRight: '1rem' }} className="nodrag">
           <input
             type="checkbox"
+            className="nodrag"
             checked={showPredictions}
-            onChange={(e) => setShowPredictions(e.target.checked)}
+            onChange={(e) => {
+              e.stopPropagation();
+              setShowPredictions(e.target.checked);
+            }}
             style={{ marginRight: '0.3rem' }}
           />
           Show Predictions
         </label>
-        <label>
+        <label className="nodrag">
           <input
             type="checkbox"
+            className="nodrag"
             checked={showActual}
-            onChange={(e) => setShowActual(e.target.checked)}
+            onChange={(e) => {
+              e.stopPropagation();
+              setShowActual(e.target.checked);
+            }}
             style={{ marginRight: '0.3rem' }}
           />
           Show Actual
         </label>
       </div>
 
-      {/* Wrap the chart in a container that applies padding around the chart */}
-      <div style={{ padding: '8px', height: '100%', width: '100%', boxSizing: 'border-box' }}>
+      {/* Wrap the chart in a container that applies padding around the chart and prevents drag */}
+      <div 
+        ref={chartContainerRef}
+        className="nodrag nowheel" 
+        style={{ 
+          padding: '8px', 
+          height: '100%', 
+          width: '100%', 
+          boxSizing: 'border-box',
+          pointerEvents: 'auto',
+          touchAction: 'none'
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <ReactApexChart
           options={chartOptions}
           series={finalSeries}
           type={chartType}
           height="100%"
           width="100%"
+          dragHandlers={dragHandlers}
         />
       </div>
     </div>

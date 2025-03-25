@@ -14,14 +14,31 @@ export const useEntities = () => {
     ({ set }) =>
       (entityDict) => {
         const newIds = Object.keys(entityDict);
-
-        // Update entityIdsAtom (union with existing)
+        
+        // Find IDs that have deleted: true
+        const deletedIds = newIds.filter(id => entityDict[id].deleted === true);
+        
+        // Find IDs that are not marked as deleted
+        const validNewIds = newIds.filter(id => entityDict[id].deleted !== true);
+        
+        // Update entityIdsAtom to remove deleted IDs and add new valid IDs
         setEntityIds((prev) => {
-          const idSet = new Set([...prev, ...newIds]);
-          return Array.from(idSet);
+          // Remove any IDs that are marked for deletion
+          const remainingIds = prev.filter(id => !deletedIds.includes(id));
+          
+          // Find IDs that are not already in the remaining array
+          const idsToAdd = validNewIds.filter((id) => !remainingIds.includes(id));
+          
+          if (deletedIds.length === 0 && idsToAdd.length === 0) {
+            // No changes needed, return the same array
+            return prev;
+          }
+          
+          // Return a new array with deleted IDs removed and new IDs added
+          return [...remainingIds, ...idsToAdd];
         });
-
-        // For each ID, partially merge data into the relevant atom
+        
+        // For each ID, merge the entity data into the relevant atom
         newIds.forEach((entityId) => {
           set(entityFamily(entityId), (prevData) => ({
             ...prevData,

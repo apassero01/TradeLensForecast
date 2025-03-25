@@ -115,8 +115,14 @@ class StrategyRequestAdapter:
         model.strategy_name = entity.strategy_name
         model.param_config = entity.param_config
         model.add_to_history = entity.add_to_history
-        model.target_entity_id = entity.target_entity_id if entity.target_entity_id else entity.parent_ids[0]
+        if len(entity.parent_ids) == 0:
+            model.target_entity_id = entity.target_entity_id
+        else:
+            model.target_entity_id = entity.target_entity_id if entity.target_entity_id else entity.parent_ids[0]
+        model.parent_ids = entity.parent_ids
         model.class_path = entity.get_class_path()
+
+
 
         if model.strategy_name == None:
             model.strategy_name = "None"

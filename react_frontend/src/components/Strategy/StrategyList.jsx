@@ -22,7 +22,7 @@ const StrategyList = ({ strategies, entityType, onSelect, onRefresh }) => {
     setSelectedStrategy(strategy);
     setSearchTerm(strategy.name);
     setIsListVisible(false);
-    onSelect(strategy);
+    onSelect({...strategy}); // Clone the strategy object to ensure proper updates
   };
 
   const handleInputFocus = () => {

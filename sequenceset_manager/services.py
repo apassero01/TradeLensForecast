@@ -249,7 +249,7 @@ class SequenceSetService(ABC):
             # If the exact last_end_date not in df (weekend?), find closest
             last_end_idx = df.index.get_indexer([last_end_date], method='ffill')[0]
 
-        start_idx_for_new = max(0, last_end_idx - (sequence_length - 1))
+        start_idx_for_new = max(0, last_end_idx - (sequence_length - 1) - 200)
         new_data = df.iloc[start_idx_for_new:]
 
         # 4) Delete overlapping sequences

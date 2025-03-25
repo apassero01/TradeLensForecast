@@ -24,7 +24,7 @@ class EncoderToRNNWithMultiHeadAttention(BaseLayer):
         self.output_sequence_length = output_seq_length
 
         # Linear layer to project the concatenated (rnn_hidden + attention_output) to the final output
-        self.fc_out = nn.Linear(d_model*2, 1)  # Output shape will be (batch_size, output_seq_length, 2)
+        self.fc_out = nn.Linear(d_model*2, 100)  # Output shape will be (batch_size, output_seq_length, 2)
 
         self.traversable_layers = nn.ModuleList([self.multi_head_attention])
 

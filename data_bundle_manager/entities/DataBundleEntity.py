@@ -5,6 +5,11 @@ from typing import Optional, Dict, Any
 class DataBundleEntity(Entity):
     entity_name = EntityEnum.DATA_BUNDLE
 
+    def __init__(self, entity_id: Optional[str] = None):
+        super().__init__(entity_id)
+        self.set_attribute('width', 300)
+        self.set_attribute('height', 500)
+
     def on_create(self, param_config: Optional[Dict[str, Any]] = None):
         pass
 

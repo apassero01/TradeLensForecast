@@ -3,8 +3,7 @@ import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from model_stage.criterion_loss import MSLELoss, GuissLoss
-from models.loss import MinOfNSequenceLoss
+from model_stage.criterion_loss import MSLELoss, GuissLoss, MinOfNSequenceLoss, SoftInverseProfitLoss, SequenceNLLLoss
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.entities.Entity import Entity
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
@@ -403,6 +402,10 @@ class ConfigureModelStageStrategy(Strategy):
             return MSLELoss()
         if criterion_str == CriterionEnum.GUISS.value:
             return GuissLoss()
+        if criterion_str == CriterionEnum.SoftPL.value:
+            return SoftInverseProfitLoss()
+        if criterion_str == CriterionEnum.SEQ_GUISS.value:
+            return SequenceNLLLoss()
         else:
             raise ValueError(f"Unsupported criterion: {criterion_str}")
         

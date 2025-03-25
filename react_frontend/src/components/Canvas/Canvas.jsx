@@ -1,23 +1,45 @@
 // src/components/Canvas/Canvas.jsx
 import React, { useMemo, useEffect, useCallback, useState, useRef } from 'react';
-import { ReactFlow, Background, BackgroundVariant, applyNodeChanges, Controls } from '@xyflow/react';
-import { useRecoilValue } from 'recoil';
+import { ReactFlow, Background, BackgroundVariant, applyNodeChanges, Controls, applyEdgeChanges } from '@xyflow/react';
+import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { flowNodesSelector, flowEdgesSelector } from '../../state/entitiesSelectors';
-import EntityNode from './Entity/EntityNode';
-import StrategyRequestEntity from './Entity/StrategyRequestEntity';
-import InputEntity from './Entity/InputEntity';
-import VisualizationEntity from './Entity/VisualizationEntity/VisualizationEntity';
 import '@xyflow/react/dist/style.css';
 import ContextMenu from './ContextMenu';
 import { useWebSocketConsumer } from '../../hooks/useWebSocketConsumer';
+import DynamicNodeWrapper from './Entity/NodeWrapper';
+import { entityIdsAtom } from '../../state/entityIdsAtom';
+import { entityFamily } from '../../state/entityFamily';
+
+
 function Canvas() {
   // 1. Read the nodes & edges from Recoil
-  const recoilNodes = useRecoilValue(flowNodesSelector);
-  const recoilEdges = useRecoilValue(flowEdgesSelector);
+  const nodeIds = useRecoilValue(entityIdsAtom)
   const { sendStrategyRequest } = useWebSocketConsumer();
-  const [nodes, setNodes] = useState(recoilNodes);
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
   const [menu, setMenu] = useState(null);
   const reactFlowRef = useRef(null);
+
+  useEffect(() => {
+    // For each active node, build a React Flow node using the backend position/dimensions.
+    // Here you might fetch the current Recoil state for each node (or have that selector provide you a snapshot).
+    const newNodes = nodeIds.map((id) => {
+      // For simplicity, assume you can get the current state from Recoil via an external function or selector.
+      // Alternatively, you might store a local mapping of id -> node properties.
+      // In this example, we assume a default if no state is available.
+      // IMPORTANT: You want to avoid recreating nodes on every render; ideally, this runs only on add/remove or backend update.
+      return {
+        id,
+        type: 'dynamic',
+        // Use the backend-specified position/dimensions when available.
+        // These values might come from Recoil or a dedicated selector.
+        position: { x: 0, y: 0 }, // Replace with actual backend position if available
+        data: { entityId: id },
+        hidden: false,
+      };
+    });
+    setNodes(newNodes);
+  }, [nodeIds]); // or add dependency on backend state changes
   
   // Instead of using the hook at component level, track mouse position directly
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -50,28 +72,15 @@ function Canvas() {
 
   const nodeTypes = useMemo(() => {
     return {
-      entityNode: EntityNode, 
-      strategyRequestEntity: StrategyRequestEntity,
-      inputEntity: InputEntity,
-      visualizationEntity: VisualizationEntity,
+      "dynamic": DynamicNodeWrapper,
     }
   }, []);
 
 
-  useEffect(() => {
-    setNodes((prevNodes) => 
-      recoilNodes.map((recoilNode) => {
-        const existingNode = prevNodes.find((n) => n.id === recoilNode.id);
-        return {
-          ...recoilNode,
-          position: existingNode?.position || recoilNode.position,
-          width: existingNode?.width || recoilNode.width,
-          height: existingNode?.height || recoilNode.height,
-        }
-      })
-    )
-  }, [recoilNodes]);
-
+  const onEdgesChange = useCallback((changes) => {
+    console.log('Edges changed', changes);
+    setEdges((prevEdges) => applyEdgeChanges(changes, prevEdges));
+  }, []);
 
   const onDragEnd = useCallback((event, node) => {
     if (!node.position.x || !node.position.y) {
@@ -103,6 +112,7 @@ function Canvas() {
       if (changes.length > 0 && changes[0].type === 'dimensions' && changes[0].resizing === false) {
         const entity = updatedNodes.find((node) => node.id === changes[0].id);
         if (entity) {
+          console.log('Updating entity', entity);
           sendStrategyRequest({
             strategy_name: 'SetAttributesStrategy',
             param_config: {
@@ -150,10 +160,11 @@ function Canvas() {
       <ReactFlow
         ref={reactFlowRef}
         nodes={nodes}
-        edges={recoilEdges}
+        edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onMove={onMoveEnd}
+        onEdgesChange={onEdgesChange}
         fitView
         onNodeDragStop={(event, node) => {
           onDragEnd(event, node);

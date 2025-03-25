@@ -4,7 +4,7 @@ import EntityNodeBase from './EntityNodeBase';
 import { useRecoilValue } from 'recoil';
 import { strategyRequestChildrenSelector } from '../../../state/entitiesSelectors';
 
-function InputEntity({ data }) {
+function InputEntity({ data, updateEntity }) {
   const [text, setText] = useState(data.visualization || '');
   // Get strategy requests associated with this entity
   const strategyRequests = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
@@ -20,7 +20,7 @@ function InputEntity({ data }) {
   };
 
   return (
-    <EntityNodeBase data={data}>
+    <EntityNodeBase data={data} updateEntity={updateEntity}>
       {({ sendStrategyRequest }) => {
                   
         const execute_request = {

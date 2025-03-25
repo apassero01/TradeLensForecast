@@ -16,6 +16,8 @@ class SequenceSetEntity(Entity):
         self.feature_dict = None
         self.metadata = None
         self.sequences = None
+        self.set_attribute('width', 326)
+        self.set_attribute('height', 326)
 
 
     @staticmethod

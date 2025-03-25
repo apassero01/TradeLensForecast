@@ -8,7 +8,7 @@ import Editor from '../Input/Editor';
 // Possibly import other custom forms if you have them
 import { entityApi } from '../../api/entityApi';
 
-function StrategyEditor({ existingRequest, entityType }) {
+function StrategyEditor({ existingRequest, entityType, updateEntity, sendStrategyRequest, isLoading, setIsLoading }) {
   const {
     requestObj,
     setRequestObj,
@@ -20,21 +20,26 @@ function StrategyEditor({ existingRequest, entityType }) {
 
   const { strategy_name, param_config } = requestObj;
 
-  const [localRegistry, setLocalRegistry] = useState([registry]);
+  const [saveRequest, setSaveRequest] = useState(false);
 
   // Use a separate state for editor content
   const [editorContent, setEditorContent] = useState(
     JSON.stringify(requestObj, null, 2)
   );
 
-  useEffect(() => {
-    handleRefresh();
-  }, []);
+  // // Add a useEffect to update editorContent when requestObj changes
+  // useEffect(() => {
+  //   setEditorContent(JSON.stringify(requestObj, null, 2));
+  // }, [requestObj]);
 
-  // Add a useEffect to update editorContent when requestObj changes
+  // Update the useEffect to sync the saveRequest state with requestObj
   useEffect(() => {
-    setEditorContent(JSON.stringify(requestObj, null, 2));
-  }, [requestObj]);
+    const updatedRequest = {
+      ...requestObj,
+      add_to_history: saveRequest
+    };
+    setRequestObj(updatedRequest);
+  }, [saveRequest]);
 
   // 1. When the user picks a strategy from StrategyList
   function handleStrategySelect(selectedStrat) {
@@ -105,16 +110,16 @@ function StrategyEditor({ existingRequest, entityType }) {
     }
   }
 
-  async function handleRefresh() {
-    try {
-      const newRegistry = await entityApi.getStrategyRegistry();
-      const flattenedRegistry = Object.values(newRegistry).flat();
-      setLocalRegistry(flattenedRegistry);
-    } catch (error) {
-      console.error('Failed to refresh strategy registry:', error);
-      // Optionally set an error state here if you want to display it to the user
-    }
-  }
+  // async function handleRefresh() {
+  //   try {
+  //     const newRegistry = await entityApi.getStrategyRegistry();
+  //     const flattenedRegistry = Object.values(newRegistry).flat();
+  //     setRegistry(flattenedRegistry);
+  //   } catch (error) {
+  //     console.error('Failed to refresh strategy registry:', error);
+  //     // Optionally set an error state here if you want to display it to the user
+  //   }
+  // }
 
   function handleExecute() {
     executeStrategy();
@@ -124,15 +129,16 @@ function StrategyEditor({ existingRequest, entityType }) {
   if (registryError) return <div className="text-red-500">{registryError}</div>;
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full relative">
       <h2 className="flex-none text-lg font-semibold">Strategy Editor</h2>
   
       <div className="flex-none w-full border border-gray-700 rounded mt-4">
         <StrategyList
-          strategies={localRegistry}
+          strategies={registry || []}
           entityType={entityType}
           onSelect={handleStrategySelect}
-          onRefresh={handleRefresh}
+          onRefresh={() => {}}
+          selectedStrategy={strategy_name}
         />
       </div>
   
@@ -153,7 +159,7 @@ function StrategyEditor({ existingRequest, entityType }) {
         />
       )}
   
-      <div className="flex-grow min-h-0 w-full mt-4">
+      <div className="flex-grow min-h-0 w-full mt-4 mb-20">
         <p className="text-sm text-gray-400 mb-2">Param Config (JSON)</p>
         <div className="h-full w-full">
           <Editor
@@ -166,13 +172,25 @@ function StrategyEditor({ existingRequest, entityType }) {
         </div>
       </div>
 
-      <div className="flex-none w-full mt-4">
+      <div className="fixed bottom-4 left-4 py-3 px-4 bg-gray-800 border border-gray-700 flex items-center space-x-4 rounded-md shadow-lg">
         <button
           onClick={handleExecute}
-          className="mt-2 px-2 py-1 bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 font-medium"
         >
           Execute
         </button>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="saveRequest"
+            checked={saveRequest}
+            onChange={(e) => setSaveRequest(e.target.checked)}
+            className="mr-2 h-4 w-4"
+          />
+          <label htmlFor="saveRequest" className="text-gray-300 text-sm">
+            Save Request
+          </label>
+        </div>
       </div>
     </div>
   );

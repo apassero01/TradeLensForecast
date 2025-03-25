@@ -33,6 +33,20 @@ export default function ContextMenu({
     });
   }, [entityId, sendStrategyRequest, onClick]);
 
+  const Visualization = useCallback(() => {
+    // Close the context menu
+    onClick();
+    
+    // Send strategy request to duplicate the entity
+    sendStrategyRequest({
+      strategy_name: 'CreateEntityStrategy',
+      target_entity_id: entityId,
+      param_config: {"entity_class": "shared_utils.entities.VisualizationEntity.VisualizationEntity"},
+      add_to_history: false,
+      nested_requests: [],
+    });
+  }, [entityId, sendStrategyRequest, onClick]);
+
   const copyEntityId = useCallback(() => {
     // Copy entity ID to clipboard
     navigator.clipboard.writeText(entityId);
@@ -133,7 +147,7 @@ export default function ContextMenu({
         </div>
         
         <button 
-          onClick={duplicateNode}
+          onClick={Visualization}
           style={{
             display: 'block',
             width: '100%',
@@ -147,7 +161,7 @@ export default function ContextMenu({
           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
           onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
-          Duplicate
+          Visualization
         </button>
         
         <button

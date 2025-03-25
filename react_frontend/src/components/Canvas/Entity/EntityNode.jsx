@@ -4,12 +4,13 @@ import EntityNodeBase from './EntityNodeBase';
 import MetadataList from './MetadataComponents/MetadataList';
 import MetadataValue from './MetadataComponents/MetadataValue';
 
-function EntityNode({ data }) {
+function EntityNode({ data, updateEntity }) {
   const metadata = data.meta_data || data.metaData || {};
   return (
     <EntityNodeBase 
       data={data}
       containerClassName="flex flex-col items-center justify-center p-4"
+      updateEntity={updateEntity}
     >
       {({ data, handleCreateChild }) => (
         <div className="flex flex-col p-4">

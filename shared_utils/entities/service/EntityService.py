@@ -237,6 +237,9 @@ class EntityService:
         """Recursively get all children of a specific type until no children are left."""
         entity = self.load_from_db(entity_id)
 
+        if not entity:
+            return []
+
         entities = []
 
         # Add the current entity if it matches the type

@@ -329,3 +329,145 @@ class GuissLoss(nn.Module):
             loss = nll  # no reduction
 
         return loss
+
+
+class MinOfNSequenceLoss(nn.Module):
+    def __init__(self, reduction='mean', lambda_range=.1):
+        """
+        :param reduction: 'mean', 'sum', or 'none'
+        :param lambda_range: Weight for the range penalty term. If 0.0, the loss is equivalent to the original.
+        """
+        super().__init__()
+        self.reduction = reduction
+        self.lambda_range = lambda_range
+
+    def forward(self, preds, target):
+        """
+        :param preds:  (batch, seq_length, n)
+        :param target: (batch, seq_length, 1)
+        :return:       scalar loss if reduction is 'mean' or 'sum', else (batch, seq_length)
+        """
+        # Expand target for broadcasting
+        target_expanded = target.expand(-1, -1, preds.size(2))
+
+        # Compute squared errors
+        errors = (preds - target_expanded) ** 2
+
+        # Take the minimum error across the n dimension
+        min_errors, _ = torch.min(errors, dim=2)
+
+        # Compute the range of predictions at each time step:
+        # (max - min) across the n dimension.
+        pred_max = torch.max(preds, dim=2)[0]
+        pred_min = torch.min(preds, dim=2)[0]
+        range_vals = pred_max - pred_min
+
+        # Combine the minimum error and the range penalty.
+        # Here, lambda_range is a hyperparameter you can tune.
+        loss = min_errors + self.lambda_range * range_vals
+
+        # Apply reduction
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
+
+
+class SoftInverseProfitLoss(nn.Module):
+    def __init__(self, reduction='mean', alpha=10.0, lambda_dist=100.0):
+        """
+        :param reduction: 'mean', 'sum', or 'none'
+        :param alpha: Controls the sharpness of the softmax weighting. Higher alpha approximates a hard max.
+        :param lambda_dist: Weight for the distance penalty term.
+        """
+        super().__init__()
+        self.reduction = reduction
+        self.alpha = alpha
+        self.lambda_dist = lambda_dist
+
+    def forward(self, preds, target):
+        """
+        :param preds:  Tensor of shape (batch, seq_length, n) with n candidate sequences.
+        :param target: Tensor of shape (batch, seq_length, 1) representing the actual sequence.
+        :return:       Scalar loss if reduction is 'mean' or 'sum', else a tensor of shape (batch,)
+        """
+        eps = 1e-8  # for numerical stability
+
+        # 1. Compute percent change for the target (using the first and last time steps)
+        target_start = target[:, 0, 0]
+        target_end = target[:, -1, 0]
+        target_start = target_start + eps  # avoid division by zero
+        target_pct_change = (target_end - target_start) / target_start  # shape: (batch,)
+
+        # 2. Compute percent change for each candidate prediction
+        preds_start = preds[:, 0, :]  # shape: (batch, n)
+        preds_end = preds[:, -1, :]   # shape: (batch, n)
+        preds_start = preds_start + eps
+        preds_pct_change = (preds_end - preds_start) / preds_start  # shape: (batch, n)
+
+        # 3. Compute profit for each candidate.
+        # Profit is positive if both target and prediction move in the same direction.
+        profit = preds_pct_change * target_pct_change.unsqueeze(1)  # shape: (batch, n)
+
+        # 4. Compute a distance measure between each candidate and the target sequence.
+        # We expand the target to match the candidate dimension.
+        target_expanded = target.expand(-1, -1, preds.size(2))  # shape: (batch, seq_length, n)
+        # Here we use the mean absolute error across the sequence.
+        distance = torch.mean(torch.abs(preds - target_expanded), dim=1)  # shape: (batch, n)
+
+        # 5. Adjust profit by subtracting a penalty proportional to the distance.
+        effective_profit = profit - self.lambda_dist * distance  # shape: (batch, n)
+
+        # 6. Use softmax weighting over candidates so that better effective profit gets more weight.
+        weights = torch.softmax(self.alpha * effective_profit, dim=1)  # shape: (batch, n)
+        weighted_effective_profit = (weights * effective_profit).sum(dim=1)  # shape: (batch,)
+
+        # 7. Define the loss as the negative of the weighted effective profit.
+        loss = -weighted_effective_profit
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
+
+class SequenceNLLLoss(nn.Module):
+    def __init__(self, reduction='mean', eps=1e-6):
+        """
+        :param reduction: Specifies the reduction to apply to the output: 'mean', 'sum', or 'none'.
+        :param eps: Small constant added to variance for numerical stability.
+        """
+        super().__init__()
+        self.reduction = reduction
+        self.eps = eps
+
+    def forward(self, preds, target):
+        """
+        Computes the negative log-likelihood loss for a batch of sequences.
+
+        :param preds: Tensor of shape (batch, seq_length, n_samples). These are the predicted samples.
+        :param target: Tensor of shape (batch, seq_length, 1). These are the ground truth values.
+        :return: Loss value (scalar if reduction is 'mean' or 'sum', else tensor of shape (batch, seq_length)).
+        """
+        # Compute the sample mean and variance along the n_samples dimension.
+        mu = torch.mean(preds, dim=2)  # shape: (batch, seq_length)
+        # Use torch.var to compute the variance; add eps for stability.
+        variance = torch.var(preds, dim=2, unbiased=False) + self.eps  # shape: (batch, seq_length)
+
+        # Remove the extra dimension in target to match mu and variance shapes.
+        target = target.squeeze(-1)  # shape: (batch, seq_length)
+
+        # Compute the negative log-likelihood for the Gaussian distribution.
+        # Formula: 0.5 * log(2*pi*variance) + 0.5 * ((target - mu)^2 / variance)
+        nll = 0.5 * torch.log(2 * math.pi * variance) + 0.5 * ((target - mu) ** 2) / variance
+
+        # Apply the specified reduction.
+        if self.reduction == 'mean':
+            return nll.mean()
+        elif self.reduction == 'sum':
+            return nll.sum()
+        else:
+            return nll

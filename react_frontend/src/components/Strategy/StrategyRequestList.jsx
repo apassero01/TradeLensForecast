@@ -35,7 +35,7 @@ function SortableItem({ id, request, updateEntity, sendStrategyRequest, onRemove
 
   const handleEdit = (e) => {
     e.stopPropagation();
-    updateEntity(request.entity_id, { hidden: false });
+    updateEntity(request.entity_id, { hidden: false, selected: true });
   };
 
   const handleRemove = (e) => {

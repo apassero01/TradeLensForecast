@@ -13,6 +13,7 @@ export const entityFamily = atomFamily({
     height: 100,
     child_ids: [],
     strategy_requests: [],
+    hidden: false,
     // etc. for other fields from the back end
   }),
 });

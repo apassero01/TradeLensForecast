@@ -141,13 +141,14 @@ export const nodeSelectorFamily = selectorFamily({
       id: entityId,
       type: nodeType,
       position: entity.position || calculateNewPosition(entity, get),
-      width: entity?.width || 200,
-      height: entity?.height || 100,
+      width: entity?.width || 300,
+      height: entity?.height || 200,
       data: { ...entity, entityId },
       hidden: entity?.hidden || false,
       entity_name: entity?.entity_name || '',
       entity_type: entity?.entity_type || '',
       entity_id: entity?.entity_id || '',
+      is_loading: false,
     };
   },
 });
@@ -195,7 +196,7 @@ const calculateNewPosition = (entity, get) => {
   if (parent_ids && parent_ids.length > 0) {
     const parent = get(nodeSelectorFamily(parent_ids[0]));
     const parentPosition = parent.position;
-    return {x: parentPosition.x, y: parentPosition.y}
+    return {x: parentPosition.x, y: parentPosition.y - 100}
   }
   return {x: 0, y: 0}
 }

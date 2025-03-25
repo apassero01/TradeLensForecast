@@ -7,30 +7,31 @@ import { strategyRequestChildrenSelector } from '../../../state/entitiesSelector
 import StrategyRequestList from '../../Strategy/StrategyRequestList';
 import { FaPlus } from 'react-icons/fa';
 
-function EntityNodeBase({ data, children }) {
+function EntityNodeBase({ data, children, updateEntity }) {
   // const entity = useRecoilValue(entityFamily(data.entityId)); // Use full entity from Recoil
   const { sendStrategyRequest } = useWebSocketConsumer();
   const strategyRequestChildren = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  console.log('EntityNodeBase rendered ', data.entityId);
+  // console.log('EntityNodeBase rendered ', data.entityId, data);
 
-  // Callback to update an entity atom
-  const updateEntity = useRecoilCallback(
-    ({ set }) =>
-      (childId, updatedFields) => {
-        set(entityFamily(childId), (prev) => ({
-          ...prev,
-          ...updatedFields,
-        }));
-        console.log('Updated entity:', childId, updatedFields);
-      },
-    []
-  );
+  // // Callback to update an entity atom
+  // const updateEntity = useRecoilCallback(
+  //   ({ set }) =>
+  //     (childId, updatedFields) => {
+  //       set(entityFamily(childId), (prev) => ({
+  //         ...prev,
+  //         ...updatedFields,
+  //       }));
+  //       console.log('Updated entity:', childId, updatedFields);
+  //     },
+  //   []
+  // );
 
   // Process strategy request children once per child
   const processedChildrenRef = useRef({});
   useEffect(() => {
-    if (strategyRequestChildren.length > 0) {
+    if (strategyRequestChildren?.length > 0) {
       const updatesToMake = [];
       strategyRequestChildren.forEach((child) => {
         if (!processedChildrenRef.current[child.entity_id]) {
@@ -38,7 +39,7 @@ function EntityNodeBase({ data, children }) {
           processedChildrenRef.current[child.entity_id] = true;
         }
       });
-      if (updatesToMake.length > 0) {
+      if (updatesToMake.length > 0 && updateEntity) {
         updatesToMake.forEach((child) => {
           updateEntity(child.entity_id, {
             hidden: true,
@@ -76,76 +77,104 @@ function EntityNodeBase({ data, children }) {
     [data.entityId, sendStrategyRequest]
   );
 
+  const handleNodeClick = useCallback((event) => {
+    // Prevent event propagation to avoid canvas deselection
+    event.stopPropagation();
+    
+    if (updateEntity) {
+      // Toggle selected state and update zIndex
+      updateEntity(data.entityId, {
+        selected: !data.selected,
+        zIndex: !data.selected ? 999 : 0, // High zIndex when selected, reset when deselected
+      });
+    }
+  }, [data.entityId, data.selected, updateEntity]);
+
   return (
-<div
-  style={{
-    backgroundColor: '#1f2937',
-    border: '1px solid #374151',
-    borderRadius: 4,
-    color: 'white',
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  }}
->
-  <NodeResizeControl minWidth={100} minHeight={50}>
-    <ResizeIcon />
-  </NodeResizeControl>
+    <div
+      onClick={handleNodeClick}
+      style={{
+        backgroundColor: '#1f2937',
+        border: data.selected 
+          ? '2px solid #3b82f6' // Bright blue highlight for selected nodes
+          : '1px solid #374151',
+        borderRadius: 4,
+        color: 'white',
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        boxShadow: data.selected 
+          ? '0 0 0 2px rgba(59, 130, 246, 0.5)' // Add a subtle glow for selected nodes
+          : 'none',
+      }}
+      className={isLoading ? 'entity-loading' : ''}
+    >
+      {isLoading && (
+        <div className="absolute inset-0 rounded-[3px] z-10">
+          <div className="absolute inset-0 rounded-[3px] border-2 border-blue-500 animate-pulse"></div>
+        </div>
+      )}
+      
+      <NodeResizeControl minWidth={100} minHeight={50}>
+        <ResizeIcon />
+      </NodeResizeControl>
 
-  <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Top} />
 
-  <div className="flex-grow h-full w-full p-4 flex items-center justify-center overflow-y-hidden overflow-x-hidden">
-    {children({
-      data: data,
-      childrenRequests: strategyRequestChildren,
-      updateEntity: updateEntity,
-      sendStrategyRequest: sendStrategyRequest,
-      onRemoveRequest: handleRemoveChild,
-    })}
-  </div>
+      <div className="flex-grow h-full w-full p-4 flex items-center justify-center overflow-y-hidden overflow-x-hidden">
+        {children({
+          data: data,
+          childrenRequests: strategyRequestChildren,
+          updateEntity: updateEntity,
+          sendStrategyRequest: sendStrategyRequest,
+          onRemoveRequest: handleRemoveChild,
+          isLoading: isLoading,
+          setIsLoading: setIsLoading,
+        })}
+      </div>
 
-  <button
-    onClick={handleCreateChild}
-    style={{
-      position: 'absolute',
-      top: '8px',
-      right: '8px',
-      backgroundColor: '#3b82f6', // Bright blue from your description
-      color: 'white',
-      border: 'none',
-      borderRadius: '50%',
-      width: '24px',
-      height: '24px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-    }}
-  >
-    <FaPlus size={12} /> {/* Assuming FaPlus from FontAwesome */}
-  </button>
+      <button
+        onClick={handleCreateChild}
+        style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          backgroundColor: '#3b82f6', // Bright blue from your description
+          color: 'white',
+          border: 'none',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <FaPlus size={12} /> {/* Assuming FaPlus from FontAwesome */}
+      </button>
 
-  <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} />
 
-  <div
-    style={{
-      position: 'absolute',
-      top: 0,
-      left: '100%',
-      height: '100%',
-      zIndex: 100,
-      display: 'flex',
-      alignItems: 'center',
-    }}
-  >
-    <StrategyRequestList
-      childrenRequests={strategyRequestChildren}
-      updateEntity={updateEntity}
-      sendStrategyRequest={sendStrategyRequest}
-      onRemoveRequest={handleRemoveChild}
-      data={data}
-    />
-  </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: '100%',
+          height: '100%',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <StrategyRequestList
+          childrenRequests={strategyRequestChildren}
+          updateEntity={updateEntity}
+          sendStrategyRequest={sendStrategyRequest}
+          onRemoveRequest={handleRemoveChild}
+          data={data}
+        />
+      </div>
     </div>
   );
 }
