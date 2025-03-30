@@ -10,18 +10,21 @@ import requests
 from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy_executor.service.StrategyExecutorService import StrategyExecutorService
 import inspect
+import logging
 
 
 class Strategy(ABC):
     entity_type = EntityEnum.ENTITY
 
     strategy_description = 'This is the base strategy class'
+
+    logger = logging.getLogger(__name__)
     
     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
         self.strategy_request = strategy_request
         self.strategy_executor = strategy_executor
         self.entity_service = EntityService()
-        self.executor_service = StrategyExecutorService(strategy_executor)
+        self.executor_service = StrategyExecutorService()
 
     @abstractmethod
     def apply(self, entity):
@@ -95,6 +98,7 @@ class CreateEntityStrategy(Strategy):
         - entity_class: fully qualified path to entity class
         - entity_uuid: (optional) UUID to use for recreation
         """
+        self.logger.info(f"Creating entity for parent {parent_entity.entity_id}")
         config = self.strategy_request.param_config
         entity_class_path = config.get('entity_class')
 
@@ -135,6 +139,7 @@ class CreateEntityStrategy(Strategy):
         self.strategy_request.add_nested_request(child_request)
         # Add the new entity to the strategy request
         self.strategy_request.ret_val['entity'] = parent_entity
+        self.logger.info(f"Entity created: {new_entity.entity_id}")
         
         return self.strategy_request
 

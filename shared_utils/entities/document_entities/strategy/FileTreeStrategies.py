@@ -102,6 +102,7 @@ class RecursiveFileScrapeStrategy(Strategy):
                     
                     response = self.executor_service.execute_request(create_request)
                     child_entity = response.ret_val['child_entity']
+                    entity = response.ret_val['entity']
                     self.strategy_request.add_nested_request(create_request)
                     
                     # Recursively process the child

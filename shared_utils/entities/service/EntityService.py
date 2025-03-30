@@ -1,4 +1,6 @@
 import importlib
+from imghdr import tests
+
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
@@ -6,7 +8,9 @@ from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.EntityModel import EntityModel
+import logging
 
+logger = logging.getLogger(__name__)
 
 class EntityService:
     def __init__(self):
@@ -15,21 +19,25 @@ class EntityService:
 
     def get_entity(self, entity_id):
         """Get an entity by its ID from cache or database"""
+        logger.info(f"Getting entity {entity_id}")
         entity = self.load_from_cache(entity_id)
+        logger.info(f"Entity {entity_id} loaded from cache")
         if entity is None:
+            logger.info(f"Entity {entity_id} not found in cache, loading from database")
             entity = self.load_from_db(entity_id)
 
         if entity is None:
+            logger.info(f"Entity {entity_id} not found in database")
             raise ValueError(f"Entity with ID {entity_id} not found")
 
         return entity
 
     def save_entity(self, entity):
         """Save an entity to cache and broadcast update via WebSocket"""
-        print(f"Saving entity {entity.entity_id} to cache")
-        
-        # Save to cacheC
+        # Save entity to cache
+        logger.info(f"Saving entity {entity.entity_id} to cache")
         self.cache_service.set(entity.entity_id, entity)
+        logger.info(f"Entity {entity.entity_id} saved to cache")
         
         # Check if entity socket exists
         socket_exists = self._check_entity_socket_exists(entity.entity_id)
@@ -37,6 +45,9 @@ class EntityService:
         if hasattr(entity, 'deleted') and entity.deleted:
             self.clear_entity(entity.entity_id)
             return
+
+        from shared_utils.tasks import test_broadcast
+        test_broadcast.delay()
         # Broadcast update
         # if not socket_exists:
         # No socket exists, broadcast to global to establish connection
@@ -180,6 +191,7 @@ class EntityService:
         try:
             model = EntityModel.objects.get(entity_id=entity_id)
         except EntityModel.DoesNotExist:
+            logger.error(f"Entity with ID {entity_id} not found in database")
             return None
 
         return self.create_instance_from_path(model.class_path).from_db(model)

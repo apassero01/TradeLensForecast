@@ -51,11 +51,15 @@ INSTALLED_APPS = [
 # Add Channels configuration
 ASGI_APPLICATION = 'TradeLens.routing.application'
 
-# Configure Channel Layers (using in-memory for development)
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer'
-    }
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [("127.0.0.1", 6379)],
+            "capacity": 1500,
+            "expiry": 10,
+        },
+    },
 }
 
 MIDDLEWARE = [
@@ -129,6 +133,14 @@ if 'test' in sys.argv:
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         'LOCATION': 'unique-test-cache',  # Unique identifier for the in-memory cache
     }
+
+# Celery settings
+CELERY_BROKER_URL = 'redis://localhost:6379/3'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/2'
+CELERY_ACCEPT_CONTENT = ['pickle']
+CELERY_TASK_SERIALIZER = 'pickle'
+CELERY_RESULT_SERIALIZER = 'pickle'
+CELERY_TIMEZONE = 'UTC'
 
 
 # Password validation

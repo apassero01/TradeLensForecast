@@ -16,6 +16,7 @@ function StrategyEditor({ existingRequest, entityType, updateEntity, sendStrateg
     registryLoading,
     registryError,
     executeStrategy,
+    refresh,
   } = useStrategyEditor(existingRequest);
 
   const { strategy_name, param_config } = requestObj;
@@ -137,7 +138,7 @@ function StrategyEditor({ existingRequest, entityType, updateEntity, sendStrateg
           strategies={registry || []}
           entityType={entityType}
           onSelect={handleStrategySelect}
-          onRefresh={() => {}}
+          onRefresh={refresh}
           selectedStrategy={strategy_name}
         />
       </div>

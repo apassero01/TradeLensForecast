@@ -56,6 +56,7 @@ class StrategyDirectory:
             EntityEnum.API_MODEL.value: [
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.ConfigureApiModelStrategy",
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.CallApiModelStrategy",
+                "shared_utils.entities.api_model.strategy.ApiModelStrategy.ClearChatHistoryStrategy",
             ],
             EntityEnum.STRATEGY_REQUEST.value: [
             ],

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
@@ -7,7 +8,7 @@ from shared_utils.strategy_executor.service.StrategyExecutorService import Strat
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 
 entity_service = EntityService()
-strategy_executor_service = StrategyExecutorService(StrategyExecutor())
+strategy_executor_service = StrategyExecutorService()
 
 class GlobalEntityConsumer(AsyncWebsocketConsumer):
     """Handles global session state and entity updates"""
@@ -154,10 +155,8 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
 
             # Convert JSON to StrategyRequestEntity
             strat_request = self.json_to_strategy_request(strategy_data)
-            
-            # Execute strategy - EntityService will handle WebSocket broadcasts
-            await sync_to_async(strategy_executor_service.execute_request)(strat_request)
-            
+
+            task = strategy_executor_service.execute_request(strat_request, wait=False)
             # Send confirmation of execution
             await self.send(json.dumps({
                 'type': 'strategy_executed',
@@ -217,7 +216,7 @@ class EntityConsumer(AsyncWebsocketConsumer):
         try:
             # Execute strategy and get updated entity data
             updated_entity = await sync_to_async(entity_service.execute_strategy)(
-                self.entity_id,
+                self.entitythey_id,
                 strategy_data
             )
 

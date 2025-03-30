@@ -37,8 +37,10 @@ export const WebSocketProvider = ({ children }) => {
     };
 
     ws.onmessage = (event) => {
+      console.log('WebSocket message received:');
       try {
         const msg = JSON.parse(event.data);
+        console.log('WebSocket message received:', msg.type);
         if (msg.type === 'entity_update') {
           mergeEntities(msg.entities);
         } else if (msg.type === 'error') {

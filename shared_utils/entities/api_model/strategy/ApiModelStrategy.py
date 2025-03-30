@@ -9,6 +9,9 @@ from typing import List
 from dataclasses import dataclass
 import json
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Message:
@@ -58,7 +61,6 @@ class ConfigureApiModelStrategy(Strategy):
         
         # Set config with OpenAI defaults if not provided
         default_config = {
-            'temperature': 0.7,
             'max_tokens': 5000,
             'top_p': 1.0,
             'frequency_penalty': 0.0,
@@ -80,7 +82,6 @@ class ConfigureApiModelStrategy(Strategy):
             'model_name': 'gpt-4o-mini',  # Optional, has defaults per model_type
             'env_key': 'OPENAI_API_KEY',  # Required - environment variable key
             'model_config': {  # Optional - has defaults
-                'temperature': 0.7,
                 'max_tokens': 4000,
                 'top_p': 1.0,
                 'frequency_penalty': 0.0,
@@ -95,7 +96,7 @@ class CallApiModelStrategy(Strategy):
     strategy_description = 'Makes a call to the configured API model using LangChain'
 
     def verify_executable(self, entity, strategy_request):
-        required_attrs = ['model_type', 'model_name', 'api_key']
+        required_attrs = ['model_type', 'model_name', 'api_key', 'serialize_entities_and_strategies']
         return all(entity.has_attribute(attr) for attr in required_attrs)
 
     def form_context(self, entity) -> str:
@@ -106,8 +107,11 @@ class CallApiModelStrategy(Strategy):
         
         if not doc_ids:
             return ""
-            
+
         contexts = []
+
+
+        contexts.append("These documents may contain import instructions or other relevant information:")
         for doc_id in doc_ids:
             doc = self.entity_service.get_entity(doc_id)
             if doc and doc.has_attribute('text'):
@@ -124,34 +128,35 @@ class CallApiModelStrategy(Strategy):
                     f"{'='*50,"DOCUMENT_END"}\n"
                 )
 
-        strategy_directory = self.get_strategy_directory(entity)
-        contexts.append(
-            f"{'='*50}\n"
-            f"Strategy Directory\n"
-            f"{'-'*50}\n"
-            f"{strategy_directory}\n"
-            f"{'='*50}\n"
-        )
+        if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
+            entity_graph = self.serialize_entity_and_children(entity.entity_id)
+            contexts.append(
+                f"{'=' * 50}\n"
+                f"Entity Graph\n"
+                f"{'-' * 50}\n"
+                f"{json.dumps(entity_graph, indent=2)}\n"
+                f"{'=' * 50}\n"
+            )
+            strategy_directory = self.get_strategy_directory(entity)
+            contexts.append(
+                f"{'='*50}\n"
+                f"Strategy Directory\n"
+                f"{'-'*50}\n"
+                f"{strategy_directory}\n"
+                f"{'='*50}\n"
+            )
 
-        available_entities = self.get_available_entities(entity)
-        contexts.append(
-            f"{'='*50}\n"
-            f"Available Entities\n"
-            f"{'-'*50}\n"
-            f"{available_entities}\n"
-            f"{'='*50}\n"
-        )
+            available_entities = self.get_available_entities(entity)
+            contexts.append(
+                f"{'='*50}\n"
+                f"Available Entities\n"
+                f"{'-'*50}\n"
+                f"{available_entities}\n"
+                f"{'='*50}\n"
+            )
 
-        entity_graph = self.serialize_entity_and_children(entity.entity_id)
-        contexts.append(
-            f"{'='*50}\n"
-            f"Entity Graph\n"
-            f"{'-'*50}\n"
-            f"{json.dumps(entity_graph, indent=2)}\n"
-            f"{'='*50}\n"
-        )
-
-        for message in history:
+        for i in range(len(history)-1, -1, -1):
+            message = history[i]
             contexts.append(
                 f"{'='*50}\n"
                 f"Message Type: {message.type.upper()}\n"
@@ -159,7 +164,7 @@ class CallApiModelStrategy(Strategy):
                 f"{message.content}\n"
                 f"{'='*50}\n"
             )
-        
+
         return "\n".join(contexts)
 
     def format_response_text(self, text: str, max_line_length: int = 80) -> str:
@@ -219,7 +224,6 @@ class CallApiModelStrategy(Strategy):
         chat = ChatOpenAI(
             model_name=entity.get_attribute('model_name'),
             openai_api_key=entity.get_attribute('api_key'),
-            temperature=entity.get_attribute('config').get('temperature', 0.7),
             max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
         )
 
@@ -230,6 +234,8 @@ class CallApiModelStrategy(Strategy):
 
         # Use invoke() instead of __call__
         response = chat.invoke(messages)
+
+        logger.info(f"Response from model: Message Received from APi model")
         
         # Get message history
         history = entity.get_attribute('message_history')
@@ -292,8 +298,18 @@ class CallApiModelStrategy(Strategy):
                 request.add_to_history = parsed_json['add_to_history']
                 request.target_entity_id = parsed_json['target_entity_id']
 
+                target_entity = self.entity_service.get_entity(request.target_entity_id)
+                target_entity.add_child(request)
+
+                ## TODO bug here - If the target entity is API model, this save will be overwritten by the next save
+                self.entity_service.save_entity(target_entity)
                 self.entity_service.save_entity(request)
-                entity.add_child(request)
+
+                self.executor_service.execute_request(request)
+
+                entity.get_attribute("message_history").append(
+                    Message(type='context', content = f"Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id}"))
+
 
             except Exception as e:
                 print(f"Error parsing JSON in strategy block: {e}")
@@ -346,6 +362,21 @@ class CallApiModelStrategy(Strategy):
         return {
             'user_input': '',  # Optional additional input
             'system_prompt': '',  # Optional system prompt
-            'context_prefix': 'Here is the relevant context:',  # Optional prefix for context
+            'context_prefix': 'Here is the relevant context:',  # Optional prefix for context\
+            'serialize_entities_and_strategies': False # Optional flag to serialize entities and strategies
         }
+
+
+class ClearChatHistoryStrategy(Strategy):
+    entity_type = EntityEnum.API_MODEL
+    strategy_description = 'Clears the chat history for an API model'
+
+    def apply(self, entity) -> StrategyRequestEntity:
+        entity.set_attribute('message_history', [])
+        entity.set_attribute('response', [])
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {}
     

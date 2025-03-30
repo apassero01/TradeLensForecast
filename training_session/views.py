@@ -225,7 +225,7 @@ def api_get_strategy_registry(request):
     print('api_get_strategy_registry')
     if request.method == 'GET':
         try:
-            executor_service = StrategyExecutorService(StrategyExecutor())
+            executor_service = StrategyExecutorService()
             strategies = executor_service.get_registry()
             return JsonResponse(strategies, safe=False)
         except Exception as e:
@@ -277,7 +277,7 @@ def api_execute_strategy(request):
 
         strat_request = json_to_StrategyRequestEntity(strategy)
 
-        strategy_executor_service = StrategyExecutorService(StrategyExecutor())
+        strategy_executor_service = StrategyExecutorService()
 
         try:
             ret_val = strategy_executor_service.execute_request(strat_request)
@@ -313,7 +313,7 @@ def api_execute_strategy_list(request):
         training_session_service = TrainingSessionEntityService()
         training_session_service.set_session(session)
 
-        strategy_executor_service = StrategyExecutorService(StrategyExecutor())
+        strategy_executor_service = StrategyExecutorService()
         for strategy in strategies:
             try:
                 strat_request = json_to_StrategyRequestEntity(strategy)

@@ -7,16 +7,46 @@ const ChatScreen = ({ visualization }) => {
   const [fontSize, setFontSize] = useState(14);
   const [displayMode, setDisplayMode] = useState('all');
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
 
   const hasData = !!(visualization && visualization.data && visualization.data.response);
   const messages = hasData ? visualization.data.response : [];
 
-  useEffect(() => {
+  const scrollToBottom = (smooth = false) => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: smooth ? 'smooth' : 'auto',
+        block: 'end'
+      });
     }
-  }, [messages, displayMode]);
+  };
+
+  // Scroll to bottom when messages change or component mounts
+  useEffect(() => {
+    // Use a small timeout to ensure DOM is fully updated
+    const timeoutId = setTimeout(() => {
+      scrollToBottom();
+    }, 50);
+    
+    return () => clearTimeout(timeoutId);
+  }, [messages, displayMode, visualization?.data]);
+
+  // Also attach a mutation observer to watch for dynamic content changes
+  useEffect(() => {
+    if (!chatContainerRef.current) return;
+    
+    const observer = new MutationObserver(() => {
+      scrollToBottom();
+    });
+    
+    observer.observe(chatContainerRef.current, {
+      childList: true,
+      subtree: true
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   if (!hasData) {
     return <div className="text-red-500">No chat messages available</div>;
@@ -161,6 +191,7 @@ const ChatScreen = ({ visualization }) => {
       <div 
         className="flex-grow min-h-0 overflow-y-auto p-4 nowheel" 
         onWheel={handleWheel}
+        ref={chatContainerRef}
       >
         <div className="flex flex-col space-y-4" style={{ fontSize: `${fontSize}px` }}>
           {filteredMessages.map((message, index) => (
@@ -193,7 +224,7 @@ const ChatScreen = ({ visualization }) => {
               </div>
             </div>
           ))}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-[1px]" />
         </div>
       </div>
     </div>

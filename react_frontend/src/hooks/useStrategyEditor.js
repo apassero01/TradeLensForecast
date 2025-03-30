@@ -41,5 +41,6 @@ export function useStrategyEditor(existingRequest) {
     setRequestObj,
     registry,
     executeStrategy,
+    refresh,
   };
 }

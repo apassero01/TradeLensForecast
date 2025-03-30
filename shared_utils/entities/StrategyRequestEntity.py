@@ -67,6 +67,23 @@ class StrategyRequestEntity(Entity):
         })
         return sup_dict
 
+    @classmethod
+    def from_dict(cls, data):
+        strat_request = StrategyRequestEntity()
+
+        strat_request.strategy_name = data['strategy_name']
+        strat_request.param_config = data['param_config']
+        strat_request.add_to_history = data['add_to_history']
+        strat_request.target_entity_id = data['target_entity_id']
+        if 'entity_id' in data:
+            strat_request.entity_id = data['entity_id']
+
+        nested_requests = data['nested_requests']
+        for nested_request in nested_requests:
+            strat_request.add_nested_request(cls.from_dict(nested_request))
+
+        return strat_request
+
 
 class StrategyRequestAdapter:
     @staticmethod

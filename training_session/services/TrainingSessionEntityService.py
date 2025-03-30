@@ -9,7 +9,7 @@ DEFAULT_SESSION_UUID = '2b012d92-1fd8-4c72-a8e4-981c45a9db6b'
 
 class TrainingSessionEntityService:
     def __init__(self):
-        self.strategy_executor_service = StrategyExecutorService(StrategyExecutor())
+        self.strategy_executor_service = StrategyExecutorService()
 
     def create_training_session_entity(self):
         """Create a new training session with minimal initialization"""

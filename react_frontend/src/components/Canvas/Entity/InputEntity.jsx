@@ -6,6 +6,7 @@ import { strategyRequestChildrenSelector } from '../../../state/entitiesSelector
 
 function InputEntity({ data, updateEntity }) {
   const [text, setText] = useState(data.visualization || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Get strategy requests associated with this entity
   const strategyRequests = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
   
@@ -17,6 +18,14 @@ function InputEntity({ data, updateEntity }) {
     const newValue = e.target.value;
     // Update both the local state and the parent's local field.
     setText(newValue);
+  };
+
+  const handleKeyDown = (e) => {
+    // Submit on Enter without Shift key (Shift+Enter allows for newlines)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.target.form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
   };
 
   return (
@@ -35,7 +44,10 @@ function InputEntity({ data, updateEntity }) {
         const handleSubmit = async (e) => {
           e.preventDefault();
           console.log('Submitting with text:', text);
-
+          
+          // Activate submission feedback
+          setIsSubmitting(true);
+          
           await sendStrategyRequest({
             strategy_name: 'SetAttributesStrategy',
             param_config: {
@@ -50,6 +62,12 @@ function InputEntity({ data, updateEntity }) {
           
           // Execute all the strategy requests
           await sendStrategyRequest(execute_request);
+          
+          // Clear the text input
+          setText('');
+          
+          // Remove the submission effect after a short delay
+          setTimeout(() => setIsSubmitting(false), 800);
         };
         
         return (
@@ -57,8 +75,13 @@ function InputEntity({ data, updateEntity }) {
             <textarea
               value={text}
               onChange={(e) => handleChange(e)}
+              onKeyDown={(e) => handleKeyDown(e)}
               placeholder="Enter text..."
-              className="w-full h-24 p-2 bg-gray-700 text-white rounded nodrag"
+              className={`w-full h-24 p-2 text-white rounded nodrag transition-all duration-200 ${
+                isSubmitting 
+                  ? 'bg-green-900 border-4 border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)]' 
+                  : 'bg-gray-700 border-2 border-transparent'
+              }`}
               style={{ resize: 'none' }}
             />
             <button
