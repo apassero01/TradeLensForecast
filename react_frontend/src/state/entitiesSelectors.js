@@ -115,6 +115,24 @@ export const strategyRequestChildrenSelector = selectorFamily({
   },
 });
 
+export const visualizationChildrenSelector = selectorFamily({
+  key: 'visualizationChildrenSelector',
+  get: (parentId) => ({ get }) => {
+    // 1. Get the parent entity
+    const parent = get(entityFamily(parentId));
+    if (!parent || !parent.child_ids) {
+      return [];
+    }
+
+    // 2. Retrieve child entities from Recoil
+    const children = parent.child_ids.map((childId) => get(entityFamily(childId)));
+
+    // 3. Filter for the ones that are strategy requests
+    //    (Adjust this check to match your actual type, e.g. 'STRATEGY_REQUEST')
+    return children.filter((child) => child.entity_type === EntityTypes.VISUALIZATION);
+  },
+});
+
 export const nonTransientEntitySelector = selectorFamily({
   key: 'nonTransientEntitySelector',
   get: (entityId) => ({ get }) => {
@@ -135,6 +153,7 @@ export const nodeSelectorFamily = selectorFamily({
       [EntityTypes.STRATEGY_REQUEST]: NodeTypes.STRATEGY_REQUEST_ENTITY,
       [EntityTypes.INPUT]: NodeTypes.INPUT_ENTITY,
       [EntityTypes.VISUALIZATION]: NodeTypes.VISUALIZATION_ENTITY,
+      [EntityTypes.DOCUMENT]: NodeTypes.DOCUMENT_ENTITY,
     }[entity.entity_type] || NodeTypes.ENTITY_NODE;
 
     return {

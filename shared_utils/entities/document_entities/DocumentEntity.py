@@ -1,7 +1,16 @@
+from uuid import uuid4
+
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
 from typing import Optional, Dict, Any
 import numpy as np
+
+from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
+from shared_utils.entities.VisualizationEntity import VisualizationEntity
+from shared_utils.models import StrategyRequest
+from shared_utils.strategy.BaseStrategy import CreateEntityStrategy
+from shared_utils.strategy.VisualizationStrategy import VisualizationStrategy
+
 
 class DocumentEntity(Entity):
     entity_name = EntityEnum.DOCUMENT  # Update this line
@@ -13,6 +22,51 @@ class DocumentEntity(Entity):
         self.set_attribute('document_type', None)
         self.set_attribute('processed_text', '')
         self.set_attribute('tokens', [])
+
+    def on_create(self, param_config: Optional[Dict[str, Any]] = None) -> list[StrategyRequestEntity]:
+        """Override this method to handle entity creation logic"""
+        strategy_request_list = []
+        child_vis_create  = StrategyRequestEntity()
+        self.add_child(child_vis_create)
+
+        child_vis_create.strategy_name = CreateEntityStrategy.__name__
+        child_uuid = str(uuid4())
+        child_vis_create.param_config = {
+            'entity_class': VisualizationEntity.get_class_path(),
+            'entity_uuid': child_uuid,
+        }
+        child_vis_create.target_entity_id = self.entity_id
+        child_vis_create.add_to_history = False
+
+        strategy_request_list.append(child_vis_create)
+
+        child_vis_viz  = StrategyRequestEntity()
+        self.add_child(child_vis_viz)
+        child_vis_viz.strategy_name = VisualizationStrategy.__name__
+        child_vis_viz.param_config = {
+            'parent_data_attribute_name': 'text',
+            'visualization_type': 'editor',
+        }
+
+        child_vis_viz.target_entity_id = child_uuid
+        child_vis_viz.add_to_history = True
+
+        strategy_request_list.append(child_vis_viz)
+
+
+
+        return strategy_request_list
+
+
+        strategy_request_list.append(child_vis_create)
+
+
+
+
+
+        # Add the child request to the parent entity
+
+
 
     def set_text(self, text: str):
         """Set the document's raw text"""

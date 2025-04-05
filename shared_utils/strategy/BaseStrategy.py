@@ -67,7 +67,6 @@ class GetEntityStrategy(Strategy):
 
 class SaveEntityStrategy(Strategy):
     """Generic strategy for saving an entity to anywhere (cache, db, etc.)"""
-
     strategy_description = 'Saves an entity to the cache'
 
     def verify_executable(self, entity, strategy_request):
@@ -108,7 +107,7 @@ class CreateEntityStrategy(Strategy):
         except ValueError:
             new_entity = None
 
-        
+
         # Import the entity class
         if new_entity is None:
             try:
@@ -125,9 +124,18 @@ class CreateEntityStrategy(Strategy):
             self.strategy_request.param_config['entity_uuid'] = new_entity.entity_id
             
         # Add as child to parent
-        new_entity.on_create(self.strategy_request.param_config)
-        
+        request_list = new_entity.on_create(self.strategy_request.param_config)
         parent_entity.add_child(new_entity)
+        self.entity_service.save_entity(new_entity)
+        if request_list:
+            for request in request_list:
+                self.entity_service.save_entity(request)
+                request = self.strategy_executor.execute_request(request)
+                if request.ret_val.get('child_entity'):
+                    result_of_execute = request.ret_val['child_entity']
+                    parent_entity.add_child(result_of_execute)
+
+        
         self.entity_service.save_entity(new_entity)
         self.strategy_request.ret_val['child_entity'] = new_entity
 
