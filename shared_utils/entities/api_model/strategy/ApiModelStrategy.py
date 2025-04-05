@@ -1,3 +1,6 @@
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import AIMessage
+
 from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, HTTPGetRequestStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
@@ -10,6 +13,7 @@ from dataclasses import dataclass
 import json
 import re
 import logging
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
@@ -220,33 +224,53 @@ class CallApiModelStrategy(Strategy):
         else:
             combined_input = user_input
 
-        # Initialize LangChain chat model
-        chat = ChatOpenAI(
-            model_name=entity.get_attribute('model_name'),
-            openai_api_key=entity.get_attribute('api_key'),
-            max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
-        )
+        # # Initialize LangChain chat model
+        # chat = ChatOpenAI(
+        #     model_name=entity.get_attribute('model_name'),
+        #     openai_api_key=entity.get_attribute('api_key'),
+        #     max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
+        # )
+        chat = init_chat_model(entity.get_attribute('model_name'), model_provider='google_genai', api_key=entity.get_attribute('api_key'))
+        chat = chat.bind_tools([self.create_strategy_request, self.end_conversation])
+        tool_dict = {"create_strategy_request": self.create_strategy_request, "end_conversation": self.end_conversation}
 
         messages = []
         if system_prompt:
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=combined_input))
 
+        history = entity.get_attribute('message_history')
+
+        MAX_ITERS = 10
+        CUR_ITERS = 0
         # Use invoke() instead of __call__
-        response = chat.invoke(messages)
+
+        history.append(Message(type='context', content=user_input))
+        while CUR_ITERS < MAX_ITERS:
+            CUR_ITERS += 1
+            response = chat.invoke(messages)
+            content = "\n".join([str(item) for item in response.content]) if isinstance(response.content,                                                                                        list) else response.content
+            history.append(Message(type='response', content=content))
+            messages.append(AIMessage(content=response.content))
+            self.entity_service.save_entity(entity)
+            for tool_call in response.tool_calls:
+                if tool_call['name'].lower() == 'end_conversation':
+                    CUR_ITERS = MAX_ITERS
+                    break
+                selected_tool = tool_dict.get(tool_call['name'].lower())
+                tool_msg = selected_tool.invoke(tool_call)
+                child_request = tool_msg.artifact
+                request = self.execute_model_request(child_request, entity)
+                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id}")
+                history.append(request_message)
+                messages.append(HumanMessage(content=request_message.content))
+            entity = self.entity_service.get_entity(entity.entity_id)
+
+
 
         logger.info(f"Response from model: Message Received from APi model")
-        
-        # Get message history
-        history = entity.get_attribute('message_history')
-        
-        # Format complete response with history
-        
-        # Update history and attributes
-        history.append(Message(type='context', content=user_input))
-        history.append(Message(type='response', content=response.content))
 
-        self.parse_strategy_requests(response.content, entity)
+        # self.parse_strategy_requests(response.content, entity)
         
         entity.set_attribute('last_context', context)
         entity.set_attribute('message_history', history)
@@ -254,65 +278,21 @@ class CallApiModelStrategy(Strategy):
         
         self.strategy_request.ret_val['response'] = history
         self.strategy_request.ret_val['context_used'] = context
+        self.strategy_request.ret_val['entity'] = entity
         
         return self.strategy_request
 
-    def parse_strategy_requests(self, message: str, entity: 'Entity'):
-        """
-        Parse strategy request blocks from a given message.
+    def execute_model_request(self, request, entity):
+        target_entity = self.entity_service.get_entity(request.target_entity_id)
+        if target_entity is None:
+            raise ValueError(f'Entity not found for id: {request.target_entity_id}')
+        target_entity.add_child(request)
+        self.entity_service.save_entity(target_entity)
+        self.entity_service.save_entity(request)
+        request = self.executor_service.execute_request(request)
 
-        This function looks for blocks marked with:
+        return request
 
-            ```Strategy
-            { JSON CODE }
-            ```
-
-        It then converts the JSON code inside these blocks into Python dictionaries
-        and returns them in a list called strategy_request_blob.
-
-        :param message: A string containing the message with potential strategy blocks.
-        :return: A list of dictionaries representing the parsed JSON strategy requests.
-        """
-        # Regex to find blocks starting with ```Strategy and ending with ```
-        pattern = r"```StrategyRequest\s*\n([\s\S]*?)\n```"
-        matches = re.findall(pattern, message, re.MULTILINE)
-
-        strategy_requests = []
-
-        for block in matches:
-            try:
-                # Strip whitespace and convert the JSON code to a Python dict
-                parsed_json = json.loads(block.strip())
-
-                child_request = StrategyRequestEntity()
-                child_request.strategy_name = CreateEntityStrategy.__name__
-                child_request.target_entity_id = entity.entity_id
-                child_request.param_config = {
-                    'entity_class': "shared_utils.entities.StrategyRequestEntity.StrategyRequestEntity",
-                    'entity_uuid': None
-                }
-                child_request = self.executor_service.execute_request(child_request)
-                request = child_request.ret_val['child_entity']
-                request.strategy_name = parsed_json['strategy_name']
-                request.param_config = parsed_json['param_config']
-                request.add_to_history = parsed_json['add_to_history']
-                request.target_entity_id = parsed_json['target_entity_id']
-
-                target_entity = self.entity_service.get_entity(request.target_entity_id)
-                target_entity.add_child(request)
-
-                ## TODO bug here - If the target entity is API model, this save will be overwritten by the next save
-                self.entity_service.save_entity(target_entity)
-                self.entity_service.save_entity(request)
-
-                self.executor_service.execute_request(request)
-
-                entity.get_attribute("message_history").append(
-                    Message(type='context', content = f"Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id}"))
-
-
-            except Exception as e:
-                print(f"Error parsing JSON in strategy block: {e}")
 
     def get_strategy_directory(self, entity: 'Entity'):
         strategy_request = StrategyRequestEntity()
@@ -343,19 +323,65 @@ class CallApiModelStrategy(Strategy):
             return return_dict
         if not entity:
             return None
-        entity_dict = entity.serialize()
         children = entity.get_children()
         if return_dict is None:
             return_dict = {}
 
         if entity_id in return_dict:
             return return_dict
-        return_dict[entity_id] = entity_dict
+        return_dict[entity_id] = {
+            'entity_id' : entity_id,
+            'entity_type': entity.entity_name.value,
+            'children_ids': children
+        }
 
         for child_id in children:
             return_dict = self.serialize_entity_and_children(child_id, return_dict)
 
         return return_dict
+
+    @tool()
+    def serialize_entities(self,entities: List[str]) -> List[dict]:
+        '''
+        Serialize a list of entities. If the model needs to know about entities with
+        specific ids, this method will return more information about the entities.
+        '''
+        serialized_entities = []
+        for entity_id in entities:
+            entity = self.entity_service.get_entity(entity_id)
+            if entity:
+                serialized_entities.append(entity.serialize())
+        return serialized_entities
+
+    @staticmethod
+    @tool
+    def end_conversation() -> str:
+        '''
+        End the conversation with the model. This method will be called when the conversation
+        is over.
+        '''
+        return ''
+
+    @staticmethod
+    @tool(response_format="content_and_artifact")
+    def create_strategy_request(strategy_name: str, param_config: dict | str, target_entity_id: str, add_to_history: bool = False):
+        '''
+        Create a strategy request entity with the given parameters.
+        @param strategy_name: The name of the strategy to execute
+        @param MUST BE JSON param_config: The configuration parameters for the strategy
+        @param target_entity_id: The id of the target entity for the strategy
+        @param add_to_history: Whether to add the strategy request to the entity's history
+        '''
+        if isinstance(param_config, str):
+            param_config = json.loads(param_config)
+
+
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = strategy_name
+        strategy_request.param_config = param_config
+        strategy_request.target_entity_id = target_entity_id
+        strategy_request.add_to_history = add_to_history
+        return "Created Strategy Request", strategy_request
 
     @staticmethod
     def get_request_config():
