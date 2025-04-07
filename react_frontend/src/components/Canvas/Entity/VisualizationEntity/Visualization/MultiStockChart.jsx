@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import StockChart from './StockChart';
 
-const MultiStockChart = ({ visualization }) => {
+const MultiStockChart = ({ visualization=visualization || {} }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const inputRef = useRef(null);
   // Enhanced drag tracking
@@ -19,7 +19,7 @@ const MultiStockChart = ({ visualization }) => {
 
   // Check that visualization.data exists
   const dataObj = visualization.data;
-  if (!dataObj || typeof dataObj !== 'object' || !Object.keys(dataObj).length === 0) {
+  if (!dataObj || typeof dataObj !== 'object' || Object.keys(dataObj)?.length === 0) {
     return <div>No sequences to display</div>;
   }
 

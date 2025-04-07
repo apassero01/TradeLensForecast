@@ -155,6 +155,22 @@ function Canvas() {
   // Close the context menu when clicking elsewhere
   const onPaneClick = useCallback(() => setMenu(null), [setMenu]);
 
+  const onConnect = useCallback((connection) => {
+    // Create new edge
+    setEdges((prevEdges) => [...prevEdges, connection]);
+
+    // Send strategy request where source is assigner and target is assignee
+    sendStrategyRequest({
+      strategy_name: 'AddChildStrategy',
+      param_config: {
+        child_id: connection.target, // The node being assigned to (target/child)
+      },
+      target_entity_id: connection.source, // The node doing the assigning (source/parent)
+      add_to_history: true,
+      nested_requests: [],
+    });
+  }, [sendStrategyRequest]);
+
   return (
     <div style={{ width: '100%', height: '100vh', flex: 1 }}>
       <ReactFlow
@@ -171,6 +187,7 @@ function Canvas() {
         }}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
+        onConnect={onConnect}
       >
         <Background
           id="2"

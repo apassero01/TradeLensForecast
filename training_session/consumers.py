@@ -154,7 +154,9 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
                 raise Exception('No session in progress')
 
             # Convert JSON to StrategyRequestEntity
-            strat_request = self.json_to_strategy_request(strategy_data)
+            # strat_request = sync_to_async(json_to_strategy_request(strategy_data))
+            # call with sync to async
+            strat_request = await sync_to_async(self.json_to_strategy_request)(strategy_data)
 
             task = strategy_executor_service.execute_request(strat_request, wait=False)
             # Send confirmation of execution

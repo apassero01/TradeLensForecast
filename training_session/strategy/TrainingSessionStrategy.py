@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import requests
 
@@ -45,7 +47,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
     Th key point is the strategy is responsible. So in this case, if there are no nested requests (happens the first time) then we created the nested 
     requests and execute them. if there are nested requests, this means that we are recreating from some history, we just need to execute them. 
     '''
-    url = 'http://localhost:8000/sequenceset_manager/get_sequence_data'
+    url = 'http://localhost:8000/sequenceset_manager/get_sequence_data/'
     name = "GetSequenceSets"
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
@@ -66,10 +68,10 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
 
         for i, param in enumerate(param_config['model_set_configs']):
             nested_request = nested_requests[i]
-            # It is possible on recreating the history here, the order of the nested requests is not the same as the order of the model set configs on original creation. 
-            # It could be a problem I don't think it is but again the strategy is responsible so if its broken only the strategy is responsible. 
+            # It is possible that on recreating the history, the order of the nested requests is not the same as the original model set configs.
             nested_request = self.strategy_executor.execute(session_entity, nested_request)
             sequence_set = nested_request.ret_val['child_entity']
+
             # Set attributes directly
             sequence_set.set_attribute('dataset_type', param_config['dataset_type'])
             sequence_set.set_attribute('sequence_length', param['sequence_length'])
@@ -79,12 +81,22 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
             sequence_set.set_attribute('X_features', X_features)
             sequence_set.set_attribute('y_features', y_features)
 
+            # Include features in the payload
             param['features'] = features
 
-            response = requests.get(self.url, params=param)
+            # Send the request as a POST with a JSON body
+            response = requests.post(self.url, json=param, stream=True)
             if response.status_code == 200:
                 try:
-                    data = response.json()
+                    # Collect the streamed response chunks
+                    json_chunks = []
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                        if chunk:
+                            json_chunks.append(chunk.decode('utf-8'))
+                    # Reassemble the full JSON string
+                    full_json = "".join(json_chunks)
+                    data = json.loads(full_json)
+
                     for obj in data:
                         sequence_data = obj['sliced_data']
                         sequence_data_array = np.array(sequence_data)
@@ -100,10 +112,12 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                             )
                             sequence_set.get_attribute('sequences').append(sequence)
 
-
                     # Only add sequence set if it has sequences
                     if sequence_set.get_attribute('sequences'):
-                        sequence_set.set_attribute('seq_end_dates', [sequence.end_timestamp for sequence in sequence_set.get_attribute('sequences')])
+                        sequence_set.set_attribute(
+                            'seq_end_dates',
+                            [sequence.end_timestamp for sequence in sequence_set.get_attribute('sequences')]
+                        )
 
                     self.entity_service.save_entity(sequence_set)
 
@@ -115,7 +129,6 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
                 print(response)
                 raise ValueError("Failed to retrieve sequence data " + response.json()['error'])
 
-            
         return self.strategy_request
 
     def verify_executable(self, session_entity, strategy_request):

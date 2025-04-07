@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 import importlib
 
@@ -593,7 +594,6 @@ class RetreiveSequencesStrategy(Strategy):
         target_attribute_name = config.get("target_attribute_name", "retrieved_sequences")
 
         sequence_ids = entity.get_attribute(id_attribute)
-
         print(sequence_ids)
 
         # Prepare the request payload. Adjust keys to match your API exactly.
@@ -602,20 +602,25 @@ class RetreiveSequencesStrategy(Strategy):
             "sequence_ids": sequence_ids.tolist() if isinstance(sequence_ids, np.ndarray) else sequence_ids
         }
 
-        
-        response = requests.post(self.url, json=params)
+        # Send the POST request with streaming enabled
+        response = requests.post(self.url, json=params, stream=True)
         if not response.ok:
             raise ValueError(
-                f"Request to {self.url} failed "
-                f"with status {response.status_code}: {response.text}"
+                f"Request to {self.url} failed with status {response.status_code}: {response.text}"
             )
-        
-        fetched_sequences = response.json()
+
+        # Reassemble the streamed response chunks into a complete JSON string
+        json_chunks = []
+        for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+            if chunk:
+                json_chunks.append(chunk.decode('utf-8'))
+        full_json = "".join(json_chunks)
+        fetched_sequences = json.loads(full_json)
+
         for sequence in fetched_sequences:
             sequence_data = sequence['sliced_data']
             sequence['sliced_data'] = sequence_data
 
-            
         # Store the raw list as-is, preserving order
         entity.set_attribute(target_attribute_name, fetched_sequences)
 

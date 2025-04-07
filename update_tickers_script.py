@@ -25,7 +25,7 @@ for ticker in tickers:
         StockDataSetService.update_recent_data(dataset)
 
         sequences_set = SequenceSetService.get_sequence_set(sequence_length = sequence_length, dataset_type='stock', ticker=ticker, interval='1d').get()
-        StockSequenceSetService.update_recent(sequences_set, ticker =  ticker, interval= '1d')
+        StockSequenceSetService.update_recent(sequences_set, ticker =  ticker, interval= '1d', start_date = "2020-01-01")
         print(f"Updated {ticker} with sequence length {sequence_length}")
 
 if __name__ == "__main__":

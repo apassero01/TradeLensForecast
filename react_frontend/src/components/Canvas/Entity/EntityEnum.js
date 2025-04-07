@@ -6,6 +6,7 @@ export const EntityTypes = Object.freeze({
     INPUT: 'input',
     ENTITY: 'entity',
     VISUALIZATION: 'visualization',
+    DOCUMENT: 'document',
   });
   
   // Define corresponding React Flow node types
@@ -14,4 +15,5 @@ export const NodeTypes = Object.freeze({
     ENTITY_NODE: 'entityNode',
     INPUT_ENTITY: 'inputEntity',
     VISUALIZATION_ENTITY: 'visualizationEntity',
+    DOCUMENT_ENTITY: 'documentEntity',
   });

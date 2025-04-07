@@ -3,6 +3,7 @@ import math
 from abc import ABC
 from collections import defaultdict
 
+from dataset_manager.services import DataSetService
 from sequenceset_manager.models import SequenceSet, Sequence
 from django.db import transaction
 import requests
@@ -508,9 +509,11 @@ class StockSequenceSetService(SequenceSetService):
             "end_date": end_date
         }
         try:
-            response = requests.get(f"http://localhost:8000/dataset_manager/get_stock_data/{ticker}", params=params)
-            data = response.json()
-            return pd.DataFrame(data).T
+            # response = requests.get(f"http://localhost:8000/dataset_manager/get_stock_data/{ticker}", params=params)
+            # data = response.json()
+            data = DataSetService.get_data_set(dataset_type="stock", ticker=ticker, interval=interval)
+            df = DataSetService.get_df_range(data, start_timestamp=start_date, end_timestamp=end_date)
+            return df
         except requests.exceptions.RequestException as e:
             print(e)
             return None
