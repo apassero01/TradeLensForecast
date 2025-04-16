@@ -33,6 +33,7 @@ class Entity():
         '''Add a child to the entity'''
         if child.entity_id not in self.children_ids:
             self.children_ids.append(child.entity_id)
+        if self.entity_id not in child.parent_ids:
             child.add_parent(self)
 
     def remove_child(self, child: 'Entity'):

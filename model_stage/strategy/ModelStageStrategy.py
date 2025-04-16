@@ -4,13 +4,14 @@ from torch import optim, nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from model_stage.criterion_loss import MSLELoss, GuissLoss, MinOfNSequenceLoss, SoftInverseProfitLoss, SequenceNLLLoss
+from model_stage.strategy.RL.RLUtils import TradingEnv, ReplayBuffer, epsilon_by_frame
 from shared_utils.strategy.BaseStrategy import Strategy
 from shared_utils.entities.Entity import Entity
 from shared_utils.strategy_executor.StrategyExecutor import StrategyExecutor
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from model_stage.entities.ModelStageEntity import ModelStageEntity
 from shared_utils.entities.EnityEnum import EntityEnum
-from models.BuiltModels import Transformer
+from models.BuiltModels import Transformer, DQN
 from model_stage.Enums.ConfigurationEnum import CriterionEnum, OptimizerEnum
 from django.conf import settings
 
@@ -525,3 +526,136 @@ class LoadModelWeightsStrategy(ModelStageStrategy):
     def get_request_config():
         return {
         }
+
+
+class ConfigureDQNModel(ModelStageStrategy):
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        if not entity.has_attribute('close'):
+            raise ValueError('Close price not found in strategy request.')
+        if not strategy_request.param_config.get('buffer_size'):
+            raise ValueError('Buffer size not found in strategy request.')
+        if not strategy_request.param_config.get('device'):
+            raise ValueError('Device not found in strategy request.')
+        if not strategy_request.param_config.get('num_layers'):
+            raise ValueError('num_layers not found in strategy request.')
+        if not strategy_request.param_config.get('d_model'):
+            raise ValueError('d_model not found in strategy request.')
+        if not strategy_request.param_config.get('num_heads'):
+            raise ValueError('num_heads not found in strategy request.')
+        if not strategy_request.param_config.get('d_ff'):
+            raise ValueError('d_ff not found in strategy request.')
+        if not strategy_request.param_config.get('dropout'):
+            raise ValueError('dropout not found in strategy request.')
+        if not strategy_request.param_config.get('encoder_input_dim'):
+            raise ValueError('encoder_input_dim not found in strategy request.')
+
+    def apply(self, entity: ModelStageEntity):
+        self.verify_executable(entity, self.strategy_request)
+        config = self.strategy_request.param_config
+
+        entity.set_attribute("trading_env", TradingEnv(entity.get_attribute('train_dataloader'), entity.get_attribute("close")))
+
+        entity.set_attribute("replay_buffer", ReplayBuffer(config['buffer_size']))
+
+        entity.set_attribute("n_actions", 3)
+        entity.set_attribute("num_episodes", 30)
+        entity.set_attribute("batch_size", 32)
+        entity.set_attribute("gamma", 0.99)
+        entity.set_attribute("device", config['device'])
+
+        model_config = {
+            "num_layers": config.get('num_layers', 2),
+            "d_model": config.get('d_model', 128),
+            "num_heads": config.get('num_heads', 8),
+            "d_ff": config.get('d_ff', 256),
+            "dropout": config.get('dropout', 0.1),
+            "encoder_input_dim": config.get('encoder_input_dim', 6),
+        }
+
+        policy_net = DQN(model_config).to(config['device'])
+        target_net = DQN(model_config).to(config['device'])
+        target_net.load_state_dict(policy_net.state_dict())
+
+        entity.set_attribute("optimizer", optim.Adam(policy_net.parameters(), lr=0.001))
+        entity.set_attribute("criterion", nn.MSELoss())
+        entity.set_attribute("policy_net", policy_net)
+        entity.set_attribute("target_net", target_net)
+        entity.set_attribute("steps_done", 0)
+
+
+
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'buffer_size': 10000,
+            'num_layers': 2,
+            'd_model': 128,
+            'num_heads': 8,
+            'd_ff': 256,
+            'dropout': 0.1,
+            'encoder_input_dim': 15,
+            'device': 'mps'
+        }
+
+class TrainDQNModel(ModelStageStrategy):
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        if not entity.has_attribute('trading_env'):
+            raise ValueError('Trading environment not found in entity.')
+        if not entity.has_attribute('replay_buffer'):
+            raise ValueError('Replay buffer not found in entity.')
+        if not entity.has_attribute('policy_net'):
+            raise ValueError('Policy network not found in entity.')
+        if not entity.has_attribute('target_net'):
+            raise ValueError('Target network not found in entity.')
+        if not entity.has_attribute('optimizer'):
+            raise ValueError('Optimizer not found in entity.')
+        if not entity.has_attribute('criterion'):
+            raise ValueError('Criterion not found in entity.')
+        if not entity.has_attribute('device'):
+            raise ValueError('Device not found in entity.')
+        if not entity.has_attribute('num_episodes'):
+            raise ValueError('Number of episodes not found in entity.')
+        if not entity.has_attribute('batch_size'):
+            raise ValueError('Batch size not found in entity.')
+
+    def apply(self, entity: ModelStageEntity):
+        self.verify_executable(entity, self.strategy_request)
+        config = self.strategy_request.param_config
+
+        trading_env = entity.get_attribute('trading_env')
+        replay_buffer = entity.get_attribute('replay_buffer')
+        policy_net = entity.get_attribute('policy_net')
+        target_net = entity.get_attribute('target_net')
+        optimizer = entity.get_attribute('optimizer')
+        criterion = entity.get_attribute('criterion')
+        device = entity.get_attribute('device')
+
+        num_episodes = entity.get_attribute('num_episodes')
+        batch_size = entity.get_attribute('batch_size')
+
+        X_train = entity.get_attribute('X_train')
+
+        frame_idx = 0
+        for episode in range(num_episodes):
+            state = trading_env.reset()
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+            episode_reward = 0
+            done = False
+            while not done:
+                epsilon = epsilon_by_frame(frame_idx)
+                frame_idx += 1
+                if np.random.rand() < epsilon:
+                    action = np.random.choice([0, 1, 2])
+                else:
+                    with torch.no_grad():
+                        q_values = policy_net(state)
+                        action = q_values.argmax().item()
+                next_state, reward, done, _ = trading_env.step(action)
+
+                episode_reward += reward
+
+                if next_state is not None:
+                    next_state = torch.from_numpy(next_state).float().unsqueeze(0).to(device)
+

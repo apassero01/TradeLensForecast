@@ -241,7 +241,7 @@ class CallApiModelStrategy(Strategy):
 
         history = entity.get_attribute('message_history')
 
-        MAX_ITERS = 10
+        MAX_ITERS = 25
         CUR_ITERS = 0
         # Use invoke() instead of __call__
 

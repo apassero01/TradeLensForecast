@@ -45,9 +45,6 @@ class EntityService:
         if hasattr(entity, 'deleted') and entity.deleted:
             self.clear_entity(entity.entity_id)
             return
-
-        from shared_utils.tasks import test_broadcast
-        test_broadcast.delay()
         # Broadcast update
         # if not socket_exists:
         # No socket exists, broadcast to global to establish connection

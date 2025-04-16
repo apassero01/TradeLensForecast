@@ -283,6 +283,7 @@ class AddChildStrategy(Strategy):
             raise ValueError("Missing required parameter: child_id")
         child_entity = self.entity_service.get_entity(child_id)
         entity.add_child(child_entity)
+        self.entity_service.save_entity(child_entity)
         self.entity_service.save_entity(entity)
 
         return self.strategy_request

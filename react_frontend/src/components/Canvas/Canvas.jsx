@@ -83,36 +83,38 @@ function Canvas() {
   }, []);
 
   const onDragEnd = useCallback((event, node) => {
-    if (!node.position.x || !node.position.y) {
-      return;
-    }
-    sendStrategyRequest({
-      strategy_name: 'SetAttributesStrategy',
-      param_config: {
-        attribute_map: {
-          'position': {
-            'x': node.position.x,
-            'y': node.position.y
-          }
-        }
-      },
-      target_entity_id: node.data.entityId,
-      add_to_history: false,
-      nested_requests: [],
-    })
+    // if (!node.position.x || !node.position.y) {
+    //   return;
+    // }
+    // sendStrategyRequest({
+    //   strategy_name: 'SetAttributesStrategy',
+    //   param_config: {
+    //     attribute_map: {
+    //       'position': {
+    //         'x': node.position.x,
+    //         'y': node.position.y
+    //       }
+    //     }
+    //   },
+    //   target_entity_id: node.data.entityId,
+    //   add_to_history: false,
+    //   nested_requests: [],
+    // })
   }, [sendStrategyRequest]);
 
   const onNodesChange = useCallback((changes) => {
     // Update nodes based on the changes
+    console.log('Nodes changed', changes);
     setNodes((prevNodes) => {
       // Use applyNodeChanges to handle updates efficiently
       const updatedNodes = applyNodeChanges(changes, prevNodes);
       
       // Handle dimension changes inside the setter function where we have the latest nodes
-      if (changes.length > 0 && changes[0].type === 'dimensions' && changes[0].resizing === false) {
-        const entity = updatedNodes.find((node) => node.id === changes[0].id);
-        if (entity) {
-          console.log('Updating entity', entity);
+      changes.forEach((change) => {
+        if (change.type === 'dimensions' && change.resizing === false) {
+          const entity = updatedNodes.find((node) => node.id === change.id);
+          if (entity) {
+            console.log('Updating entity', entity);
           sendStrategyRequest({
             strategy_name: 'SetAttributesStrategy',
             param_config: {
@@ -120,13 +122,34 @@ function Canvas() {
                 'width': entity.width,
                 'height': entity.height,
               }
-            },
-            target_entity_id: entity.data.entityId,
-            add_to_history: false,
-            nested_requests: [],
-          });
+              },
+              target_entity_id: entity.data.entityId,
+              add_to_history: false,
+              nested_requests: [],
+            });
+          }
         }
-      }
+        if (change.type === 'position' && !change.dragging) {
+          const entity = updatedNodes.find((node) => node.id === change.id);
+          if (entity) {
+            console.log('Updating entity', entity);
+            sendStrategyRequest({
+              strategy_name: 'SetAttributesStrategy',
+              param_config: {
+                attribute_map: {
+                  'position': {
+                    'x': entity.position.x,
+                    'y': entity.position.y
+                  }
+                }
+              },
+              target_entity_id: entity.data.entityId,
+              add_to_history: false,
+              nested_requests: [],
+            })
+          }
+        }
+      });
       
       return updatedNodes;
     });
@@ -166,7 +189,7 @@ function Canvas() {
         child_id: connection.target, // The node being assigned to (target/child)
       },
       target_entity_id: connection.source, // The node doing the assigning (source/parent)
-      add_to_history: true,
+      add_to_history: false,
       nested_requests: [],
     });
   }, [sendStrategyRequest]);
@@ -188,6 +211,13 @@ function Canvas() {
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onConnect={onConnect}
+        // selectionKeyCode={"Shift"}
+        selectionOnDrag={true}
+        selectionMode={"partial"}
+        panOnDrag={true}
+        snapToGrid={false}
+        maxZoom={10}
+        minZoom={0.1}
       >
         <Background
           id="2"

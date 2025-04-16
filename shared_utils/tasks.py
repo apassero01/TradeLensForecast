@@ -27,14 +27,3 @@ def execute_strategy_request(strategy_request):
     logger.info("Task finished: strategy execution complete")
 
     return result
-
-@shared_task
-def test_broadcast():
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "entities",
-        {
-            "type": "entity_update",
-            "entities": {"message": "Test message from worker"}
-        }
-    )
