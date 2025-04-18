@@ -11,11 +11,12 @@ import { entityIdsAtom } from '../../../state/entityIdsAtom';
 import { useReactFlow, addEdge } from '@xyflow/react';
 import { useRecoilCallback } from 'recoil';
 import { entityFamily } from '../../../state/entityFamily';
-
+import ViewEntity from './ViewEntity/ViewEntity';
 const componentMapping = {
     [NodeTypes.VISUALIZATION_ENTITY]: VisualizationEntity,
     [NodeTypes.INPUT_ENTITY]: InputEntity,
     [NodeTypes.STRATEGY_REQUEST_ENTITY]: StrategyRequestEntity,
+    [NodeTypes.VIEW_ENTITY]: ViewEntity,
 };
 
 
@@ -135,6 +136,9 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
             break;
         case EntityTypes.VISUALIZATION:
             dynamicType = NodeTypes.VISUALIZATION_ENTITY;
+            break;
+        case EntityTypes.VIEW:
+            dynamicType = NodeTypes.VIEW_ENTITY;
             break;
         default:
             dynamicType = NodeTypes.ENTITY_NODE;
