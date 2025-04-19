@@ -1,31 +1,33 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import EntityNodeBase from './EntityNodeBase';
+import { useRecoilValue } from 'recoil';
+import { childrenByTypeSelector } from '../../../state/entitiesSelectors';
+import { EntityTypes } from './EntityEnum';
+import  visualizationComponents  from '../Entity/VisualizationEntity/Visualization/visualizationComponents';
+import useRenderStoredView from '../../../hooks/useRenderStoredView';
+import StrategyRequests from '../../../utils/StrategyRequestBuilder';
 
-function DocumentEntity({ data, updateEntity }) {
-  const renderContent = ({ 
-    data: nodeData, 
-    childrenRequests, 
-    updateEntity: updateNodeEntity,
-    sendStrategyRequest,
-    onRemoveRequest,
-    isLoading,
-    setIsLoading,
-    getVisualizationOverlay
-  }) => {
-    return (
-      <div className="relative w-full h-full">
-        {/* Base document content - set to lower z-index */}
-        <div className="w-full h-full flex items-center justify-center z-0 relative">
-          <span className="text-white">{data.content || 'Document'}</span>
-        </div>
+function DocumentEntity({ data, updateEntity, sendStrategyRequest }) {
 
-        {/* Visualization overlay - position absolute and higher z-index */}
-        <div className="absolute inset-0 z-20">
-          {/* {getVisualizationOverlay()} */}
-        </div>
+  // console.log('DocumentEntity', EntityTypes.VIEW);
+  const viewEntities = useRecoilValue(childrenByTypeSelector({ parentId: data.entityId, type: EntityTypes.VIEW }));
+
+  const editorViewEntity = viewEntities.find(view =>
+    view.data?.view_component_type === "editor"
+  );
+
+  const editorViewEntityIdToUse = editorViewEntity?.entity_id;
+
+  const editorView = useRenderStoredView(editorViewEntityIdToUse, sendStrategyRequest, updateEntity);
+
+  const renderContent = () => (
+    <div className="flex flex-col h-full w-full">
+      <h4 className="text-xs text-gray-500 mt-2 mb-1 px-2 flex-shrink-0">Editor View:</h4>
+      <div className="nodrag border border-gray-300 rounded p-1 m-1 bg-gray-50 flex-grow min-h-0 overflow-auto">
+        {editorView ? editorView : <p className="text-xs text-gray-400 italic">No editor view available.</p>}
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <EntityNodeBase

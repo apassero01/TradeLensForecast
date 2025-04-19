@@ -1,3 +1,5 @@
+import json
+
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.EntityModel import EntityModel
@@ -127,6 +129,19 @@ class StrategyRequestAdapter:
             except StrategyRequest.DoesNotExist:
                 # Create a new model instance if it does not exist
                 model = StrategyRequest(entity_id=entity.entity_id)
+
+        if hasattr(model, 'attributes'):
+            attributes = {}
+            for key, value in entity.get_attributes().items():
+                try:
+                    # Try serializing the value
+                    if not isinstance(value, (str, int, float, bool, list, dict)):
+                        pass
+                    json.dumps(value)
+                    # If successful, save it
+                    attributes[key] = value
+                except (TypeError, ValueError):
+                    pass
 
         # Map basic attributes
         model.strategy_name = entity.strategy_name

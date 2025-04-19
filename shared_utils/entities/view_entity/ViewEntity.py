@@ -15,4 +15,5 @@ class ViewEntity(Entity):
         parent_dict["parent_attributes"] = self.get_attribute("parent_attributes")
         parent_dict["view_component_type"] = self.get_attribute("view_component_type")
         parent_dict["view_component"] = self.get_attribute("view_component")
+        parent_dict["hidden"] = self.get_attribute('hidden') if self.has_attribute('hidden') else True
         return parent_dict

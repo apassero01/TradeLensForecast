@@ -133,6 +133,16 @@ export const visualizationChildrenSelector = selectorFamily({
   },
 });
 
+export const childrenByTypeSelector = selectorFamily({
+  key: 'childrenByTypeSelector',
+  get: ({ parentId, type }) => ({ get }) => {
+    const parent = get(nodeSelectorFamily(parentId));
+    const children = parent.data.child_ids.map((childId) => get(nodeSelectorFamily(childId)));
+    const childEntities = children.filter((child) => child.data.entity_type === type);
+    return childEntities;
+  },
+});
+
 export const nonTransientEntitySelector = selectorFamily({
   key: 'nonTransientEntitySelector',
   get: (entityId) => ({ get }) => {
@@ -154,6 +164,7 @@ export const nodeSelectorFamily = selectorFamily({
       [EntityTypes.INPUT]: NodeTypes.INPUT_ENTITY,
       [EntityTypes.VISUALIZATION]: NodeTypes.VISUALIZATION_ENTITY,
       [EntityTypes.DOCUMENT]: NodeTypes.DOCUMENT_ENTITY,
+      [EntityTypes.VIEW]: NodeTypes.VIEW_ENTITY,
     }[entity.entity_type] || NodeTypes.ENTITY_NODE;
 
     return {

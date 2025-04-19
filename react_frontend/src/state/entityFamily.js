@@ -14,6 +14,5 @@ export const entityFamily = atomFamily({
     child_ids: [],
     strategy_requests: [],
     hidden: false,
-    // etc. for other fields from the back end
   }),
 });

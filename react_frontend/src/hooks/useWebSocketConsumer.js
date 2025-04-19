@@ -18,9 +18,11 @@ export function useWebSocketConsumer() {
       return;
     }
 
+    const strategyRequestList = Array.isArray(strategyRequest) ? strategyRequest : (strategyRequest === null || strategyRequest === undefined ? [] : [strategyRequest]);
+
     const payload = {
       command: 'execute_strategy',
-      strategy: strategyRequest,
+      strategy: strategyRequestList,
     };
 
     try {

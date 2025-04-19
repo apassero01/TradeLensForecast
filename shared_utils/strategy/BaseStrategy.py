@@ -125,19 +125,27 @@ class CreateEntityStrategy(Strategy):
             self.strategy_request.param_config['entity_uuid'] = new_entity.entity_id
             
         # Add as child to parent
-        request_list = new_entity.on_create(self.strategy_request.param_config)
         parent_entity.add_child(new_entity)
         self.entity_service.save_entity(new_entity)
+
+        if config.get('initial_attributes') is not None:
+            set_initial_request = SetAttributesStrategy.request_constructor(target_entity_id=new_entity.entity_id, attribute_map=config.get("initial_attributes"))
+            self.entity_service.save_entity(set_initial_request)
+            set_initial_request = self.strategy_executor.execute_request(set_initial_request)
+
+        new_entity = self.entity_service.get_entity(new_entity.entity_id)
+        request_list = new_entity.on_create(self.strategy_request.param_config)
+
         if request_list:
             for request in request_list:
                 self.entity_service.save_entity(request)
                 request = self.strategy_executor.execute_request(request)
-                if request.ret_val.get('child_entity'):
-                    result_of_execute = request.ret_val['child_entity']
-                    parent_entity.add_child(result_of_execute)
+                # if request.ret_val.get('child_entity'):
+                    # result_of_execute = request.ret_val['child_entity']
+                    # new_entity.add_child(result_of_execute)
 
         
-        self.entity_service.save_entity(new_entity)
+        new_entity = self.entity_service.get_entity(new_entity.entity_id)
         self.strategy_request.ret_val['child_entity'] = new_entity
 
         # Workaround for the fact there needs to be a request on an entity for its updated state to be returned to whose asking so need to make a mock request that this is a new entity that exists
@@ -271,6 +279,16 @@ class SetAttributesStrategy(Strategy):
         return {
             'attribute_map': {"attribute_name": "attribute_value"}
         }
+
+    @classmethod
+    def request_constructor(cls, target_entity_id, attribute_map: dict, add_to_history: bool = False):
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = cls.__name__
+        strategy_request.param_config = {"attribute_map": attribute_map}
+        strategy_request.target_entity_id = target_entity_id
+        strategy_request.add_to_history = add_to_history
+        strategy_request._nested_requests = []
+        return strategy_request
     
 class AddChildStrategy(Strategy):
     """Generic strategy for adding a child entity to its parent"""

@@ -7,8 +7,9 @@ import numpy as np
 
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.VisualizationEntity import VisualizationEntity
+from shared_utils.entities.view_entity.ViewEntity import ViewEntity
 from shared_utils.models import StrategyRequest
-from shared_utils.strategy.BaseStrategy import CreateEntityStrategy
+from shared_utils.strategy.BaseStrategy import CreateEntityStrategy, SetAttributesStrategy
 from shared_utils.strategy.VisualizationStrategy import VisualizationStrategy
 
 
@@ -32,7 +33,7 @@ class DocumentEntity(Entity):
         child_vis_create.strategy_name = CreateEntityStrategy.__name__
         child_uuid = str(uuid4())
         child_vis_create.param_config = {
-            'entity_class': VisualizationEntity.get_class_path(),
+            'entity_class': ViewEntity.get_class_path(),
             'entity_uuid': child_uuid,
         }
         child_vis_create.target_entity_id = self.entity_id
@@ -42,10 +43,10 @@ class DocumentEntity(Entity):
 
         child_vis_viz  = StrategyRequestEntity()
         self.add_child(child_vis_viz)
-        child_vis_viz.strategy_name = VisualizationStrategy.__name__
-        child_vis_viz.param_config = {
-            'parent_data_attribute_name': 'text',
-            'visualization_type': 'editor',
+        child_vis_viz.strategy_name = SetAttributesStrategy.__name__
+        child_vis_viz.param_config['attribute_map'] = {
+            'parent_attributes': {"text":"text"},
+            'view_component_type': 'editor',
         }
 
         child_vis_viz.target_entity_id = child_uuid
@@ -56,10 +57,6 @@ class DocumentEntity(Entity):
 
 
         return strategy_request_list
-
-
-        strategy_request_list.append(child_vis_create)
-
 
 
 
@@ -126,4 +123,6 @@ class DocumentEntity(Entity):
             'document_type': self.get_document_type() if self.has_attribute('document_type') else None,
             'tokens_count': len(self.get_tokens()) if self.has_attribute('tokens') else 0,
         }
+        sup_dict['text'] = self.get_text()
+        sup_dict['document_type'] = self.get_document_type() if self.has_attribute('document_type') else None
         return sup_dict

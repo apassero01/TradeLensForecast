@@ -141,6 +141,7 @@ class Entity():
             'position': self.get_attribute('position') if self.has_attribute('position') else None,
             'width': self.get_attribute('width') if self.has_attribute('width') else None,
             'height': self.get_attribute('height') if self.has_attribute('height') else None,
+            'hidden': self.get_attribute('hidden') if self.has_attribute('hidden') else None,
         }
 
     def to_db(self, model=None):
@@ -204,33 +205,35 @@ class EntityAdapter:
         if hasattr(model, 'attributes'):
             attributes = {}
             ##TODO Somepoint need to find a safe way to do this. ran into an issue where we could serialize to db but when sending to frontend datetime was not serializzable.
-            # for key, value in entity.get_attributes().items():
-            #     try:
-            #         # Try serializing the value
-            #         json.dumps(value)
-            #         # If successful, save it
-            #         attributes[key] = value
-            #     except (TypeError, ValueError):
-            #         pass
+            for key, value in entity.get_attributes().items():
+                try:
+                    # Try serializing the value
+                    if not isinstance(value, (str, int, float, bool, list, dict)):
+                        pass
+                    json.dumps(value)
+                    # If successful, save it
+                    attributes[key] = value
+                except (TypeError, ValueError):
+                    pass
             if hasattr(entity, 'db_attributes'):
                 for key in entity.db_attributes:
                     if entity.has_attribute(key):
                         attributes[key] = entity.get_attribute(key)
 
-            # Save the attributes to the model
-            #TODO need to loop through all attributes and check if they are serializable instead of hardcoding
-            if entity.has_attribute('position'):
-                attributes['position'] = entity.get_attribute('position')
-
-            if entity.has_attribute('text'):
-                attributes['text'] = entity.get_attribute('text')
-
-            if entity.has_attribute('width'):
-                attributes['width'] = entity.get_attribute('width')
-
-            if entity.has_attribute('height'):
-                attributes['height'] = entity.get_attribute('height')
-            model.attributes = attributes
+            # # Save the attributes to the model
+            # #TODO need to loop through all attributes and check if they are serializable instead of hardcoding
+            # if entity.has_attribute('position'):
+            #     attributes['position'] = entity.get_attribute('position')
+            #
+            # if entity.has_attribute('text'):
+            #     attributes['text'] = entity.get_attribute('text')
+            #
+            # if entity.has_attribute('width'):
+            #     attributes['width'] = entity.get_attribute('width')
+            #
+            # if entity.has_attribute('height'):
+            #     attributes['height'] = entity.get_attribute('height')
+            # model.attributes = attributes
 
 
         if hasattr(model, 'entity_type'):

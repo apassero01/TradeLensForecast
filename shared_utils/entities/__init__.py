@@ -16,3 +16,4 @@ def discover_entities():
     from model_stage.entities.ModelStageEntity import ModelStageEntity
     from .document_entities.DocumentEntity import DocumentEntity
     from .input_entity.InputEntity import InputEntity
+    from .view_entity.ViewEntity import ViewEntity

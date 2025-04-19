@@ -3,11 +3,11 @@ import { useRecoilState, useRecoilCallback } from 'recoil';
 import { entityApi } from '../api/entityApi';
 import { entityIdsAtom } from '../state/entityIdsAtom';
 import { entityFamily } from '../state/entityFamily';
+import useUpdateFlowNodes from './useUpdateFlowNodes';
 
 export const useEntities = () => {
   // We'll manage the array of IDs here
   const [entityIds, setEntityIds] = useRecoilState(entityIdsAtom);
-
   // 1. Merging a dictionary of { entityId: {...data} } using useRecoilCallback
   //    This ensures we can call "set" on atomFamily inside a top-level hook.
   const mergeEntities = useRecoilCallback(
@@ -38,7 +38,6 @@ export const useEntities = () => {
           return [...remainingIds, ...idsToAdd];
         });
         
-        // For each ID, merge the entity data into the relevant atom
         newIds.forEach((entityId) => {
           set(entityFamily(entityId), (prevData) => ({
             ...prevData,

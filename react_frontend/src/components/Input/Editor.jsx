@@ -11,7 +11,7 @@ import ace from 'ace-builds';
 ace.config.set('basePath', '/ace-builds');
 ace.config.set('workerPath', '/ace-builds');
 
-const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, entityId }) => {
+const Editor = ({ visualization, onChange, sendStrategyRequest, viewEntity}) => {
   const [editorText, setEditorText] = useState(null);
   const [fontSize, setFontSize] = useState(14);
   const [editorMode, setEditorMode] = useState('text');
@@ -51,7 +51,7 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, enti
       return;
     }
     
-    if (!visualization || !entityId || !parent_ids || parent_ids.length === 0) {
+    if (!visualization || !viewEntity.entity_id || !viewEntity.data?.parent_ids || viewEntity.data?.parent_ids.length === 0) {
       console.error('Cannot save: Missing required data (visualization, entityId, or parent_ids)');
       return;
     }
@@ -70,7 +70,7 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, enti
             'text': editorText,
           }
         },
-        target_entity_id: parent_ids[0],
+        target_entity_id: viewEntity.data?.parent_ids[0],
         add_to_history: false,
         nested_requests: [],
       };
@@ -80,7 +80,7 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, enti
     } catch (error) {
       console.error('Failed to save editor text:', error);
     }
-  }, [visualization, editorText, sendStrategyRequest, entityId, parent_ids]);
+  }, [visualization, editorText, sendStrategyRequest, viewEntity]);
 
   // Only initialize the editor content once or when visualization.data changes
   useEffect(() => {
@@ -105,7 +105,6 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, parent_ids, enti
       }
     }
     
-    console.log('Setting initial editor text:', initialText);
     setEditorText(initialText);
 
     const { config = {} } = visualization;

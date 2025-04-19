@@ -12,11 +12,15 @@ import { useReactFlow, addEdge } from '@xyflow/react';
 import { useRecoilCallback } from 'recoil';
 import { entityFamily } from '../../../state/entityFamily';
 import ViewEntity from './ViewEntity/ViewEntity';
+import DocumentEntity from './DocumentEntity';
+import { useWebSocketConsumer } from '../../../hooks/useWebSocketConsumer';
+import useUpdateFlowNodes from '../../../hooks/useUpdateFlowNodes';
 const componentMapping = {
     [NodeTypes.VISUALIZATION_ENTITY]: VisualizationEntity,
     [NodeTypes.INPUT_ENTITY]: InputEntity,
     [NodeTypes.STRATEGY_REQUEST_ENTITY]: StrategyRequestEntity,
     [NodeTypes.VIEW_ENTITY]: ViewEntity,
+    [NodeTypes.DOCUMENT_ENTITY]: DocumentEntity,
 };
 
 
@@ -25,7 +29,8 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
     const reactFlowInstance = useReactFlow();
     const nodeData = useRecoilValue(nodeSelectorFamily(id));
     const nodeIds = useRecoilValue(entityIdsAtom);
-
+    const {sendStrategyRequest} = useWebSocketConsumer();
+    const updateEntity = useUpdateFlowNodes(reactFlowInstance);
 
     function updateNodeEdges(nodeId, newParentIds) {
       // 1. Retrieve the current edges from the React Flow instance.
@@ -41,57 +46,6 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
       // 4. Update the edges in the React Flow instance.
       reactFlowInstance.addEdges(edges);
     }
-
-    const updateEntity = useRecoilCallback(
-        ({ set, snapshot }) => async (childId, updatedFields) => {
-          console.log('updateEntity', childId, updatedFields);
-          
-          // First, make sure the node is visible (if we're trying to show it)
-          if (updatedFields.hasOwnProperty('hidden') && updatedFields.hidden === false) {
-            // First update React Flow nodes to make it visible
-            reactFlowInstance.setNodes((nodes) => 
-              nodes.map((node) => 
-                node.id === childId 
-                  ? { ...node, hidden: false }
-                  : node
-              )
-            );
-            
-            // Give React Flow a moment to process this change
-            await new Promise(resolve => setTimeout(resolve, 0));
-          }
-          
-          // Now update the Recoil state
-          set(entityFamily(childId), (prev) => ({ ...prev, ...updatedFields }));
-          
-          // Wait for the atom update to propagate
-          const updatedEntity = await snapshot.getPromise(entityFamily(childId));
-          
-          // Finally, ensure React Flow has the latest node data
-          reactFlowInstance.setNodes((nodes) => 
-            nodes.map((node) => 
-              node.id === childId 
-                ? {
-                    ...node,
-                    key: `${childId}-${Date.now()}`,
-                    hidden: updatedFields.hasOwnProperty('hidden') ? updatedFields.hidden : node.hidden,
-                    data: { 
-                      ...node.data,
-                      entityId: childId,
-                      _updateTimestamp: Date.now() 
-                    }
-                  }
-                : node
-            )
-          );
-          
-        //   // Force React Flow to update its internal state
-        //   setTimeout(() => {
-        //     reactFlowInstance.updateNodeInternals([childId]);
-        //   }, 50);
-        },
-        [reactFlowInstance]
-      );
 
 
     // Use useEffect unconditionally; if nodeData is not ready, exit early
@@ -140,6 +94,9 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
         case EntityTypes.VIEW:
             dynamicType = NodeTypes.VIEW_ENTITY;
             break;
+        case EntityTypes.DOCUMENT:
+            dynamicType = NodeTypes.DOCUMENT_ENTITY;
+            break;
         default:
             dynamicType = NodeTypes.ENTITY_NODE;
     }
@@ -149,7 +106,7 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
 
     // Render the chosen node component with up-to-date properties.
     // Those properties include the backend-provided position, width, height, etc.
-    return <SpecificNodeComponent key={`${data.entityId}-${data.hidden}`} id={id} {...nodeData} updateEntity={updateEntity} />;
+    return <SpecificNodeComponent key={`${data.entityId}-${data.hidden}`} id={id} {...nodeData} updateEntity={updateEntity} sendStrategyRequest={sendStrategyRequest} />;
 };
 
 export default React.memo(DynamicNodeWrapper);

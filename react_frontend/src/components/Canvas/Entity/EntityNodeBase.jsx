@@ -3,7 +3,8 @@ import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { NodeResizeControl, Handle, Position } from '@xyflow/react';
 import { useWebSocketConsumer } from '../../../hooks/useWebSocketConsumer';
 import { entityFamily } from '../../../state/entityFamily';
-import { strategyRequestChildrenSelector } from '../../../state/entitiesSelectors';
+import { strategyRequestChildrenSelector, childrenByTypeSelector } from '../../../state/entitiesSelectors';
+import { EntityTypes } from './EntityEnum';
 import StrategyRequestList from '../../Strategy/StrategyRequestList';
 import { FaPlus } from 'react-icons/fa';
 
@@ -11,22 +12,8 @@ function EntityNodeBase({ data, children, updateEntity }) {
   // const entity = useRecoilValue(entityFamily(data.entityId)); // Use full entity from Recoil
   const { sendStrategyRequest } = useWebSocketConsumer();
   const strategyRequestChildren = useRecoilValue(strategyRequestChildrenSelector(data.entityId));
+  // const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: data.entityId, type: EntityTypes.VIEW }));
   const [isLoading, setIsLoading] = React.useState(false);
-
-  // console.log('EntityNodeBase rendered ', data.entityId, data);
-
-  // // Callback to update an entity atom
-  // const updateEntity = useRecoilCallback(
-  //   ({ set }) =>
-  //     (childId, updatedFields) => {
-  //       set(entityFamily(childId), (prev) => ({
-  //         ...prev,
-  //         ...updatedFields,
-  //       }));
-  //       console.log('Updated entity:', childId, updatedFields);
-  //     },
-  //   []
-  // );
 
   // Process strategy request children once per child
   const processedChildrenRef = useRef({});
@@ -47,6 +34,15 @@ function EntityNodeBase({ data, children, updateEntity }) {
         });
       }
     }
+
+    // if (viewChildren) {
+    //   viewChildren.forEach((child) => {
+    //     if (!processedChildrenRef.current[child.entity_id]) {
+    //       updateEntity(child.entity_id, { hidden: child?.hidden });
+    //       processedChildrenRef.current[child.entity_id] = true;
+    //     }
+    //   });
+    // }
   }, [strategyRequestChildren, updateEntity]);
 
   // Create a child strategy request

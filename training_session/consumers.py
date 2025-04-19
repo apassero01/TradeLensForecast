@@ -146,7 +146,7 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
             }))
 
     async def handle_execute_strategy(self, strategy_data):
-        """Handle strategy execution via WebSocket"""
+        """Handle strategy execution via WebSocket expected to take a list of strategies"""
         try:
             print(f"Executing strategy: {strategy_data}")
             session_id = entity_service.get_session_id()
@@ -156,14 +156,16 @@ class GlobalEntityConsumer(AsyncWebsocketConsumer):
             # Convert JSON to StrategyRequestEntity
             # strat_request = sync_to_async(json_to_strategy_request(strategy_data))
             # call with sync to async
-            strat_request = await sync_to_async(self.json_to_strategy_request)(strategy_data)
 
-            task = strategy_executor_service.execute_request(strat_request, wait=False)
-            # Send confirmation of execution
-            await self.send(json.dumps({
-                'type': 'strategy_executed',
-                'message': 'Strategy executed successfully'
-            }))
+            for strategy in strategy_data:
+                strat_request = await sync_to_async(self.json_to_strategy_request)(strategy)
+
+                task = strategy_executor_service.execute_request(strat_request, wait=False)
+                # Send confirmation of execution
+                await self.send(json.dumps({
+                    'type': 'strategy_executed',
+                    'message': 'Strategy executed successfully'
+                }))
 
         except Exception as e:
             print(f"Error executing strategy: {str(e)}")
