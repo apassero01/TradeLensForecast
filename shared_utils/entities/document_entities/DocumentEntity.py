@@ -50,7 +50,7 @@ class DocumentEntity(Entity):
         }
 
         child_vis_viz.target_entity_id = child_uuid
-        child_vis_viz.add_to_history = True
+        child_vis_viz.add_to_history = False
 
         strategy_request_list.append(child_vis_viz)
 

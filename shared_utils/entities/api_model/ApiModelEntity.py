@@ -20,10 +20,7 @@ class ApiModelEntity(Entity):
 
     def serialize(self) -> dict:
         parent_dict = super().serialize()
-        # Don't include sensitive info like API key in serialization
-        parent_dict['meta_data'] = {
-            'model_type': self.get_attribute('model_type'),
-            'model_name': self.get_attribute('model_name'),
-            'has_api_key': self.get_attribute('api_key') is not None
-        }
+        parent_dict['model_type'] = self.get_attribute('model_type')
+        parent_dict['model_name'] = self.get_attribute('model_name')
+        parent_dict['message_history'] = [message.serialize() for message in self.get_attribute('message_history')]
         return parent_dict 

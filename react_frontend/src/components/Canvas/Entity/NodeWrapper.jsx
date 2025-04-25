@@ -8,7 +8,7 @@ import InputEntity from './InputEntity'
 import StrategyRequestEntity from './StrategyRequestEntity';
 import EntityNode from './EntityNode';
 import { entityIdsAtom } from '../../../state/entityIdsAtom';
-import { useReactFlow, addEdge } from '@xyflow/react';
+import { useReactFlow, addEdge, useUpdateNodeInternals } from '@xyflow/react';
 import { useRecoilCallback } from 'recoil';
 import { entityFamily } from '../../../state/entityFamily';
 import ViewEntity from './ViewEntity/ViewEntity';
@@ -55,11 +55,6 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
         reactFlowInstance.setNodes((nds) =>
             nds.map((node) => {
                 if (node.id === id) {
-                    // Only update if the positions differ
-                    // if (
-                    //     node.position.x !== nodeData.position.x ||
-                    //     node.position.y !== nodeData.position.y
-                    // ) {
                     return {
                         ...node,
                         position: nodeData.position,

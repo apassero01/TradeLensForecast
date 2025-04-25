@@ -42,7 +42,7 @@ export default function ContextMenu({
         setShowViewsSubmenu(false);
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -52,7 +52,7 @@ export default function ContextMenu({
   const duplicateNode = useCallback(() => {
     // Close the context menu
     onClick();
-    
+
     // Send strategy request to duplicate the entity
     sendStrategyRequest({
       strategy_name: 'DuplicateEntityStrategy',
@@ -66,10 +66,9 @@ export default function ContextMenu({
   const newView = useCallback(() => {
     // Close the context menu
     onClick();
-    
-    const create_request = StrategyRequests.createEntity(entityId, "shared_utils.entities.view_entity.ViewEntity.ViewEntity", {hidden: false});
+
+    const create_request = StrategyRequests.createEntity(entityId, "shared_utils.entities.view_entity.ViewEntity.ViewEntity", { hidden: false, width: 350, height: 350 });
     sendStrategyRequest([create_request]);
-    updateEntity(entityId, { hidden: false });
   }, [entityId, sendStrategyRequest, onClick, updateEntity]);
 
   const copyEntityId = useCallback(() => {
@@ -88,7 +87,7 @@ export default function ContextMenu({
     // Perform deletion after confirmation
     // Close the context menu
     onClick();
-    
+
     // Send strategy request to delete the entity
     sendStrategyRequest({
       strategy_name: 'RemoveEntityStrategy',
@@ -117,7 +116,7 @@ export default function ContextMenu({
           onClick();
         }}
       />
-      
+
       {/* The context menu */}
       <div
         style={{
@@ -134,7 +133,7 @@ export default function ContextMenu({
         }}
       >
         <div style={{ padding: '8px 10px', borderBottom: '1px solid #374151' }}>
-          <div 
+          <div
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <span style={{ fontSize: '12px', color: 'white' }}>{shortenedId}</span>
@@ -170,8 +169,8 @@ export default function ContextMenu({
             )}
           </div>
         </div>
-        
-        <button 
+
+        <button
           onClick={newView}
           style={{
             display: 'block',
@@ -188,10 +187,10 @@ export default function ContextMenu({
         >
           New View
         </button>
-        
+
         {/* Views submenu button - only show if there are views */}
         {viewChildren && viewChildren.length > 0 && (
-          <div 
+          <div
             style={{ position: 'relative' }}
             onMouseEnter={() => setShowViewsSubmenu(true)}
             onMouseLeave={() => setShowViewsSubmenu(false)}
@@ -213,10 +212,10 @@ export default function ContextMenu({
               Views
               <span style={{ position: 'absolute', right: '10px' }}>▶</span>
             </button>
-            
+
             {/* Views submenu */}
             {showViewsSubmenu && (
-              <div 
+              <div
                 ref={viewsMenuRef}
                 style={{
                   position: 'absolute',
@@ -230,12 +229,12 @@ export default function ContextMenu({
                 }}
               >
                 {viewChildren.map((view) => {
-                  const viewName = view.data.view_component_type || 
-                                  `View ${view.id.substring(0, 6)}`;
+                  const viewName = view.data.view_component_type ||
+                    `View ${view.id.substring(0, 6)}`;
                   const isHidden = !!view.data.hidden;
-                  
+
                   return (
-                    <div 
+                    <div
                       key={view.id}
                       style={{
                         display: 'flex',
@@ -266,7 +265,7 @@ export default function ContextMenu({
             )}
           </div>
         )}
-        
+
         <button
           onClick={deleteNode}
           style={{

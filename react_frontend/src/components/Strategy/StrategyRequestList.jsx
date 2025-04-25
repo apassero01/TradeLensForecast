@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FaPlay, FaEdit, FaTimes } from 'react-icons/fa';
+import { StrategyRequests } from '../../utils/StrategyRequestBuilder';
 // Define the SortableItem component without memo for now
 function SortableItem({ id, request, updateEntity, sendStrategyRequest, onRemoveRequest }) {
   // Use dnd-kit hook for the sortable item
@@ -35,6 +36,7 @@ function SortableItem({ id, request, updateEntity, sendStrategyRequest, onRemove
 
   const handleEdit = (e) => {
     e.stopPropagation();
+    sendStrategyRequest(StrategyRequests.hideEntity(request.entity_id, false));
     updateEntity(request.entity_id, { hidden: false, selected: true });
   };
 

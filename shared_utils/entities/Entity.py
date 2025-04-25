@@ -6,6 +6,11 @@ from uuid import uuid4, UUID
 import numpy as np
 from django.db import models
 from shared_utils.entities.EntityModel import EntityModel
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class Entity():
     entity_name = EntityEnum.ENTITY
     db_attributes = []
@@ -207,20 +212,23 @@ class EntityAdapter:
             ##TODO Somepoint need to find a safe way to do this. ran into an issue where we could serialize to db but when sending to frontend datetime was not serializzable.
             for key, value in entity.get_attributes().items():
                 try:
-                    # Try serializing the value
-                    if not isinstance(value, (str, int, float, bool, list, dict)):
-                        pass
+                    # will raise TypeError (or ValueError) if value contains
+                    # anything that json can’t handle
                     json.dumps(value)
-                    # If successful, save it
-                    attributes[key] = value
                 except (TypeError, ValueError):
-                    pass
+                    logger.debug(
+                        "Skipping non-serializable attribute %r: %r (type %s)",
+                        key, value, type(value).__name__
+                    )
+                else:
+                    attributes[key] = value
             if hasattr(entity, 'db_attributes'):
                 for key in entity.db_attributes:
                     if entity.has_attribute(key):
                         attributes[key] = entity.get_attribute(key)
 
             # # Save the attributes to the model
+            model.attributes = attributes
             # #TODO need to loop through all attributes and check if they are serializable instead of hardcoding
             # if entity.has_attribute('position'):
             #     attributes['position'] = entity.get_attribute('position')

@@ -2,18 +2,19 @@
 import React, { useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { ReactFlow, Background, BackgroundVariant, applyNodeChanges, Controls, applyEdgeChanges } from '@xyflow/react';
 import { useRecoilValue, useRecoilCallback } from 'recoil';
-import { flowNodesSelector, flowEdgesSelector } from '../../state/entitiesSelectors';
+import { flowNodesSelector, flowEdgesSelector, hiddenPropertiesSelector, allEntitiesSelector } from '../../state/entitiesSelectors';
 import '@xyflow/react/dist/style.css';
 import ContextMenu from './ContextMenu';
 import { useWebSocketConsumer } from '../../hooks/useWebSocketConsumer';
 import DynamicNodeWrapper from './Entity/NodeWrapper';
 import { entityIdsAtom } from '../../state/entityIdsAtom';
 import { entityFamily } from '../../state/entityFamily';
-
+import HiddenSyncer from './HiddenSyncer';
 
 function Canvas() {
   // 1. Read the nodes & edges from Recoil
   const nodeIds = useRecoilValue(entityIdsAtom)
+  const allEntities = useRecoilValue(allEntitiesSelector)
   const { sendStrategyRequest } = useWebSocketConsumer();
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -81,26 +82,6 @@ function Canvas() {
     console.log('Edges changed', changes);
     setEdges((prevEdges) => applyEdgeChanges(changes, prevEdges));
   }, []);
-
-  const onDragEnd = useCallback((event, node) => {
-    // if (!node.position.x || !node.position.y) {
-    //   return;
-    // }
-    // sendStrategyRequest({
-    //   strategy_name: 'SetAttributesStrategy',
-    //   param_config: {
-    //     attribute_map: {
-    //       'position': {
-    //         'x': node.position.x,
-    //         'y': node.position.y
-    //       }
-    //     }
-    //   },
-    //   target_entity_id: node.data.entityId,
-    //   add_to_history: false,
-    //   nested_requests: [],
-    // })
-  }, [sendStrategyRequest]);
 
   const onNodesChange = useCallback((changes) => {
     // Update nodes based on the changes
@@ -194,6 +175,10 @@ function Canvas() {
     });
   }, [sendStrategyRequest]);
 
+  const onInit = useCallback((instance) => {
+    reactFlowRef.current = instance;
+  }, []);
+
   return (
     <div style={{ width: '100%', height: '100vh', flex: 1 }}>
       <ReactFlow
@@ -205,20 +190,18 @@ function Canvas() {
         onMove={onMoveEnd}
         onEdgesChange={onEdgesChange}
         fitView
-        onNodeDragStop={(event, node) => {
-          onDragEnd(event, node);
-        }}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onConnect={onConnect}
-        // selectionKeyCode={"Shift"}
         selectionOnDrag={true}
         selectionMode={"partial"}
         panOnDrag={true}
         snapToGrid={false}
         maxZoom={10}
         minZoom={0.1}
+        onInit={onInit}
       >
+        <HiddenSyncer />
         <Background
           id="2"
           gap={25}

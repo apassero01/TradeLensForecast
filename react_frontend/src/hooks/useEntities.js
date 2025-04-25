@@ -3,7 +3,6 @@ import { useRecoilState, useRecoilCallback } from 'recoil';
 import { entityApi } from '../api/entityApi';
 import { entityIdsAtom } from '../state/entityIdsAtom';
 import { entityFamily } from '../state/entityFamily';
-import useUpdateFlowNodes from './useUpdateFlowNodes';
 
 export const useEntities = () => {
   // We'll manage the array of IDs here

@@ -11,6 +11,7 @@ import signal
 import subprocess
 import logging
 import atexit
+import threading
 from pathlib import Path
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "TradeLens.settings")
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def _spawn(cmd, *, name, cwd=PROJECT_DIR, env=None):
-    """Start *cmd* in its own process‑group and return the Popen handle."""
+    """Start *cmd* in its own process-group and return the Popen handle."""
     log.info("Starting %s: %s", name, " ".join(cmd))
     return subprocess.Popen(
         cmd,
@@ -56,39 +57,59 @@ def main() -> None:
     _purge_celery()
 
     if debug:
-        # In debug mode, run Celery worker in the main process for debugging
-        daphne_proc = _spawn(
-            ["daphne", "-b", "0.0.0.0", "-p", "8000", "TradeLens.asgi:application"],
-            name="daphne",
-        )
-        # Register cleanup to terminate Daphne when the main process exits
-        atexit.register(
-            lambda: os.killpg(daphne_proc.pid, signal.SIGTERM) if daphne_proc.poll() is None else None
-        )
-        # Import and run the Celery worker in the main process
-        from TradeLens.celery import app  # Adjust this import if your app is defined elsewhere
-        app.worker_main(
-            ["worker", "--loglevel=debug", f"--pool={pool}", f"--concurrency={concurrency}"]
-        )
+        # ─── DEBUG MODE: run Daphne & Celery in-process so debugger sees every frame ───
+        from TradeLens.asgi import application  # use full ProtocolTypeRouter from your project
+        from daphne.server import Server
+
+        # Run Daphne (with HTTP & WebSocket support) in a daemon thread
+        def _run_daphne_in_process():
+            log.info("Starting in-process Daphne (debug mode)…")
+            srv = Server(
+                application=application,
+                endpoints=["tcp:8000:0.0.0.0"],  # port first, then interface
+                signal_handlers=False,           # top-level handles signals
+            )
+            srv.run()
+
+        t = threading.Thread(target=_run_daphne_in_process, daemon=True)
+        t.start()
+
+        # Run Celery worker in this same process
+        from TradeLens.celery import app as celery_app
+        celery_app.worker_main([
+            "worker",
+            "--loglevel=debug",
+            f"--pool={pool}",
+            f"--concurrency={concurrency}",
+        ])
+
     else:
-        # Normal mode: run both as subprocesses
+        # ─── NORMAL MODE: run each in its own subprocess ─────────────────────────────
         procs = [
             _spawn(
                 ["daphne", "-b", "0.0.0.0", "-p", "8000", "TradeLens.asgi:application"],
                 name="daphne",
             ),
             _spawn(
-                ["celery", "-A", "TradeLens", "worker", "--loglevel=debug", "--pool=" + pool, f"--concurrency={concurrency}"],
-                name="celery‑worker",
+                [
+                    "celery",
+                    "-A",
+                    "TradeLens",
+                    "worker",
+                    "--loglevel=debug",
+                    f"--pool={pool}",
+                    f"--concurrency={concurrency}",
+                ],
+                name="celery-worker",
             ),
         ]
 
-        # Forward ^C / kill to every child process‑group
+        # Forward ^C / kill to every child process-group
         def _shutdown(signum, _frame):
             log.info("Shutting down (%s)…", signal.Signals(signum).name)
             for p in procs:
-                if p.poll() is None:  # still alive
-                    os.killpg(p.pid, signal.SIGTERM)  # whole group
+                if p.poll() is None:
+                    os.killpg(p.pid, signal.SIGTERM)
             for p in procs:
                 p.wait()
             sys.exit(0)
@@ -103,7 +124,7 @@ def main() -> None:
                     if p.poll() is not None:
                         log.warning("%s exited with code %s", p.args[0], p.returncode)
                         _shutdown(signal.SIGTERM, None)
-                signal.pause()  # wake up only on signal
+                signal.pause()
         except KeyboardInterrupt:
             _shutdown(signal.SIGINT, None)
 

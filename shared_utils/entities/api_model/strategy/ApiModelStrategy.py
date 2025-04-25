@@ -245,12 +245,12 @@ class CallApiModelStrategy(Strategy):
         CUR_ITERS = 0
         # Use invoke() instead of __call__
 
-        history.append(Message(type='context', content=user_input))
+        self.add_to_message_history(entity, Message(type='request', content=user_input))
         while CUR_ITERS < MAX_ITERS:
             CUR_ITERS += 1
             response = chat.invoke(messages)
             content = "\n".join([str(item) for item in response.content]) if isinstance(response.content,                                                                                        list) else response.content
-            history.append(Message(type='response', content=content))
+            self.add_to_message_history(entity, Message(type='response', content=content))
             messages.append(AIMessage(content=response.content))
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
@@ -262,7 +262,7 @@ class CallApiModelStrategy(Strategy):
                 child_request = tool_msg.artifact
                 request = self.execute_model_request(child_request, entity)
                 request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id}")
-                history.append(request_message)
+                self.add_to_message_history(entity, request_message)
                 messages.append(HumanMessage(content=request_message.content))
             entity = self.entity_service.get_entity(entity.entity_id)
 
@@ -382,6 +382,15 @@ class CallApiModelStrategy(Strategy):
         strategy_request.target_entity_id = target_entity_id
         strategy_request.add_to_history = add_to_history
         return "Created Strategy Request", strategy_request
+
+    def add_to_message_history(self, entity, message):
+        """
+        Add a message to the message history of the entity.
+        """
+        history = entity.get_attribute('message_history')
+        history.append(message)
+        self.entity_service.save_entity(entity)
+
 
     @staticmethod
     def get_request_config():

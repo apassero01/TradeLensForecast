@@ -2,12 +2,10 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { useRecoilValue, useRecoilCallback } from 'recoil';
 import { NodeResizeControl, Handle, Position } from '@xyflow/react';
 import { useWebSocketConsumer } from '../../../hooks/useWebSocketConsumer';
-import { entityFamily } from '../../../state/entityFamily';
 import { strategyRequestChildrenSelector, childrenByTypeSelector } from '../../../state/entitiesSelectors';
-import { EntityTypes } from './EntityEnum';
 import StrategyRequestList from '../../Strategy/StrategyRequestList';
 import { FaPlus } from 'react-icons/fa';
-
+import { StrategyRequests } from '../../../utils/StrategyRequestBuilder';
 function EntityNodeBase({ data, children, updateEntity }) {
   // const entity = useRecoilValue(entityFamily(data.entityId)); // Use full entity from Recoil
   const { sendStrategyRequest } = useWebSocketConsumer();
@@ -28,6 +26,7 @@ function EntityNodeBase({ data, children, updateEntity }) {
       });
       if (updatesToMake.length > 0 && updateEntity) {
         updatesToMake.forEach((child) => {
+          sendStrategyRequest(StrategyRequests.hideEntity(child.entity_id, true));
           updateEntity(child.entity_id, {
             hidden: true,
           });

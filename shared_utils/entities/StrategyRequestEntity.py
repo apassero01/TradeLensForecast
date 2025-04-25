@@ -5,6 +5,9 @@ from shared_utils.entities.Entity import Entity
 from shared_utils.entities.EntityModel import EntityModel
 from shared_utils.models import StrategyRequest
 from typing import List, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class StrategyRequestEntity(Entity):
@@ -134,14 +137,16 @@ class StrategyRequestAdapter:
             attributes = {}
             for key, value in entity.get_attributes().items():
                 try:
-                    # Try serializing the value
-                    if not isinstance(value, (str, int, float, bool, list, dict)):
-                        pass
+                    # will raise TypeError (or ValueError) if value contains
+                    # anything that json can’t handle
                     json.dumps(value)
-                    # If successful, save it
-                    attributes[key] = value
                 except (TypeError, ValueError):
-                    pass
+                    logger.debug(
+                        "Skipping non-serializable attribute %r: %r (type %s)",
+                        key, value, type(value).__name__
+                    )
+                else:
+                    attributes[key] = value
 
         # Map basic attributes
         model.strategy_name = entity.strategy_name
