@@ -146,7 +146,7 @@ class Entity():
             'position': self.get_attribute('position') if self.has_attribute('position') else None,
             'width': self.get_attribute('width') if self.has_attribute('width') else None,
             'height': self.get_attribute('height') if self.has_attribute('height') else None,
-            'hidden': self.get_attribute('hidden') if self.has_attribute('hidden') else None,
+            'hidden': self.get_attribute('hidden') if self.has_attribute('hidden') else False,
         }
 
     def to_db(self, model=None):

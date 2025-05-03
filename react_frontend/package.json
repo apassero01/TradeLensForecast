@@ -24,12 +24,14 @@
     "react-flow": "^1.0.3",
     "react-icons": "^5.5.0",
     "react-image": "^4.1.0",
-    "react-markdown": "^10.0.0",
+    "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
     "react-scripts": "5.0.1",
     "recoil": "^0.7.7",
     "recoilize": "^3.2.0",
     "redux": "^5.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -55,5 +57,11 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "typescript": "^4.9.5"
   }
 }

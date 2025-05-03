@@ -17,3 +17,4 @@ def discover_entities():
     from .document_entities.DocumentEntity import DocumentEntity
     from .input_entity.InputEntity import InputEntity
     from .view_entity.ViewEntity import ViewEntity
+    from .meal_planner.RecipeEntity import RecipeEntity

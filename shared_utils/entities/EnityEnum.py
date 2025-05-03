@@ -15,4 +15,5 @@ class EntityEnum(Enum):
     API_MODEL = "api_model"
     INPUT = "input"
     VIEW = "view"
+    RECIPE = "recipe"
 

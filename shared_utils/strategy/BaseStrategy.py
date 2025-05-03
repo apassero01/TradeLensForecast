@@ -127,6 +127,7 @@ class CreateEntityStrategy(Strategy):
         # Add as child to parent
         parent_entity.add_child(new_entity)
         self.entity_service.save_entity(new_entity)
+        self.entity_service.save_entity(parent_entity)
 
         if config.get('initial_attributes') is not None:
             set_initial_request = SetAttributesStrategy.request_constructor(target_entity_id=new_entity.entity_id, attribute_map=config.get("initial_attributes"))
@@ -149,8 +150,24 @@ class CreateEntityStrategy(Strategy):
     def get_request_config():
         return {
             'entity_class': '',
-            'entity_uuid': None  # Added to show it's an expected config option
+            'entity_uuid': None,  # Added to show it's an expected config option
+            'initial_attributes': None
         }
+
+    @classmethod
+    def request_constructor(cls, target_entity_id, child_class_path: str,  entity_uuid: str = None, add_to_history: bool = False, initial_attributes: dict = None):
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = cls.__name__
+        strategy_request.param_config = {
+            'entity_class': child_class_path,
+            'entity_uuid': entity_uuid,
+        }
+        if initial_attributes is not None:
+            strategy_request.param_config['initial_attributes'] = initial_attributes
+        strategy_request.target_entity_id = target_entity_id
+        strategy_request.add_to_history = add_to_history
+        strategy_request._nested_requests = []
+        return strategy_request
 
 
 class AssignAttributesStrategy(Strategy):
@@ -310,6 +327,9 @@ class RemoveChildStrategy(Strategy):
         entity.remove_child_by_id(child_id)
         child_entity = self.entity_service.get_entity(child_id)
         child_entity.remove_parent(entity)
+        self.entity_service.save_entity(entity)
+        self.entity_service.save_entity(child_entity)
+
 
         return self.strategy_request
 

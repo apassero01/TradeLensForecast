@@ -231,15 +231,13 @@ class CallApiModelStrategy(Strategy):
         #     max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
         # )
         chat = init_chat_model(entity.get_attribute('model_name'), model_provider='google_genai', api_key=entity.get_attribute('api_key'))
-        chat = chat.bind_tools([self.create_strategy_request, self.end_conversation])
-        tool_dict = {"create_strategy_request": self.create_strategy_request, "end_conversation": self.end_conversation}
+        chat = chat.bind_tools([self.create_strategy_request, self.tasks_complete])
+        tool_dict = {"create_strategy_request": self.create_strategy_request, "tasks_complete": self.tasks_complete}
 
         messages = []
         if system_prompt:
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=combined_input))
-
-        history = entity.get_attribute('message_history')
 
         MAX_ITERS = 25
         CUR_ITERS = 0
@@ -251,20 +249,23 @@ class CallApiModelStrategy(Strategy):
             response = chat.invoke(messages)
             content = "\n".join([str(item) for item in response.content]) if isinstance(response.content,                                                                                        list) else response.content
             self.add_to_message_history(entity, Message(type='response', content=content))
-            messages.append(AIMessage(content=response.content))
+            if response.content != '':
+                messages.append(AIMessage(content=response.content))
+
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
-                if tool_call['name'].lower() == 'end_conversation':
+                if tool_call['name'].lower() == 'tasks_complete':
                     CUR_ITERS = MAX_ITERS
                     break
                 selected_tool = tool_dict.get(tool_call['name'].lower())
                 tool_msg = selected_tool.invoke(tool_call)
                 child_request = tool_msg.artifact
                 request = self.execute_model_request(child_request, entity)
+                entity = self.entity_service.get_entity(entity.entity_id)
                 request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id}")
                 self.add_to_message_history(entity, request_message)
                 messages.append(HumanMessage(content=request_message.content))
-            entity = self.entity_service.get_entity(entity.entity_id)
+
 
 
 
@@ -273,12 +274,10 @@ class CallApiModelStrategy(Strategy):
         # self.parse_strategy_requests(response.content, entity)
         
         entity.set_attribute('last_context', context)
-        entity.set_attribute('message_history', history)
-        entity.set_attribute('response', [message.serialize() for message in history])
-        
-        self.strategy_request.ret_val['response'] = history
+
         self.strategy_request.ret_val['context_used'] = context
         self.strategy_request.ret_val['entity'] = entity
+        self.entity_service.save_entity(entity)
         
         return self.strategy_request
 
@@ -355,7 +354,7 @@ class CallApiModelStrategy(Strategy):
 
     @staticmethod
     @tool
-    def end_conversation() -> str:
+    def tasks_complete() -> str:
         '''
         End the conversation with the model. This method will be called when the conversation
         is over.
@@ -409,6 +408,7 @@ class ClearChatHistoryStrategy(Strategy):
     def apply(self, entity) -> StrategyRequestEntity:
         entity.set_attribute('message_history', [])
         entity.set_attribute('response', [])
+        self.entity_service.save_entity(entity)
         return self.strategy_request
 
     @staticmethod

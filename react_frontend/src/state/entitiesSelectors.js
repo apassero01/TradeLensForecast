@@ -1,7 +1,7 @@
 import { selector } from 'recoil';
 import { entityIdsAtom } from './entityIdsAtom';
 import { entityFamily } from './entityFamily';
-import { EntityTypes, NodeTypes } from '../components/Canvas/Entity/EntityEnum';
+import { EntityTypes } from '../components/Canvas/Entity/EntityEnum';
 import { selectorFamily } from 'recoil';
 
 export const strategyRequestChildrenSelector = selectorFamily({
@@ -27,7 +27,9 @@ export const childrenByTypeSelector = selectorFamily({
   get: ({ parentId, type }) => ({ get }) => {
     const parent = get(nodeSelectorFamily(parentId));
     const children = parent.data.child_ids.map((childId) => get(nodeSelectorFamily(childId)));
+    console.log('children', children);
     const childEntities = children.filter((child) => child.data.entity_type === type);
+    console.log('childEntities', childEntities);
     return childEntities;
   },
 });
@@ -39,17 +41,9 @@ export const nodeSelectorFamily = selectorFamily({
     const entity = get(entityFamily(entityId));
     if (!entity) return null; // Handle missing entities
 
-    const nodeType = {
-      [EntityTypes.STRATEGY_REQUEST]: NodeTypes.STRATEGY_REQUEST_ENTITY,
-      [EntityTypes.INPUT]: NodeTypes.INPUT_ENTITY,
-      [EntityTypes.VISUALIZATION]: NodeTypes.VISUALIZATION_ENTITY,
-      [EntityTypes.DOCUMENT]: NodeTypes.DOCUMENT_ENTITY,
-      [EntityTypes.VIEW]: NodeTypes.VIEW_ENTITY,
-    }[entity.entity_type] || NodeTypes.ENTITY_NODE;
-
     return {
       id: entityId,
-      type: nodeType,
+      type: entity.entity_type,
       position: entity.position || calculateNewPosition(entity, get),
       width: entity?.width || 300,
       height: entity?.height || 200,

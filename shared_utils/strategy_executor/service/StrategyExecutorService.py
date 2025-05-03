@@ -29,6 +29,8 @@ class StrategyExecutorService:
 
         if 'entity' in strat_request.ret_val:
             entity = strat_request.ret_val['entity']
+        else:
+            entity = self.entity_service.get_entity(entity.entity_id)
 
         if strat_request.add_to_history:
             entity.update_strategy_requests(strat_request)

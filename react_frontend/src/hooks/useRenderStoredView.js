@@ -84,7 +84,7 @@ function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity) {
                 </div>
             )}
         >
-            <ViewComponent visualization={vissualization} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} viewEntity={viewEntityStore} />
+            <ViewComponent visualization={vissualization} data={viewData} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} viewEntity={viewEntityStore} />
         </ErrorBoundary>
     );
 }

@@ -2,25 +2,26 @@
 import React, { useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../state/entitiesSelectors';
-import { EntityTypes, NodeTypes } from './EntityEnum';
+import { EntityTypes } from './EntityEnum';
 import VisualizationEntity from './VisualizationEntity/VisualizationEntity';
 import InputEntity from './InputEntity'
 import StrategyRequestEntity from './StrategyRequestEntity';
 import EntityNode from './EntityNode';
 import { entityIdsAtom } from '../../../state/entityIdsAtom';
 import { useReactFlow, addEdge, useUpdateNodeInternals } from '@xyflow/react';
-import { useRecoilCallback } from 'recoil';
-import { entityFamily } from '../../../state/entityFamily';
 import ViewEntity from './ViewEntity/ViewEntity';
 import DocumentEntity from './DocumentEntity';
 import { useWebSocketConsumer } from '../../../hooks/useWebSocketConsumer';
 import useUpdateFlowNodes from '../../../hooks/useUpdateFlowNodes';
+import RecipeEntity from './RecipeEntity';
+
 const componentMapping = {
-    [NodeTypes.VISUALIZATION_ENTITY]: VisualizationEntity,
-    [NodeTypes.INPUT_ENTITY]: InputEntity,
-    [NodeTypes.STRATEGY_REQUEST_ENTITY]: StrategyRequestEntity,
-    [NodeTypes.VIEW_ENTITY]: ViewEntity,
-    [NodeTypes.DOCUMENT_ENTITY]: DocumentEntity,
+    [EntityTypes.VISUALIZATION]: VisualizationEntity,
+    [EntityTypes.INPUT]: InputEntity,
+    [EntityTypes.STRATEGY_REQUEST]: StrategyRequestEntity,
+    [EntityTypes.VIEW]: ViewEntity,
+    [EntityTypes.DOCUMENT]: DocumentEntity,
+    [EntityTypes.RECIPE]: RecipeEntity,
 };
 
 
@@ -74,30 +75,9 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
     // Now safely return null if nodeData is not yet available
     if (!nodeData) return null;
 
-    // Compute the dynamic node type based on the node's entity_type.
-    let dynamicType;
-    switch (nodeData.entity_type) {
-        case EntityTypes.STRATEGY_REQUEST:
-            dynamicType = NodeTypes.STRATEGY_REQUEST_ENTITY;
-            break;
-        case EntityTypes.INPUT:
-            dynamicType = NodeTypes.INPUT_ENTITY;
-            break;
-        case EntityTypes.VISUALIZATION:
-            dynamicType = NodeTypes.VISUALIZATION_ENTITY;
-            break;
-        case EntityTypes.VIEW:
-            dynamicType = NodeTypes.VIEW_ENTITY;
-            break;
-        case EntityTypes.DOCUMENT:
-            dynamicType = NodeTypes.DOCUMENT_ENTITY;
-            break;
-        default:
-            dynamicType = NodeTypes.ENTITY_NODE;
-    }
-
-    // Pick the actual node component based on the computed type.
-    const SpecificNodeComponent = componentMapping[dynamicType] || EntityNode;
+    // Directly look up the component in the mapping using the entity type.
+    // If the type is not found in the mapping, default to EntityNode.
+    const SpecificNodeComponent = componentMapping[nodeData.entity_type] || EntityNode;
 
     // Render the chosen node component with up-to-date properties.
     // Those properties include the backend-provided position, width, height, etc.

@@ -6,7 +6,7 @@ import { strategyRequestChildrenSelector, childrenByTypeSelector } from '../../.
 import StrategyRequestList from '../../Strategy/StrategyRequestList';
 import { FaPlus } from 'react-icons/fa';
 import { StrategyRequests } from '../../../utils/StrategyRequestBuilder';
-function EntityNodeBase({ data, children, updateEntity }) {
+function EntityNodeBase({ data, updateEntity, children }) {
   // const entity = useRecoilValue(entityFamily(data.entityId)); // Use full entity from Recoil
   const { sendStrategyRequest } = useWebSocketConsumer();
   const strategyRequestChildren = useRecoilValue(strategyRequestChildrenSelector(data.entityId));

@@ -7,7 +7,9 @@ import MultiLine from "./MultiLine";
 import Editor from '../../../../Input/Editor';
 import ChatScreen from './ChatScreen';
 import PhotoDisplay from './PhotoDisplay';
-
+import RecipeInstructions from './Recipe/RecipeInstructions';
+import RecipeListItem from './Recipe/RecipeListItem';
+import RecipeList from './Recipe/RecipeList';
 const visualizationComponents = {
   histogram: Histogram,
   linegraph: Line,
@@ -15,7 +17,10 @@ const visualizationComponents = {
   multiline: MultiLine,
   editor: Editor,
   chat: ChatScreen,
-  photo: PhotoDisplay
+  photo: PhotoDisplay,
+  recipeinstructions: RecipeInstructions,
+  recipelistitem: RecipeListItem,
+  recipelist: RecipeList,
 };
 
 export default visualizationComponents;
