@@ -258,11 +258,11 @@ const StockChart = ({ visualization, metaData = {} }) => {
       title: { text: yAxisLabel, style: { color: '#9E9E9E', fontSize: '24px' } },
     },
     grid: { borderColor: '#444' },
-    tooltip: { theme: 'dark' },
     plotOptions: {
       candlestick: { wick: { useFillColor: true } },
     },
     legend: {
+      show: false,
       position: 'top',
       labels: { colors: '#9E9E9E' },
     },

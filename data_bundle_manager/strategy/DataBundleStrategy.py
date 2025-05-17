@@ -146,6 +146,8 @@ class SplitBundleDateStrategy(DataBundleStrategy):
         data_bundle.set_attribute('train_row_ids', train_row_ids)
         data_bundle.set_attribute('test_row_ids', test_row_ids)
 
+        self.strategy_request.ret_val['entity'] = data_bundle
+
         return self.strategy_request
 
     def train_test_split(self, data_bundle, split_date):
@@ -242,7 +244,7 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
         for feature_set in feature_sets:
             self.entity_service.save_entity(feature_set)
 
-
+        self.strategy_request.ret_val['entity'] = data_bundle
         return self.strategy_request
 
     def scale_X_by_features(self, feature_sets, arr1, arr2, arr1_feature_dict):
@@ -398,6 +400,8 @@ class InverseScaleByFeatureSetsStrategy(Strategy):
         # Optionally, persist any changes to the feature set entities.
         for fs in feature_sets:
             self.entity_service.save_entity(fs)
+
+        self.strategy_request.ret_val['entity'] = entity
 
         return self.strategy_request
 

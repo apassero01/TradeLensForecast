@@ -3,6 +3,7 @@ import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../state/entitiesSelectors'; // Adjust path as needed
 import visualizationComponents from '../components/Canvas/Entity/VisualizationEntity/Visualization/visualizationComponents'; // Adjust path
 import ErrorBoundary from '../components/common/ErrorBoundary'; // Adjust path
+import ViewEntity from '../components/Canvas/Entity/ViewEntity/ViewEntity';
 
 /**
  * Custom hook to render a view component based on details
@@ -35,7 +36,8 @@ function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity) {
         }, {});
     }, [parentEntityStore, viewEntityStore?.data?.parent_attributes]);
 
-    const vissualization = {data: viewData}
+    const visualization = {data: viewData, viewEntityId: viewEntityId, parentEntityId: parentEntityStore?.data?.entity_id, ViewEntity: viewEntityStore}
+
 
     // --- Perform checks *after* the unconditional hook call ---
 
@@ -84,7 +86,7 @@ function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity) {
                 </div>
             )}
         >
-            <ViewComponent visualization={vissualization} data={viewData} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} viewEntity={viewEntityStore} />
+            <ViewComponent visualization= {visualization} data={viewData} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} viewEntityId={viewEntityId} parentEntityId={parentEntityStore?.data?.entity_id} />
         </ErrorBoundary>
     );
 }

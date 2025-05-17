@@ -18,6 +18,12 @@ class ModelStageEntity(Entity):
             'predictions': self.get_attribute("predictions").shape if self.has_attribute("predictions") else None,
             'results': self.get_attribute("results").shape if self.has_attribute("results") else None,
         }
+        super_dict['predictions'] = self.get_attribute("predictions").tolist() if self.has_attribute("predictions") else None
+        super_dict['pred_transformed'] = self.get_attribute("pred_transformed").tolist() if self.has_attribute("pred_transformed") else None
+        super_dict['train_loss'] = self.get_attribute("train_loss") if self.has_attribute("train_loss") else None
+        super_dict['val_loss'] = self.get_attribute("val_loss") if self.has_attribute("val_loss") else None
+        super_dict['sequences'] = self.get_attribute("sequences") if self.has_attribute("sequences") else None
+        super_dict['y_test'] = self.get_attribute("y_test").tolist() if self.has_attribute("y_test") else None
 
         return super_dict
 

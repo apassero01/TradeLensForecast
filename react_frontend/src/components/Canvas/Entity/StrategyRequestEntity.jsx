@@ -2,8 +2,9 @@
 import React, { memo, useEffect, useCallback, Suspense } from 'react';
 import EntityNodeBase from './EntityNodeBase';
 import StrategyEditor from '../../Strategy/StrategyEditor';
+import StrategyRequests from '../../../utils/StrategyRequestBuilder';
 
-function StrategyRequestEntity({ data, updateEntity }) {
+function StrategyRequestEntity({ data, updateEntity, sendStrategyRequest }) {
   console.log('StrategyRequestEntity rendered', data);
   // Create a callback for handling the Escape key
   const handleKeyDown = useCallback((event) => {
@@ -20,7 +21,7 @@ function StrategyRequestEntity({ data, updateEntity }) {
         // We'll use the updateEntity function from the render props
         // This will be called when the component is rendered
         if (updateEntity) {
-          updateEntity(data.entityId, { hidden: true });
+          sendStrategyRequest(StrategyRequests.hideEntity(data.entityId));
         }
       }
     }

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import StockChart from './StockChart';
 
-const MultiStockChart = ({ visualization=visualization || {} }) => {
+const MultiStockChart = ({ data, updateEntity, sendStrategyRequest }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const inputRef = useRef(null);
   // Enhanced drag tracking
@@ -17,13 +17,16 @@ const MultiStockChart = ({ visualization=visualization || {} }) => {
     }
   }, [currentIndex]);
 
+  const sequences = data?.sequences;
+  const predictions = data?.predictions;
+  const actuals = data?.actuals;
+
   // Check that visualization.data exists
-  const dataObj = visualization.data;
-  if (!dataObj || typeof dataObj !== 'object' || Object.keys(dataObj)?.length === 0) {
+  if (!sequences) {
     return <div>No sequences to display</div>;
   }
 
-  const totalCharts = dataObj[Object.keys(dataObj)[0]].length;
+  const totalCharts = sequences.length;
 
   // Navigation controls
   const handleNext = () => {
@@ -72,19 +75,17 @@ const MultiStockChart = ({ visualization=visualization || {} }) => {
 
   // Build visualization data structure
   const currentSequence = {
-    sequence: dataObj[Object.keys(dataObj)[0]][currentIndex],
+    sequence: sequences[currentIndex],
   };
 
   if (
-    dataObj.y_test &&
-    dataObj.test_sequences &&
-    Array.isArray(dataObj.pred_transformed) &&
-    dataObj.y_test.length > currentIndex &&
-    Array.isArray(dataObj.test_sequences) &&
-    dataObj.y_test.length > currentIndex
+    predictions &&
+    actuals &&
+    predictions.length > currentIndex &&
+    actuals.length > currentIndex
   ) {
-    currentSequence.predictions = dataObj.pred_transformed[currentIndex];
-    currentSequence.actual = dataObj.y_test[currentIndex];
+    currentSequence.predictions = predictions[currentIndex];
+    currentSequence.actual = actuals[currentIndex];
   }
 
   // Format metadata
@@ -100,9 +101,9 @@ const MultiStockChart = ({ visualization=visualization || {} }) => {
   // Prepare stock visualization data
   const stock_visualization = {
     config: {
-      title: visualization.config?.title || `Stock Chart (Sequence #${currentIndex + 1})`,
-      xAxisLabel: visualization.config?.xAxisLabel || 'Index',
-      yAxisLabel: visualization.config?.yAxisLabel || 'Price',
+      title: `Stock Chart (Sequence #${currentIndex + 1})`,
+      xAxisLabel: 'Index',
+      yAxisLabel: 'Price',
     },
     data: currentSequence.sequence.sliced_data,
   };

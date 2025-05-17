@@ -10,6 +10,7 @@ import PhotoDisplay from './PhotoDisplay';
 import RecipeInstructions from './Recipe/RecipeInstructions';
 import RecipeListItem from './Recipe/RecipeListItem';
 import RecipeList from './Recipe/RecipeList';
+import NewLine from './newLine';
 const visualizationComponents = {
   histogram: Histogram,
   linegraph: Line,
@@ -21,6 +22,7 @@ const visualizationComponents = {
   recipeinstructions: RecipeInstructions,
   recipelistitem: RecipeListItem,
   recipelist: RecipeList,
+  newline: NewLine,
 };
 
 export default visualizationComponents;

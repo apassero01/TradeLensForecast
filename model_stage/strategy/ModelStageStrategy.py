@@ -44,6 +44,8 @@ class CreateModelStrategy(ModelStageStrategy):
         entity.set_attribute("train_loss", [])
         entity.set_attribute("val_loss", [])
 
+        self.strategy_request.ret_val['entity'] = entity
+
         return self.strategy_request
 
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
@@ -129,11 +131,13 @@ class FitModelStrategy(Strategy):
             val_loss = self._evaluate(model, val_dataloader, criterion, device)
             entity.get_attribute('train_loss').append(train_loss)
             entity.get_attribute('val_loss').append(val_loss)
+            self.entity_service.save_entity(entity)
             print(f"Epoch {epoch + 1} | Train Loss: {train_loss:.3f} | Val Loss: {val_loss:.3f}")
 
         entity.set_attribute('gradients', self.get_gradients_with_names(model))
 
         self.strategy_request.ret_val['status'] = 'model_fit_completed'
+        self.strategy_request.ret_val['entity'] = entity
         return self.strategy_request
 
     @staticmethod
@@ -269,6 +273,7 @@ class PredictModelStrategy(Strategy):
 
         predictions = self._predict(model, prediction_input, device)
         entity.set_attribute("predictions", predictions)
+        self.strategy_request.ret_val['entity'] = entity
         return self.strategy_request
 
     @staticmethod
@@ -370,6 +375,7 @@ class ConfigureModelStageStrategy(Strategy):
         entity.set_attribute('device', config['device'])
 
         self.strategy_request.ret_val['status'] = 'model_configured'
+        self.strategy_request.ret_val['entity'] = entity
         return self.strategy_request
 
     @staticmethod
