@@ -69,6 +69,7 @@ class StrategyRequestEntity(Entity):
             'add_to_history': self.add_to_history,
             'entity_id': self.entity_id,
             'target_entity_id': self.target_entity_id if self.target_entity_id else self.parent_ids[0] if self.parent_ids else None,
+            'hidden': self.get_attribute("hidden") if self.has_attribute('hidden') else True,
         })
         return sup_dict
 

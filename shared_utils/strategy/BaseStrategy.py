@@ -648,6 +648,8 @@ class RetreiveSequencesStrategy(Strategy):
         # Store the raw list as-is, preserving order
         entity.set_attribute(target_attribute_name, fetched_sequences)
 
+        self.strategy_request.ret_val['entity'] = entity
+
         return self.strategy_request
 
     @staticmethod

@@ -57,6 +57,7 @@ class VisualizationStrategy(Strategy):
             "data": data
         }
         entity.set_attribute('visualization', visualization)
+        self.strategy_request.ret_val['entity'] = entity
         return self.strategy_request
 
     def verify_executable(self, entity: 'Entity', strategy_request: 'StrategyRequestEntity'):
@@ -216,6 +217,8 @@ class LineGraphStrategy(VisualizationStrategy):
 
         # 4. Store the visualization in the entity
         entity.set_attribute('visualization', visualization)
+        self.strategy_request.ret_val['entity'] = entity
+
         return self.strategy_request
 
     @staticmethod

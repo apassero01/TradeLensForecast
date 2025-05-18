@@ -76,6 +76,8 @@ class ConfigureApiModelStrategy(Strategy):
             default_config.update(config['model_config'])
         
         entity.set_attribute('config', default_config)
+
+        self.strategy_request.ret_val['entity'] = entity
             
         return self.strategy_request
 
@@ -230,7 +232,7 @@ class CallApiModelStrategy(Strategy):
         #     openai_api_key=entity.get_attribute('api_key'),
         #     max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
         # )
-        chat = init_chat_model(entity.get_attribute('model_name'), model_provider='google_genai', api_key=entity.get_attribute('api_key'))
+        chat = init_chat_model(entity.get_attribute('model_name'), model_provider=entity.get_attribute('model_type'), api_key=entity.get_attribute('api_key'))
         chat = chat.bind_tools([self.create_strategy_request, self.tasks_complete])
         tool_dict = {"create_strategy_request": self.create_strategy_request, "tasks_complete": self.tasks_complete}
 

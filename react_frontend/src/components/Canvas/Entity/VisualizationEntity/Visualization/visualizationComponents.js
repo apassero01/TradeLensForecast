@@ -11,6 +11,9 @@ import RecipeInstructions from './Recipe/RecipeInstructions';
 import RecipeListItem from './Recipe/RecipeListItem';
 import RecipeList from './Recipe/RecipeList';
 import NewLine from './newLine';
+import EditorList from './Editor/EditorList';
+import EditorListItem from './Editor/EditorListItem';
+
 const visualizationComponents = {
   histogram: Histogram,
   linegraph: Line,
@@ -23,6 +26,8 @@ const visualizationComponents = {
   recipelistitem: RecipeListItem,
   recipelist: RecipeList,
   newline: NewLine,
+  editorlist: EditorList,
+  document_summary_view: EditorListItem,
 };
 
 export default visualizationComponents;

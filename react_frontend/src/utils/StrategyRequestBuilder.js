@@ -174,8 +174,22 @@ export const StrategyRequests = {
       .build();
   },
 
+  /**
+   * Hide an entity
+   */
   hideEntity(entityId, hide = true) {
     return StrategyRequests.setAttributes(entityId, { hidden: hide });
+  },
+
+  /**
+   * Remove an entity
+   */
+  removeEntity(entityId) {
+    return new StrategyRequestBuilder()
+      .withStrategyName('RemoveEntityStrategy')
+      .withTargetEntity(entityId)
+      .withAddToHistory(false)
+      .build();
   }
 };
 

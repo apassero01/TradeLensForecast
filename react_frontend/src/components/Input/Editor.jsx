@@ -44,7 +44,7 @@ const isLikelyMarkdown = (text) => {
 };
 
 const Editor = ({ visualization, onChange, sendStrategyRequest, data, viewEntityId, parentEntityId}) => {
-  const [editorText, setEditorText] = useState(null);
+  const [editorText, setEditorText] = useState('');
   const [fontSize, setFontSize] = useState(14);
   const [editorMode, setEditorMode] = useState('text');
   const [isInitialized, setIsInitialized] = useState(false);
@@ -127,7 +127,7 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, data, viewEntity
       initialText = visualization.data;
     } else if (typeof visualization.data === 'object' && visualization.data !== null) {
       if (visualization.data.text !== undefined) {
-        initialText = visualization.data.text;
+        initialText = visualization.data.text === null ? '' : visualization.data.text;
       } else {
         try {
           initialText = JSON.stringify(visualization.data, null, 2);
@@ -169,7 +169,7 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, data, viewEntity
         visualization.data.text !== undefined) {
       // If mode ended up as text, but data structure suggests specific text field, use it.
       // This might override JSON view if data is an object with a 'text' field but not explicit 'text' or 'markdown' type.
-      setEditorText(visualization.data.text);
+      setEditorText(visualization.data.text === null ? '' : visualization.data.text);
     }
     
     setIsInitialized(true);  // Mark as initialized
@@ -197,6 +197,7 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, data, viewEntity
     <div  
       className="flex flex-col w-full h-full nodrag bg-gray-800"
       onClick={handleClick}
+      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
     >
       <div 
         className="flex-none border-b border-gray-700 p-2 flex justify-between items-center"
@@ -259,13 +260,14 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, data, viewEntity
       </div>
 
       <div 
-        className="flex-grow min-h-0 relative"
+        className="flex-grow relative"
         onClick={handleClick}
+        style={{ height: 'calc(100% - 52px)', position: 'relative' }}
       >
         {editorMode === 'markdown' ? (
           <div 
             className="p-4 prose prose-invert max-w-none overflow-auto h-full nowheel"
-            style={{ fontSize: `${fontSize}px` }}
+            style={{ fontSize: `${fontSize}px`, height: '100%' }}
             onWheel={(e) => e.stopPropagation()}
           >
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
@@ -273,36 +275,41 @@ const Editor = ({ visualization, onChange, sendStrategyRequest, data, viewEntity
             </ReactMarkdown>
           </div>
         ) : (
-          <AceEditor
-            ref={editorRef}
-            mode={editorMode}
-            theme="monokai"
-            value={editorText === null ? '' : editorText}
-            onChange={handleEditorChange}
-            fontSize={fontSize}
-            width="100%"
-            height="100%"
-            name="document-editor"
-            editorProps={{ 
-              $blockScrolling: true,
-            }}
-            setOptions={{
-              showLineNumbers: true,
-              wrap: false,
-              tabSize: 2,
-              useSoftTabs: true,
-              showPrintMargin: false,
-              highlightActiveLine: false,
-              useWorker: true,
-            }}
-            readOnly={config.readOnly || false}
-            className="w-full h-full"
-            onLoad={(editor) => {
-              editor.container.style.transform = 'none';
-              editor.container.addEventListener('click', handleClick);
-            }}
-            onClick={handleClick}
-          />
+          <div className="absolute inset-0">
+            <AceEditor
+              ref={editorRef}
+              mode={editorMode}
+              theme="monokai"
+              value={editorText}
+              onChange={handleEditorChange}
+              fontSize={fontSize}
+              width="100%"
+              height="100%"
+              name="document-editor"
+              editorProps={{ 
+                $blockScrolling: true,
+              }}
+              setOptions={{
+                showLineNumbers: true,
+                wrap: false,
+                tabSize: 2,
+                useSoftTabs: true,
+                showPrintMargin: false,
+                highlightActiveLine: false,
+                useWorker: true,
+              }}
+              readOnly={config.readOnly || false}
+              className="w-full h-full"
+              onLoad={(editor) => {
+                editor.container.style.transform = 'none';
+                editor.container.style.height = '100%';
+                editor.container.style.width = '100%';
+                editor.container.addEventListener('click', handleClick);
+                editor.resize();
+              }}
+              onClick={handleClick}
+            />
+          </div>
         )}
       </div>
     </div>
