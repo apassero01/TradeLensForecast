@@ -73,7 +73,7 @@ export default function AbstractList({
   gapExpanded = DEFAULT_GAP_EXPANDED,
   headerFooterHeight = DEFAULT_HEADER_FOOTER_HEIGHT,
   enableAutoResize = true, // Auto-resize enabled by default
-  hideChildrenInitially = true, // Hide children initially by default
+  hideChildrenInitially = false, // Hide children initially by default
   createMissingViews = true, // Create missing views by default
 }: AbstractListProps) {
   const children = useRecoilValue(childrenByTypeSelector({ parentId: parentEntityId, type: entityType })) as any[];
