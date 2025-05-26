@@ -51,26 +51,41 @@ class StrategyExecutorService:
         If wait is True, then wait for the result (if offloaded via Celery);
         if wait is False, return immediately with the AsyncResult.
         """
-        target_entity = self.entity_service.get_entity(strategy_request.target_entity_id)
-        if target_entity is None:
-            raise ValueError(f'Entity not found for id: {strategy_request.target_entity_id}')
-        # Check if we're already inside a Celery task.
-        if self.is_running_in_task():
-            # Already inside a task, so run synchronously.
-            logger.info("Running strategy synchronously")
-            return self.execute(target_entity, strategy_request)
-        else:
-            # Not inside a task; offload execution as a new Celery task.
-            from shared_utils.tasks import execute_strategy_request  # Import our Celery task.
-            logger.info("Offloading strategy execution to Celery")
-            # If needed, serialize the strategy_request (e.g., using to_dict) for safe transport.
-            task = execute_strategy_request.delay(strategy_request)
-            if wait:
-                # For callers that need the result, wait for the task to complete.
-                result = task.get(timeout=600)
-                return result
+        target_entity_ids = []
+        if strategy_request.has_attribute('target_entity_ids'):
+            target_entity_ids = strategy_request.get_attribute('target_entity_ids')
+
+        if target_entity_ids is None:
+            target_entity_ids = [strategy_request.target_entity_id]
+        else :
+            target_entity_ids += [strategy_request.target_entity_id]
+        # Ensure target_entity_ids is a set
+        target_entity_ids = set(target_entity_ids)
+
+        ret_val = None
+        for target_entity_id in target_entity_ids:
+            target_entity = self.entity_service.get_entity(target_entity_id)
+            if target_entity is None:
+                raise ValueError(f'Entity not found for id: {target_entity_id}')
+            # Check if we're already inside a Celery task.
+            if self.is_running_in_task():
+                # Already inside a task, so run synchronously.
+                logger.info("Running strategy synchronously")
+                ret_val = self.execute(target_entity, strategy_request)
             else:
-                return task
+                # Not inside a task; offload execution as a new Celery task.
+                from shared_utils.tasks import execute_strategy_request  # Import our Celery task.
+                logger.info("Offloading strategy execution to Celery")
+                # If needed, serialize the strategy_request (e.g., using to_dict) for safe transport.
+                task = execute_strategy_request.delay(strategy_request)
+                if wait:
+                    # For callers that need the result, wait for the task to complete.
+                    ## TODO at some point we should be sending and forgetting, and the executors that need to wait for results should do that themselves not block other tasks
+                    ret_val = task.get(timeout=600)
+                else:
+                    ret_val = task
+
+        return ret_val
 
     @staticmethod
     def is_running_in_task():

@@ -175,6 +175,19 @@ function Canvas() {
     });
   }, [sendStrategyRequest]);
 
+  const onEdgesDelete = useCallback((edges) => {
+    console.log('Edges deleted', edges);
+    sendStrategyRequest({
+      strategy_name: 'RemoveChildStrategy',
+      param_config: {
+        child_id: edges[0].target,
+      },
+      target_entity_id: edges[0].source,
+      add_to_history: false,
+      nested_requests: [],
+    });
+  }, [sendStrategyRequest]);
+
   const onInit = useCallback((instance) => {
     reactFlowRef.current = instance;
   }, []);
@@ -193,6 +206,7 @@ function Canvas() {
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onConnect={onConnect}
+        onEdgesDelete={onEdgesDelete}
         selectionOnDrag={true}
         selectionMode={"partial"}
         panOnDrag={true}

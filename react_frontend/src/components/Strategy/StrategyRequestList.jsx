@@ -36,8 +36,11 @@ function SortableItem({ id, request, updateEntity, sendStrategyRequest, onRemove
 
   const handleEdit = (e) => {
     e.stopPropagation();
+    // updateEntity(request.entity_id, { hidden: false, selected: true, position: { x: e.clientX, y: e.clientY } });
+    // sendStrategyRequest(
+    //   StrategyRequests.setAttributes(request.entity_id, { position: { x: e.clientX, y: e.clientY }, hidden: false }),
+    // );
     sendStrategyRequest(StrategyRequests.hideEntity(request.entity_id, false));
-    updateEntity(request.entity_id, { hidden: false, selected: true });
   };
 
   const handleRemove = (e) => {

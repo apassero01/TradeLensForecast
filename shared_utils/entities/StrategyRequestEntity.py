@@ -27,6 +27,7 @@ class StrategyRequestEntity(Entity):
         self.target_entity_id = self.parent_ids[0] if self.parent_ids else None
         self.set_attribute('width', 700)
         self.set_attribute('height', 500)
+        self.set_attribute('target_entity_ids', [])
     def add_nested_request(self, request: 'StrategyRequestEntity'):
         """Add a nested strategy request"""
         if not isinstance(request, StrategyRequestEntity):

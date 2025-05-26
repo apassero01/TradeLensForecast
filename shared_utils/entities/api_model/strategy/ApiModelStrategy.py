@@ -128,7 +128,7 @@ class CallApiModelStrategy(Strategy):
                     doc_type = f"{doc_type} - {doc.get_attribute('name')}"
                 contexts.append(
                     f"{'='*50}\n"
-                    f"Document Type and Name and Path : {doc_type.upper()}\n"
+                    f"Document Type and Name and Path : {doc_type.upper() + " DocumentID: "  + doc_id}\n"
                     f"{'-'*50,'DOCUMENT_BEGIN'}\n"
                     f"{doc.get_text()}\n"
                     f"{'='*50,"DOCUMENT_END"}\n"
@@ -365,13 +365,14 @@ class CallApiModelStrategy(Strategy):
 
     @staticmethod
     @tool(response_format="content_and_artifact")
-    def create_strategy_request(strategy_name: str, param_config: dict | str, target_entity_id: str, add_to_history: bool = False):
+    def create_strategy_request(strategy_name: str, param_config: dict | str, target_entity_id: str, add_to_history: bool = False, target_entity_ids: List[str] = None) -> str:
         '''
         Create a strategy request entity with the given parameters.
         @param strategy_name: The name of the strategy to execute
         @param MUST BE JSON param_config: The configuration parameters for the strategy
         @param target_entity_id: The id of the target entity for the strategy
         @param add_to_history: Whether to add the strategy request to the entity's history
+        @param target_entity_ids: List of target entity ids for the strategy if we are executing the request on multiple entities
         '''
         if isinstance(param_config, str):
             param_config = json.loads(param_config)
@@ -381,7 +382,8 @@ class CallApiModelStrategy(Strategy):
         strategy_request.strategy_name = strategy_name
         strategy_request.param_config = param_config
         strategy_request.target_entity_id = target_entity_id
-        strategy_request.add_to_history = add_to_history
+        strategy_request.add_to_history = False
+        strategy_request.set_attribute('target_entity_ids', target_entity_ids)
         return "Created Strategy Request", strategy_request
 
     def add_to_message_history(self, entity, message):

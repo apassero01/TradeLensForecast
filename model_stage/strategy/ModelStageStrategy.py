@@ -137,7 +137,7 @@ class FitModelStrategy(Strategy):
         entity.set_attribute('gradients', self.get_gradients_with_names(model))
 
         self.strategy_request.ret_val['status'] = 'model_fit_completed'
-        self.strategy_request.ret_val['entity'] = entity
+        self.entity_service.save_entity(entity)
         return self.strategy_request
 
     @staticmethod
@@ -273,7 +273,7 @@ class PredictModelStrategy(Strategy):
 
         predictions = self._predict(model, prediction_input, device)
         entity.set_attribute("predictions", predictions)
-        self.strategy_request.ret_val['entity'] = entity
+        self.entity_service.save_entity(entity)
         return self.strategy_request
 
     @staticmethod

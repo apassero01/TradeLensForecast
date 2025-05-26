@@ -28,6 +28,7 @@ export default function ContextMenu({
 
   const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: entityId, type: EntityTypes.VIEW }));
   const updateEntity = useUpdateFlowNodes(reactFlowInstance);
+  const entity = useRecoilValue(nodeSelectorFamily(entityId));
 
   const handleToggleVisibility = useCallback((viewId, isHidden) => {
     const hideRequest = StrategyRequests.hideEntity(viewId, !isHidden);
@@ -97,6 +98,12 @@ export default function ContextMenu({
       nested_requests: [],
     });
   }, [onClick, sendStrategyRequest, entityId]);
+
+  const unhideAllChildren = useCallback(() => {
+    // TODO: Implement unhide all children functionality
+    const unhideRequest = StrategyRequests.hideEntity(entityId, false);
+    sendStrategyRequest(unhideRequest);
+  }, [entityId, sendStrategyRequest]);
 
   return (
     <>
@@ -265,6 +272,25 @@ export default function ContextMenu({
             )}
           </div>
         )}
+
+        <button
+          onClick={unhideAllChildren}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '8px 10px',
+            textAlign: 'left',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            borderTop: '1px solid #374151',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          Unhide all children
+        </button>
 
         <button
           onClick={deleteNode}

@@ -1,8 +1,9 @@
 import importlib
+import asyncio
 from imghdr import tests
 
 from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 
 from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities import Entity
@@ -103,6 +104,39 @@ class EntityService:
         
         try:
             print(f"Deleting entity {entity_id} from database")
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, use thread executor for sync database operations
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._delete_entity_from_db_sync, entity_id)
+                        future.result()
+                        return
+            except RuntimeError:
+                pass
+            
+            # We're in a sync context, use the original approach
+            get_entity_model = sync_to_async(EntityModel.objects.get)
+            delete_entity = sync_to_async(lambda entity: entity.delete())
+            entity = async_to_sync(get_entity_model)(entity_id=entity_id)
+            async_to_sync(delete_entity)(entity)
+        except EntityModel.DoesNotExist:
+            pass
+        except Exception as e:
+            # If we get async/sync mixing errors, fall back to thread executor
+            if "async event loop" in str(e) or "AsyncToSync" in str(e):
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._delete_entity_from_db_sync, entity_id)
+                    future.result()
+            else:
+                print(f"Error deleting entity {entity_id} from database: {str(e)}")
+
+    def _delete_entity_from_db_sync(self, entity_id):
+        """Synchronous version of deleting entity from database for use in thread executor"""
+        try:
             entity = EntityModel.objects.get(entity_id=entity_id)
             entity.delete()
         except EntityModel.DoesNotExist:
@@ -151,6 +185,36 @@ class EntityService:
     def entity_exists_in_db(self, entity_id):
         """Check if entity exists in database"""
         try:
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, use thread executor for sync database operations
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._entity_exists_in_db_sync, entity_id)
+                        return future.result()
+            except RuntimeError:
+                pass
+            
+            # We're in a sync context, use the original approach
+            get_entity_model = sync_to_async(EntityModel.objects.get)
+            async_to_sync(get_entity_model)(entity_id=entity_id)
+            return True
+        except EntityModel.DoesNotExist:
+            return False
+        except Exception as e:
+            # If we get async/sync mixing errors, fall back to thread executor
+            if "async event loop" in str(e) or "AsyncToSync" in str(e):
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._entity_exists_in_db_sync, entity_id)
+                    return future.result()
+            raise
+
+    def _entity_exists_in_db_sync(self, entity_id):
+        """Synchronous version of entity_exists_in_db for use in thread executor"""
+        try:
             EntityModel.objects.get(entity_id=entity_id)
             return True
         except EntityModel.DoesNotExist:
@@ -177,21 +241,59 @@ class EntityService:
         ##TODO this kind of bad but easy
         children_ids = []
         for child_id in entity.get_children():
-            child_entity = self.load_from_cache(child_id)
-            if child_entity:
-                if child_entity.entity_name == entity_type:
-                    children_ids.append(child_id)
+                try:
+                    child_entity = self.get_entity(child_id)
+                    if child_entity:
+                        if child_entity.entity_name == entity_type:
+                            children_ids.append(child_id)
+                except ValueError:
+                    # Entity not found in cache or database
+                    logger.error(f"Entity with ID {child_id} not found")
+                    continue
+
         return children_ids
 
     def load_from_db(self, entity_id):
         """Load an entity from database"""
         try:
-            model = EntityModel.objects.get(entity_id=entity_id)
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, use thread executor for sync database operations
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._load_from_db_sync, entity_id)
+                        return future.result()
+            except RuntimeError:
+                pass
+            
+            # We're in a sync context, use the original approach
+            get_entity_model = sync_to_async(EntityModel.objects.get)
+            model = async_to_sync(get_entity_model)(entity_id=entity_id)
+            
         except EntityModel.DoesNotExist:
             logger.error(f"Entity with ID {entity_id} not found in database")
             return None
+        except Exception as e:
+            # If we get async/sync mixing errors, fall back to thread executor
+            if "async event loop" in str(e) or "AsyncToSync" in str(e):
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._load_from_db_sync, entity_id)
+                    return future.result()
+            raise
 
         return self.create_instance_from_path(model.class_path).from_db(model)
+
+    def _load_from_db_sync(self, entity_id):
+        """Synchronous version of load_from_db for use in thread executor"""
+        try:
+            model = EntityModel.objects.get(entity_id=entity_id)
+            return self.create_instance_from_path(model.class_path).from_db(model)
+        except EntityModel.DoesNotExist:
+            logger.error(f"Entity with ID {entity_id} not found in database")
+            return None
 
     def clear_entities(self, entity_ids):
         """Remove multiple entities from cache"""
@@ -233,14 +335,52 @@ class EntityService:
     def delete_session_db(self, session_id):
         """Delete the current session from the database"""
         all_entities = self.recurse_children(session_id)
+        
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context, use thread executor for sync database operations
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._delete_session_entities_sync, all_entities)
+                    future.result()
+                    self.clear_all_entities()
+                    return
+        except RuntimeError:
+            pass
+        
+        # We're in a sync context, use the original approach
+        for entity in all_entities:
+            try:
+                # Wrap the synchronous database operations with sync_to_async
+                get_entity_model = sync_to_async(EntityModel.objects.get)
+                delete_entity = sync_to_async(lambda entity_model: entity_model.delete())
+                entity_model = async_to_sync(get_entity_model)(entity_id=entity.entity_id)
+                async_to_sync(delete_entity)(entity_model)
+            except EntityModel.DoesNotExist:
+                pass
+            except Exception as e:
+                # If we get async/sync mixing errors, fall back to thread executor
+                if "async event loop" in str(e) or "AsyncToSync" in str(e):
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._delete_session_entities_sync, all_entities)
+                        future.result()
+                        break
+                else:
+                    print(f"Error deleting entity {entity.entity_id} from database: {str(e)}")
+
+        self.clear_all_entities()
+
+    def _delete_session_entities_sync(self, all_entities):
+        """Synchronous version of deleting session entities for use in thread executor"""
         for entity in all_entities:
             try:
                 entity_model = EntityModel.objects.get(entity_id=entity.entity_id)
                 entity_model.delete()
             except EntityModel.DoesNotExist:
                 pass
-
-        self.clear_all_entities()
 
     def recurse_children(self, entity_id, entity_type = None):
         """Recursively get all children of a specific type until no children are left."""
