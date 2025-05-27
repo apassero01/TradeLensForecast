@@ -13,6 +13,7 @@ import RecipeList from './Recipe/RecipeList';
 import NewLine from './newLine';
 import EditorList from './Editor/EditorList';
 import EditorListItem from './Editor/EditorListItem';
+import MealPlanView from './MealPlanner/MealPlanView';
 
 const visualizationComponents = {
   histogram: Histogram,
@@ -28,6 +29,7 @@ const visualizationComponents = {
   newline: NewLine,
   editorlist: EditorList,
   document_summary_view: EditorListItem,
+  mealplan: MealPlanView,
 };
 
 export default visualizationComponents;

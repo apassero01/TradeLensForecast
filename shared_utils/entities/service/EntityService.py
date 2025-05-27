@@ -1,12 +1,10 @@
 import importlib
 import asyncio
-from imghdr import tests
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync, sync_to_async
 
 from shared_utils.cache.CacheService import CacheService
-from shared_utils.entities import Entity
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.EntityModel import EntityModel
 import logging
@@ -32,6 +30,9 @@ class EntityService:
             raise ValueError(f"Entity with ID {entity_id} not found")
 
         return entity
+
+    def delete_entity(self, entity_id):
+        self.clear_entity(entity_id)
 
     def save_entity(self, entity):
         """Save an entity to cache and broadcast update via WebSocket"""

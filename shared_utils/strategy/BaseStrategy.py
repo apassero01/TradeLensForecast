@@ -787,3 +787,105 @@ class HTTPGetRequestStrategy(Strategy):
             }
         }
 
+class SerializeEntitiesStrategy(Strategy):
+    """
+    Serializes a list of entities by their IDs and stores the result as a dictionary
+    mapping entity_id to serialized values in the specified result attribute of the entity passed into the strategy.
+
+    For example, if the entity_ids are [1, 2, 3] and the result_attribute is 'serialized_entities',
+    and this method is called on an entity with ID 100, the result will be stored in:
+    entity.set_attribute('serialized_entities', {
+        1: serialized_value_1,
+        2: serialized_value_2,
+        3: serialized_value_3
+    })
+
+    where serialized_value_i is the result of calling serialize() on the entity with ID i. and the entity passed into the strategy is entity 100
+    """
+
+    entity_type = EntityEnum.ENTITY  # Adjust if necessary
+
+    def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
+        super().__init__(strategy_executor, strategy_request)
+
+    def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
+        """
+        Validate we have the entity_ids list and result_attribute in param_config
+        """
+        config = strategy_request.param_config
+        
+        if 'entity_ids' not in config:
+            raise ValueError("param_config must include 'entity_ids' list")
+        
+        entity_ids = config['entity_ids']
+        if not isinstance(entity_ids, (list, tuple)):
+            raise ValueError("'entity_ids' must be a list or tuple of entity IDs")
+        
+        if 'result_attribute' not in config:
+            raise ValueError("param_config must include 'result_attribute' to store the serialized results")
+
+    def apply(self, entity: Entity):
+        """
+        Serialize all entities in the entity_ids list and store the results
+        as a dictionary mapping entity_id to serialized values.
+        """
+        self.verify_executable(entity, self.strategy_request)
+        config = self.strategy_request.param_config
+        
+        entity_ids = config.get('entity_ids', [])
+        result_attribute = config.get('result_attribute', 'serialized_entities')
+        
+        serialized_results = {}
+        
+        for entity_id in entity_ids:
+            try:
+                target_entity = self.entity_service.get_entity(entity_id)
+                if target_entity:
+                    # Call the serialize method on the entity
+                    serialized_data = target_entity.serialize()
+                    serialized_results[entity_id] = serialized_data
+                else:
+                    self.logger.warning(f"Entity with ID {entity_id} not found")
+                    serialized_results[entity_id] = None
+            except Exception as e:
+                self.logger.error(f"Failed to serialize entity {entity_id}: {e}")
+                serialized_results[entity_id] = None
+        
+        # Store the serialized results in the entity
+        # entity.set_attribute(result_attribute, serialized_results)
+        self.strategy_request.ret_val[result_attribute] = serialized_results
+        
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        """
+        Default config for SerializeEntitiesStrategy.
+         - 'entity_ids': List of entity IDs to serialize
+         - 'result_attribute': The attribute under which we store the serialized results
+        """
+        return {
+            "strategy_name": "SerializeEntitiesStrategy",
+            "strategy_path": None,
+            "param_config": {
+                "entity_ids": [],
+                "result_attribute": "serialized_entities"
+            }
+        }
+
+    @classmethod
+    def request_constructor(cls, target_entity_id, entity_ids: list, result_attribute: str = "serialized_entities", add_to_history: bool = False):
+        """
+        Convenience method to construct a strategy request for serializing entities.
+        """
+        strategy_request = StrategyRequestEntity()
+        strategy_request.strategy_name = cls.__name__
+        strategy_request.param_config = {
+            "entity_ids": entity_ids,
+            "result_attribute": result_attribute
+        }
+        strategy_request.target_entity_id = target_entity_id
+        strategy_request.add_to_history = add_to_history
+        strategy_request._nested_requests = []
+        return strategy_request
+

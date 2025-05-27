@@ -36,7 +36,6 @@ class StrategyExecutorService:
             entity.update_strategy_requests(strat_request)
             self.entity_service.save_entity(strat_request)
 
-
         self.entity_service.save_entity(entity)
 
         logger.info(f"Strategy {strategy_name} executed successfully")

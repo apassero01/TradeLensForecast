@@ -247,6 +247,11 @@ class CallApiModelStrategy(Strategy):
 
         self.add_to_message_history(entity, Message(type='request', content=user_input))
         while CUR_ITERS < MAX_ITERS:
+            serialized_api_model = entity.serialize()
+            if 'message_history' in serialized_api_model:
+                # Remove message history to avoid duplicate context will need more refined context management later
+                del serialized_api_model['message_history']
+            messages.append(SystemMessage(json.dumps(serialized_api_model)))
             CUR_ITERS += 1
             response = chat.invoke(messages)
             content = "\n".join([str(item) for item in response.content]) if isinstance(response.content,                                                                                        list) else response.content
@@ -264,7 +269,10 @@ class CallApiModelStrategy(Strategy):
                 child_request = tool_msg.artifact
                 request = self.execute_model_request(child_request, entity)
                 entity = self.entity_service.get_entity(entity.entity_id)
-                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id}")
+                ret_val = request.ret_val
+                if 'entity' in ret_val:
+                    del ret_val['entity']
+                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} with return data {json.dumps(ret_val)}")
                 self.add_to_message_history(entity, request_message)
                 messages.append(HumanMessage(content=request_message.content))
 

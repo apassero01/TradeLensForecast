@@ -20,7 +20,8 @@ class StrategyDirectory:
                 "data_bundle_manager.strategy.DataBundleStrategy.InverseScaleByFeatureSetsStrategy",
                 "shared_utils.strategy.BaseStrategy.UpdateChildrenStrategy",
                 "shared_utils.strategy.BaseStrategy.ExecuteRequestChildren",
-                "shared_utils.strategy.BaseStrategy.HTTPGetRequestStrategy"
+                "shared_utils.strategy.BaseStrategy.HTTPGetRequestStrategy",
+                "shared_utils.strategy.BaseStrategy.SerializeEntitiesStrategy",
             ],
             EntityEnum.TRAINING_SESSION.value: [
                 "training_session.strategy.TrainingSessionStrategy.GetSequenceSetsStrategy",
@@ -59,6 +60,10 @@ class StrategyDirectory:
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.ClearChatHistoryStrategy",
             ],
             EntityEnum.STRATEGY_REQUEST.value: [
+            ],
+            EntityEnum.MEAL_PLAN.value: [
+                "shared_utils.entities.meal_planner.strategy.AddRecipeToDayStrategy.AddRecipeToDayStrategy",
+                "shared_utils.entities.meal_planner.strategy.RemoveRecipeFromDayStrategy.RemoveRecipeFromDayStrategy",
             ],
         }
 
