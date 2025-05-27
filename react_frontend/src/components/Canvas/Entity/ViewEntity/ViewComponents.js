@@ -3,7 +3,7 @@ import Line from './Line';
 import MultiStockChart from "./MultiStockChart";
 import MultiLine from "./MultiLine";
 import Editor from '../../../../Input/Editor';
-import ChatScreen from './ChatScreen';
+import ChatView from './ChatView'; // Import the new ChatView component
 import PhotoDisplay from './PhotoDisplay';
 
 const viewComponents = {
@@ -12,7 +12,7 @@ const viewComponents = {
   stockchart: MultiStockChart,
   multiline: MultiLine,
   editor: Editor,
-  chat: ChatScreen,
+  chat: ChatView, // Use ChatView for the 'chat' key
   photo: PhotoDisplay
 };
 
