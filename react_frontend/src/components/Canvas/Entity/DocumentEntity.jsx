@@ -13,7 +13,7 @@ function DocumentEntity({ data, updateEntity, sendStrategyRequest }) {
   const viewEntities = useRecoilValue(childrenByTypeSelector({ parentId: data.entityId, type: EntityTypes.VIEW }));
 
   const editorViewEntity = viewEntities.find(view =>
-    view.data?.view_component_type === "editor"
+    view.data?.view_component_type === "advanced_document_editor"
   );
 
   const editorViewEntityIdToUse = editorViewEntity?.entity_id;

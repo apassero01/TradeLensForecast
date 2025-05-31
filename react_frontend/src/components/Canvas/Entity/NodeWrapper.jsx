@@ -33,22 +33,6 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
     const {sendStrategyRequest} = useWebSocketConsumer();
     const updateEntity = useUpdateFlowNodes(reactFlowInstance);
 
-    function updateNodeEdges(nodeId, newParentIds) {
-      // 1. Retrieve the current edges from the React Flow instance.
-      
-      const edges = newParentIds.map((parentId) => ({
-        id: `${parentId}-${nodeId}`,
-        source: parentId,
-        target: nodeId,
-      }));
-    
-      
-    
-      // 4. Update the edges in the React Flow instance.
-      reactFlowInstance.addEdges(edges);
-    }
-
-
     // Use useEffect unconditionally; if nodeData is not ready, exit early
     useEffect(() => {
         if (!nodeData) return;
@@ -68,7 +52,8 @@ const DynamicNodeWrapper = ({ id, data, hidden }) => {
             })
         );
 
-        updateNodeEdges(id, nodeData.data?.parent_ids);
+        // Edge management is now handled centrally in Canvas component
+        // Remove the updateNodeEdges call to prevent conflicts
 
     }, [nodeData, reactFlowInstance, id, nodeIds, hidden, updateEntity]);
 

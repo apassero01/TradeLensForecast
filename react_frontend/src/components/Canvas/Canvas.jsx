@@ -21,26 +21,72 @@ function Canvas() {
   const [menu, setMenu] = useState(null);
   const reactFlowRef = useRef(null);
 
-  useEffect(() => {
-    // For each active node, build a React Flow node using the backend position/dimensions.
-    // Here you might fetch the current Recoil state for each node (or have that selector provide you a snapshot).
-    const newNodes = nodeIds.map((id) => {
-      // For simplicity, assume you can get the current state from Recoil via an external function or selector.
-      // Alternatively, you might store a local mapping of id -> node properties.
-      // In this example, we assume a default if no state is available.
-      // IMPORTANT: You want to avoid recreating nodes on every render; ideally, this runs only on add/remove or backend update.
-      return {
-        id,
-        type: 'dynamic',
-        // Use the backend-specified position/dimensions when available.
-        // These values might come from Recoil or a dedicated selector.
-        position: { x: 0, y: 0 }, // Replace with actual backend position if available
-        data: { entityId: id },
-        hidden: false,
-      };
+  // Create entity map for O(1) lookups
+  const entityMap = useMemo(() => {
+    const map = new Map();
+    allEntities.forEach(entity => {
+      map.set(entity.id, entity);
     });
-    setNodes(newNodes);
-  }, [nodeIds]); // or add dependency on backend state changes
+    return map;
+  }, [allEntities]);
+
+  useEffect(() => {
+    setNodes((currentNodes) => {
+      // Create a map of existing nodes for quick lookup
+      const existingNodesMap = new Map(currentNodes.map(node => [node.id, node]));
+      
+      // Find nodes to add (in nodeIds but not in current nodes)
+      const nodesToAdd = nodeIds.filter(id => !existingNodesMap.has(id));
+      
+      // Find nodes to remove (in current nodes but not in nodeIds)
+      const nodeIdsSet = new Set(nodeIds);
+      const filteredNodes = currentNodes.filter(node => nodeIdsSet.has(node.id));
+      
+      // Add new nodes
+      const newNodes = nodesToAdd.map((id) => {
+        // Try to get position from entity state if available
+        const entity = entityMap.get(id);
+        const position = entity?.position || { x: Math.random() * 500, y: Math.random() * 500 };
+        
+        return {
+          id,
+          type: 'dynamic',
+          position,
+          data: { entityId: id },
+          hidden: false,
+          width: entity?.width,
+          height: entity?.height,
+        };
+      });
+      
+      // Combine filtered existing nodes with new nodes
+      return [...filteredNodes, ...newNodes];
+    });
+  }, [nodeIds, entityMap]);
+  
+  // Manage edges based on entity relationships
+  useEffect(() => {
+    const newEdges = [];
+    
+    // Generate edges based on parent_ids in entity data
+    allEntities.forEach(entity => {
+      if (entity.data?.parent_ids && Array.isArray(entity.data.parent_ids)) {
+        entity.data.parent_ids.forEach(parentId => {
+          // Only create edge if both nodes exist
+          if (nodeIds.includes(parentId) && nodeIds.includes(entity.id)) {
+            newEdges.push({
+              id: `${parentId}-${entity.id}`,
+              source: parentId,
+              target: entity.id,
+            });
+          }
+        });
+      }
+    });
+    
+    // Update edges state with the new relationships
+    setEdges(newEdges);
+  }, [allEntities, nodeIds]);
   
   // Instead of using the hook at component level, track mouse position directly
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -96,13 +142,13 @@ function Canvas() {
           const entity = updatedNodes.find((node) => node.id === change.id);
           if (entity) {
             console.log('Updating entity', entity);
-          sendStrategyRequest({
-            strategy_name: 'SetAttributesStrategy',
-            param_config: {
-              attribute_map: {
-                'width': entity.width,
-                'height': entity.height,
-              }
+            sendStrategyRequest({
+              strategy_name: 'SetAttributesStrategy',
+              param_config: {
+                attribute_map: {
+                  'width': entity.width,
+                  'height': entity.height,
+                }
               },
               target_entity_id: entity.data.entityId,
               add_to_history: false,

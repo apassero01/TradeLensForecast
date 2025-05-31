@@ -110,9 +110,11 @@ export default function ContextMenu({
 
   const unhideAllChildren = useCallback(() => {
     // TODO: Implement unhide all children functionality
-    const unhideRequest = StrategyRequests.hideEntity(entityId, false);
-    sendStrategyRequest(unhideRequest);
-  }, [entityId, sendStrategyRequest]);
+    entity.data.child_ids.forEach(childId => {
+      const unhideRequest = StrategyRequests.hideEntity(childId, false);
+      sendStrategyRequest(unhideRequest);
+    });
+  }, [entity, sendStrategyRequest]);
 
   return (
     <>

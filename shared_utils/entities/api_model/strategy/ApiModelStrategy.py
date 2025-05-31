@@ -77,7 +77,7 @@ class ConfigureApiModelStrategy(Strategy):
         
         entity.set_attribute('config', default_config)
 
-        self.strategy_request.ret_val['entity'] = entity
+        self.entity_service.save_entity(entity)
             
         return self.strategy_request
 
@@ -204,10 +204,7 @@ class CallApiModelStrategy(Strategy):
         # Get user input and system prompt from config
         config = self.strategy_request.param_config
 
-        if entity.has_attribute('user_input'):
-            user_input = entity.get_attribute('user_input')
-        else:
-            user_input = config.get('user_input', '')
+        user_input = config.get('user_input', '')
 
         system_prompt = config.get('system_prompt', '')
         context_prefix = config.get('context_prefix', 'Here is the relevant context:')
@@ -232,7 +229,11 @@ class CallApiModelStrategy(Strategy):
         #     openai_api_key=entity.get_attribute('api_key'),
         #     max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
         # )
-        chat = init_chat_model(entity.get_attribute('model_name'), model_provider=entity.get_attribute('model_type'), api_key=entity.get_attribute('api_key'))
+        chat = init_chat_model(
+            model=entity.get_attribute('model_name'), 
+            model_provider=entity.get_attribute('model_type'), 
+            api_key=entity.get_attribute('api_key')
+        )
         chat = chat.bind_tools([self.create_strategy_request, self.tasks_complete])
         tool_dict = {"create_strategy_request": self.create_strategy_request, "tasks_complete": self.tasks_complete}
 
@@ -258,6 +259,8 @@ class CallApiModelStrategy(Strategy):
             self.add_to_message_history(entity, Message(type='response', content=content))
             if response.content != '':
                 messages.append(AIMessage(content=response.content))
+            else:
+                messages.append(AIMessage(content="No response from model.... please call tasks_complete() tool to end the conversation."))
 
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
@@ -272,7 +275,14 @@ class CallApiModelStrategy(Strategy):
                 ret_val = request.ret_val
                 if 'entity' in ret_val:
                     del ret_val['entity']
-                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} with return data {json.dumps(ret_val)} This step is complete: Are there any further actions needed?")
+                target_entity = self.entity_service.get_entity(request.target_entity_id)
+                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the tasks_complete() tool")
+
+                if target_entity.entity_id != entity.entity_id:
+                    updated_entity_message = Message(type='response',
+                                                     content=self.format_entity_response(target_entity.serialize()))
+                    request_message.content += f"\n\n{updated_entity_message.content}"
+
                 self.add_to_message_history(entity, request_message)
                 messages.append(HumanMessage(content=request_message.content))
 
@@ -341,7 +351,8 @@ class CallApiModelStrategy(Strategy):
         return_dict[entity_id] = {
             'entity_id' : entity_id,
             'entity_type': entity.entity_name.value,
-            'children_ids': children
+            'children_ids': children,
+            'name' : entity.get_attribute('name') if entity.has_attribute('name') else None,
         }
 
         for child_id in children:
@@ -411,6 +422,19 @@ class CallApiModelStrategy(Strategy):
             'context_prefix': 'Here is the relevant context:',  # Optional prefix for context\
             'serialize_entities_and_strategies': False # Optional flag to serialize entities and strategies
         }
+
+    def format_entity_response(self, entities_dict):
+        entity_graph_json = json.dumps(entities_dict, indent=2)
+
+        response = f"""
+    
+        {'=' * 50}
+        Entity Graph
+        {'-' * 50}
+        {entity_graph_json}
+        {'=' * 50}
+        """
+        return response
 
 
 class ClearChatHistoryStrategy(Strategy):

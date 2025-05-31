@@ -400,6 +400,18 @@ class RemoveEntityStrategy(Strategy):
             remove_child_request = self.executor_service.execute_request(remove_child_request)
             self.strategy_request.add_nested_request(remove_child_request)
 
+        for child_id in entity.children_ids:
+            try:
+                child = self.entity_service.get_entity(child_id)
+            except ValueError:
+                self.logger.warning(f"Child entity {child_id} not found, skipping removal.")
+                continue
+            if len(child.parent_ids) == 1 and child.parent_ids[0] == entity.entity_id:
+                remove_entity_request = StrategyRequestEntity()
+                remove_entity_request.target_entity_id = child_id
+                remove_entity_request.strategy_name = RemoveEntityStrategy.__name__
+                remove_entity_request = self.executor_service.execute_request(remove_entity_request)
+
         entity.deleted = True
         self.strategy_request.ret_val['entity'] = entity
 

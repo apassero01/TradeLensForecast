@@ -45,8 +45,8 @@ class DocumentEntity(Entity):
         self.add_child(child_vis_viz)
         child_vis_viz.strategy_name = SetAttributesStrategy.__name__
         child_vis_viz.param_config['attribute_map'] = {
-            'parent_attributes': {"text":"text"},
-            'view_component_type': 'editor',
+            'parent_attributes': {"text":"text", "name":"name"},
+            'view_component_type': 'advanced_document_editor',
         }
 
         child_vis_viz.target_entity_id = child_uuid
@@ -125,4 +125,7 @@ class DocumentEntity(Entity):
         }
         sup_dict['text'] = self.get_text()
         sup_dict['document_type'] = self.get_document_type() if self.has_attribute('document_type') else None
+        for key in self.get_attributes():
+            if key not in sup_dict:
+                sup_dict[key] = self.get_attribute(key)
         return sup_dict

@@ -52,7 +52,8 @@ class StrategyDirectory:
             ],
             EntityEnum.DOCUMENT.value: [
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.ScrapeFilePathStrategy",
-                "shared_utils.entities.document_entities.strategy.FileTreeStrategies.RecursiveFileScrapeStrategy",
+                "shared_utils.entities.document_entities.strategy.FileTreeStrategies.GetFilePathWithDepth",
+                "shared_utils.entities.document_entities.strategy.SearchDocumentsStrategy.SearchDocumentsStrategy",
             ],  
             EntityEnum.API_MODEL.value: [
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.ConfigureApiModelStrategy",

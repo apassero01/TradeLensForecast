@@ -45,13 +45,13 @@ function EntityNodeBase({ data, updateEntity, children }) {
     // Prevent event propagation to avoid canvas deselection
     event.stopPropagation();
     
-    if (updateEntity) {
-      // Toggle selected state and update zIndex
-      updateEntity(data.entityId, {
-        selected: !data.selected,
-        zIndex: !data.selected ? 999 : 0, // High zIndex when selected, reset when deselected
-      });
-    }
+    // if (updateEntity) {
+    //   // Toggle selected state and update zIndex
+    //   updateEntity(data.entityId, {
+    //     selected: !data.selected,
+    //     zIndex: !data.selected ? 999 : 0, // High zIndex when selected, reset when deselected
+    //   });
+    // }
   }, [data.entityId, data.selected, updateEntity]);
 
   return (
