@@ -46,6 +46,7 @@ export default function MealPlanView({
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string>('');
   const [selectedRecipes, setSelectedRecipes] = useState<Set<string>>(new Set());
+  const [draggedOverDay, setDraggedOverDay] = useState<string | null>(null); // For drag-over visual feedback
 
   // Get all recipe children of the meal plan
   const recipeChildren = useRecoilValue(
@@ -94,8 +95,89 @@ export default function MealPlanView({
     setSelectedRecipes(new Set());
   };
 
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>, dayKey: string) => {
+    event.preventDefault();
+    // Dynamically set dropEffect based on the drag source type
+    if (Array.from(event.dataTransfer.types).includes('application/json/mealplanitem')) {
+      event.dataTransfer.dropEffect = 'move';
+    } else {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    setDraggedOverDay(dayKey);
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>, dayKey: string) => {
+    event.preventDefault(); // Necessary for some browsers
+    setDraggedOverDay(dayKey);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    setDraggedOverDay(null);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>, dayKey: string) => {
+    event.preventDefault();
+    setDraggedOverDay(null);
+
+    // Try to get data for an internal move first
+    const mealPlanItemDataString = event.dataTransfer.getData('application/json/mealplanitem');
+
+    if (mealPlanItemDataString) {
+      try {
+        const { recipeId: RId, sourceDayKey } = JSON.parse(mealPlanItemDataString);
+        console.log(`MealPlanView Internal Drop: Parsed data - targetDayKey='${dayKey}', recipeId='${RId}', sourceDayKey='${sourceDayKey}'`);
+
+        if (RId && sourceDayKey && sourceDayKey !== dayKey) {
+          console.log(`Attempting to move recipe ${RId} from ${sourceDayKey} to ${dayKey}`);
+          // 1. Remove from the source day
+          sendStrategyRequest(StrategyRequests.builder()
+            .withStrategyName('RemoveRecipeFromDayStrategy')
+            .withTargetEntity(parentEntityId)
+            .withParams({ day: sourceDayKey, recipe_id: RId })
+            .withAddToHistory(false) // Consistent with your previous change
+            .build());
+
+          // 2. Add to the target day
+          sendStrategyRequest(StrategyRequests.builder()
+            .withStrategyName('AddRecipeToDayStrategy')
+            .withTargetEntity(parentEntityId)
+            .withParams({ day: dayKey, recipe_id: RId })
+            .build());
+        } else if (sourceDayKey === dayKey) {
+          console.log("Recipe dropped onto the same day. No action taken.");
+        } else {
+          console.warn("MealPlanView Internal Drop: Invalid RId or sourceDayKey, or sourceDayKey is the same as target. No move action taken.", { RId, sourceDayKey, targetDayKey: dayKey });
+        }
+      } catch (error) {
+        console.error("Error parsing meal plan item data or processing internal drop:", error);
+        // Fallback to text/plain if JSON parsing fails or data is malformed
+        const recipeIdFromText = event.dataTransfer.getData('text/plain');
+        if (recipeIdFromText) {
+          console.log(`MealPlanView Drop (fallback from error): dayKey='${dayKey}', recipeId='${recipeIdFromText}'`);
+          sendStrategyRequest(StrategyRequests.builder()
+            .withStrategyName('AddRecipeToDayStrategy')
+            .withTargetEntity(parentEntityId)
+            .withParams({ day: dayKey, recipe_id: recipeIdFromText })
+            .build());
+        }
+      }
+    } else {
+      // Fallback: Drag from external source (e.g., RecipeList)
+      const recipeId = event.dataTransfer.getData('text/plain');
+      console.log(`MealPlanView External Drop: dayKey='${dayKey}', recipeId='${recipeId}'`);
+
+      if (recipeId) {
+        sendStrategyRequest(StrategyRequests.builder()
+          .withStrategyName('AddRecipeToDayStrategy')
+          .withTargetEntity(parentEntityId)
+          .withParams({ day: dayKey, recipe_id: recipeId })
+          .build());
+      }
+    }
+  };
+
   // Function to render recipe list items for a specific day
-  const renderRecipesForDay = (recipeIds: string[]) => {
+  const renderRecipesForDay = (recipeIds: string[], dayKey: string) => {
     if (!recipeIds || recipeIds.length === 0) {
       return (
         <div className="text-center text-gray-500 py-4 text-sm">
@@ -106,15 +188,37 @@ export default function MealPlanView({
 
     return recipeIds.map((recipeId) => {
       const recipe = recipeMap[recipeId];
+
+      // Defensive check for falsy recipeId
+      if (!recipeId) {
+        console.warn('MealPlanView renderRecipesForDay: Encountered a falsy recipeId. Skipping render for this item.');
+        return null; // Or some placeholder if you prefer
+      }
+
       if (!recipe) {
         return (
-          <div key={recipeId} className="text-red-400 text-sm p-2">
-            Recipe not found: {recipeId}
+          <div key={recipeId} className="text-red-400 text-sm p-2 bg-gray-700 rounded-md relative border border-red-500">
+            <span>Recipe not found: {recipeId.substring(0, 8)}...</span>
+            <button
+              onClick={() => {
+                sendStrategyRequest(StrategyRequests.builder()
+                  .withStrategyName('RemoveRecipeFromDayStrategy')
+                  .withTargetEntity(parentEntityId) // This is the MealPlan entity ID
+                  .withParams({ day: dayKey, recipe_id: recipeId })
+                  .withAddToHistory(false)
+                  .build());
+              }}
+              className="absolute top-1 right-1 text-gray-400 hover:text-red-400 p-1 rounded-full transition-colors nodrag"
+              aria-label="Remove missing recipe"
+            >
+              {/* @ts-ignore */}
+              <IoClose size={16} />
+            </button>
           </div>
         );
       }
 
-      return <RecipeItemRenderer key={recipeId} recipe={recipe} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} />;
+      return <RecipeItemRenderer key={recipeId} recipe={recipe} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} parentEntityId={parentEntityId} dayKey={dayKey} />;
     });
   };
 
@@ -144,11 +248,18 @@ export default function MealPlanView({
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4 overflow-y-auto">
         {DAYS_OF_WEEK.map((day) => {
           const dayRecipes = data[day.key as keyof MealPlanViewData] as string[];
+          const isDraggedOver = draggedOverDay === day.key;
           
           return (
             <div
               key={day.key}
-              className="bg-gray-700 rounded-lg border border-gray-600 flex flex-col min-h-[300px]"
+              onDragOver={(e) => handleDragOver(e, day.key)}
+              onDragEnter={(e) => handleDragEnter(e, day.key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, day.key)}
+              className={`bg-gray-700 rounded-lg border border-gray-600 flex flex-col min-h-[300px] transition-all duration-150 ${
+                isDraggedOver ? 'ring-2 ring-blue-500 border-blue-500 bg-gray-600' : ''
+              }`}
             >
               {/* Day Header */}
               <div className="bg-gray-600 rounded-t-lg p-3 border-b border-gray-500">
@@ -160,7 +271,7 @@ export default function MealPlanView({
               {/* Recipes Container */}
               <div className="flex-1 p-2 overflow-y-auto">
                 <div className="space-y-2">
-                  {renderRecipesForDay(dayRecipes)}
+                  {renderRecipesForDay(dayRecipes, day.key)}
                 </div>
               </div>
 
@@ -268,10 +379,14 @@ function RecipeItemRenderer({
   recipe,
   sendStrategyRequest,
   updateEntity,
+  parentEntityId,
+  dayKey,
 }: {
   recipe: any;
   sendStrategyRequest: (strategyRequest: any) => void;
   updateEntity: (entityId: string, data: any) => void;
+  parentEntityId: string;
+  dayKey: string;
 }) {
   // Get the recipe's view children to find the list item view
   const viewChildren = useRecoilValue(
@@ -290,18 +405,85 @@ function RecipeItemRenderer({
     updateEntity
   );
 
+  const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
+    // Prevent drag if the target is an element with the 'nodrag' class
+    // const targetElement = event.target as HTMLElement;
+    // if (targetElement.closest('.nodrag')) { // Check for .nodrag class
+    //   event.preventDefault();
+    //   console.log("Drag prevented on .nodrag element");
+    //   return;
+    // }
+
+    const dragData = JSON.stringify({ recipeId: recipe.entity_id, sourceDayKey: dayKey });
+    event.dataTransfer.setData('application/json/mealplanitem', dragData);
+    event.dataTransfer.effectAllowed = 'move';
+    console.log(`RecipeItemRenderer DragStart: recipeId='${recipe.entity_id}', sourceDayKey='${dayKey}'`);
+
+    // Create custom drag image (copied from RecipeListItemRenderer.tsx)
+    const dragImage = document.createElement('div');
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px'; // Position off-screen
+    dragImage.style.backgroundColor = 'rgba(55, 65, 81, 0.9)'; // bg-gray-700 with opacity
+    dragImage.style.color = 'white';
+    dragImage.style.padding = '4px 8px'; // p-1 px-2
+    dragImage.style.borderRadius = '4px'; // rounded
+    dragImage.style.fontSize = '0.875rem'; // text-sm
+    dragImage.textContent = recipe.data?.name || 'Recipe Item'; // Use recipe.data.name or fallback
+    document.body.appendChild(dragImage);
+    event.dataTransfer.setDragImage(dragImage, 10, 10); // Small offset from cursor
+
+    // Clean up the appended element
+    setTimeout(() => {
+      if (document.body.contains(dragImage)) {
+        document.body.removeChild(dragImage);
+      }
+    }, 0);
+  };
+
+  const handleRemoveRecipe = () => {
+    sendStrategyRequest(StrategyRequests.builder()
+      .withStrategyName('RemoveRecipeFromDayStrategy')
+      .withTargetEntity(parentEntityId)
+      .withParams({ day: dayKey, recipe_id: recipe.entity_id })
+      .build());
+  };
+
   if (!renderedView) {
     return (
-      <div className="bg-gray-600 rounded p-2 text-sm text-gray-300">
+      <div
+        draggable={true}
+        onDragStart={handleDragStart}
+        className="bg-gray-600 rounded p-2 text-sm text-gray-300 relative cursor-grab nodrag"
+      >
         <div className="font-medium">{recipe.data?.name || 'Unnamed Recipe'}</div>
         <div className="text-xs text-gray-400 mt-1">View not available</div>
+        <button
+          onClick={handleRemoveRecipe}
+          className="absolute top-1 right-1 text-gray-400 hover:text-red-500 p-1 rounded-full transition-colors"
+          aria-label="Remove recipe"
+        >
+          {/* @ts-ignore */}
+          <IoClose size={18} />
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="transform scale-95 origin-top">
+    <div
+      draggable={true}
+      onDragStart={handleDragStart}
+      className="transform scale-95 origin-top relative group cursor-grab nodrag"
+    >
       {renderedView}
+      <button
+        onClick={handleRemoveRecipe}
+        className="absolute top-1 right-1 text-gray-400 hover:text-red-500 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 p-1 rounded-full transition-all opacity-0 group-hover:opacity-100"
+        aria-label="Remove recipe"
+      >
+        {/* @ts-ignore */}
+        <IoClose size={18} />
+      </button>
     </div>
   );
 } 

@@ -13,37 +13,6 @@ function EntityNodeBase({ data, updateEntity, children }) {
   // const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: data.entityId, type: EntityTypes.VIEW }));
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // Process strategy request children once per child
-  const processedChildrenRef = useRef({});
-  useEffect(() => {
-    if (strategyRequestChildren?.length > 0) {
-      const updatesToMake = [];
-      strategyRequestChildren.forEach((child) => {
-        if (!processedChildrenRef.current[child.entity_id]) {
-          updatesToMake.push(child);
-          processedChildrenRef.current[child.entity_id] = true;
-        }
-      });
-      if (updatesToMake.length > 0 && updateEntity) {
-        updatesToMake.forEach((child) => {
-          sendStrategyRequest(StrategyRequests.hideEntity(child.entity_id, true));
-          updateEntity(child.entity_id, {
-            hidden: true,
-          });
-        });
-      }
-    }
-
-    // if (viewChildren) {
-    //   viewChildren.forEach((child) => {
-    //     if (!processedChildrenRef.current[child.entity_id]) {
-    //       updateEntity(child.entity_id, { hidden: child?.hidden });
-    //       processedChildrenRef.current[child.entity_id] = true;
-    //     }
-    //   });
-    // }
-  }, [strategyRequestChildren, updateEntity]);
-
   // Create a child strategy request
   const handleCreateChild = useCallback(() => {
     const request = {

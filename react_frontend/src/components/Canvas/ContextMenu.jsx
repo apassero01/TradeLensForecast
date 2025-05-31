@@ -99,6 +99,15 @@ export default function ContextMenu({
     });
   }, [onClick, sendStrategyRequest, entityId]);
 
+  const hideEntity = useCallback(() => {
+    onClick(); // Close context menu
+
+    // Strategy request to set hidden to false (unhide)
+    const unhideRequest = StrategyRequests.hideEntity(entityId, true);
+    sendStrategyRequest(unhideRequest);
+
+  }, [onClick, entityId, sendStrategyRequest]);
+
   const unhideAllChildren = useCallback(() => {
     // TODO: Implement unhide all children functionality
     const unhideRequest = StrategyRequests.hideEntity(entityId, false);
@@ -272,6 +281,25 @@ export default function ContextMenu({
             )}
           </div>
         )}
+
+        <button
+          onClick={hideEntity}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '8px 10px',
+            textAlign: 'left',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            borderTop: '1px solid #374151',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          Hide
+        </button>
 
         <button
           onClick={unhideAllChildren}

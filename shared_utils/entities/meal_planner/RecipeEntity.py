@@ -13,6 +13,7 @@ class RecipeEntity(Entity):
         super().__init__(entity_id)
         self.set_attribute('name', '')
         self.set_attribute('instructions', '')
+        self.set_attribute('ingredients', [])
         self.set_attribute("hidden", True)
 
     def on_create(self, param_config: Optional[dict] = None) -> list:
@@ -20,7 +21,7 @@ class RecipeEntity(Entity):
         requests = []
         instruction_child_id = str(uuid4())
         instruction_view_attributes = {
-            'parent_attributes': {"instructions": "instructions"},
+            'parent_attributes': {"instructions": "instructions", "ingredients": "ingredients"},
             'view_component_type': 'recipeinstructions',
         }
         instruction_view_request = CreateEntityStrategy.request_constructor(self.entity_id, ViewEntity.get_class_path(), entity_uuid=instruction_child_id, initial_attributes=instruction_view_attributes)
@@ -41,5 +42,6 @@ class RecipeEntity(Entity):
         serialized_data = super().serialize()
         serialized_data['name'] = self.get_attribute('name')
         serialized_data['instructions'] = self.get_attribute('instructions')
+        serialized_data['ingredients'] = self.get_attribute('ingredients')
         return serialized_data
 

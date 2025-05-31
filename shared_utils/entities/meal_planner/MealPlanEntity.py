@@ -56,6 +56,45 @@ class MealPlanEntity(Entity):
         )
         requests.append(meal_plan_view_request)
 
+        # Create a recipe list view for the meal planner dashboard
+        recipe_list_view_child_id = str(uuid4())
+        recipe_list_view_attributes = {
+            'parent_attributes': {},
+            'view_component_type': 'recipelist',
+        }
+        recipe_list_view_request = CreateEntityStrategy.request_constructor(
+            self.entity_id, 
+            ViewEntity.get_class_path(), 
+            entity_uuid=recipe_list_view_child_id, 
+            initial_attributes=recipe_list_view_attributes
+        )
+        requests.append(recipe_list_view_request)
+
+        # Create the dashboard view that combines both
+        dashboard_view_child_id = str(uuid4())
+        dashboard_view_attributes = {
+            'parent_attributes': {
+                "name": "name",
+                "week_start_date": "week_start_date",
+                "monday": "monday",
+                "tuesday": "tuesday", 
+                "wednesday": "wednesday",
+                "thursday": "thursday",
+                "friday": "friday",
+                "saturday": "saturday",
+                "sunday": "sunday",
+                "hidden": "false"
+            },
+            'view_component_type': 'mealplannerdashboard',
+        }
+        dashboard_view_request = CreateEntityStrategy.request_constructor(
+            self.entity_id, 
+            ViewEntity.get_class_path(), 
+            entity_uuid=dashboard_view_child_id, 
+            initial_attributes=dashboard_view_attributes
+        )
+        requests.append(dashboard_view_request)
+
         return requests
 
     def serialize(self):

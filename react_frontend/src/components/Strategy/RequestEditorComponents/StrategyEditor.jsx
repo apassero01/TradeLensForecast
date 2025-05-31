@@ -1,34 +1,30 @@
 // src/components/StrategyEditor.jsx
 import React, { useEffect, useState } from 'react';
-import { useStrategyEditor } from '../../hooks/useStrategyEditor';
-import StrategyList from './StrategyList';
-import EntitySelector from './RequestEditorComponents/EntitySelector';
-import Editor from '../Input/Editor';
+import { useStrategyEditor } from '../../../hooks/useStrategyEditor';
+import StrategyList from '../StrategyList';
+import EntitySelector from './EntitySelector';
+import Editor from '../../Input/Editor';
 // Possibly import other custom forms if you have them
-import { entityApi } from '../../api/entityApi';
+import { entityApi } from '../../../api/entityApi';
 
 function StrategyEditor({ existingRequest, entityType }) {
   const {
     requestObj,
     setRequestObj,
     registry,
+    availableEntities,
     registryLoading,
     registryError,
     executeStrategy,
+    refresh,
   } = useStrategyEditor(existingRequest);
 
   const { strategy_name, param_config } = requestObj;
-
-  const [localRegistry, setLocalRegistry] = useState([registry]);
 
   // Use a separate state for editor content
   const [editorContent, setEditorContent] = useState(
     JSON.stringify(requestObj, null, 2)
   );
-
-  useEffect(() => {
-    handleRefresh();
-  }, []);
 
   // Add a useEffect to update editorContent when requestObj changes
   useEffect(() => {
@@ -83,17 +79,6 @@ function StrategyEditor({ existingRequest, entityType }) {
     }
   }
 
-  async function handleRefresh() {
-    try {
-      const newRegistry = await entityApi.getStrategyRegistry();
-      const flattenedRegistry = Object.values(newRegistry).flat();
-      setLocalRegistry(flattenedRegistry);
-    } catch (error) {
-      console.error('Failed to refresh strategy registry:', error);
-      // Optionally set an error state here if you want to display it to the user
-    }
-  }
-
   function handleExecute() {
     executeStrategy();
   }
@@ -107,10 +92,10 @@ function StrategyEditor({ existingRequest, entityType }) {
   
       <div className="flex-none w-full border border-gray-700 rounded mt-4">
         <StrategyList
-          strategies={localRegistry}
+          strategies={registry || []}
           entityType={entityType}
           onSelect={handleStrategySelect}
-          onRefresh={handleRefresh}
+          onRefresh={refresh}
         />
       </div>
   
@@ -120,6 +105,7 @@ function StrategyEditor({ existingRequest, entityType }) {
           <EntitySelector
             value={param_config.entity_class || ''}
             onChange={handleEntityClassSelect}
+            entities={availableEntities}
           />
         </div>
       )}

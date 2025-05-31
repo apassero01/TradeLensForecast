@@ -14,19 +14,9 @@ interface RecipeListItemData {
   name: string;
 }
 
-export default function RecipeListItem({ data, sendStrategyRequest, parentEntityId }: RecipeListItemProps) {
+export default function RecipeListItem({ data, sendStrategyRequest, parentEntityId, viewEntityId }: RecipeListItemProps) {
   const handleDelete = () => {
-    // Assuming StrategyRequests.removeEntity is the correct method
-    // and it takes the entityId of the item to be removed.
-    // In this context, we want to remove the recipe item itself,
-    // so we should use an ID associated with *this* item, not its parent.
-    // However, the user specifically asked for parentEntityId to be used.
-    // This might be an error in the request, as typically one would remove the item itself.
-    // For now, I will follow the user's request and use parentEntityId.
-    // If this recipe item has its own entity_id, that would typically be used here.
-    // Let's assume 'data.entity_id' or a similar prop would hold the actual ID of this item.
-    // For now, sticking to the user's direct request:
-    sendStrategyRequest(StrategyRequests.removeEntity(parentEntityId));
+    sendStrategyRequest(StrategyRequests.removeChild(viewEntityId, viewEntityId));
   };
 
   return (
@@ -46,14 +36,6 @@ export default function RecipeListItem({ data, sendStrategyRequest, parentEntity
         >
           {/* @ts-ignore */}
           <IoEyeOutline size={20} />
-        </button>
-        <button
-          onClick={handleDelete}
-          className="text-gray-400 hover:text-red-500 p-1"
-          aria-label="Remove recipe"
-        >
-          {/* @ts-ignore */}
-          <IoClose size={20} />
         </button>
       </div>
     </div>

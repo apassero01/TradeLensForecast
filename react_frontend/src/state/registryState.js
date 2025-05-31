@@ -19,3 +19,19 @@ export const registrySelector = selector({
   },
 });
 
+// 3. Create an async selector for available entities
+export const availableEntitiesSelector = selector({
+  key: 'availableEntitiesSelector',
+  get: async ({ get }) => {
+    // Depend on refreshTriggerAtom. Its value is not used except to trigger a re-run.
+    get(refreshTriggerAtom);
+    try {
+      const result = await entityApi.fetchAvailableEntities();
+      return result;
+    } catch (error) {
+      console.error('Failed to fetch available entities:', error);
+      return {};
+    }
+  },
+});
+

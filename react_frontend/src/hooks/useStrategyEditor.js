@@ -1,5 +1,5 @@
 import { useRecoilValue, useRecoilState } from 'recoil';
-import { registrySelector, refreshTriggerAtom } from '../state/registryState';
+import { registrySelector, availableEntitiesSelector, refreshTriggerAtom } from '../state/registryState';
 import { useWebSocketConsumer } from './useWebSocketConsumer';
 import { useState, useEffect } from 'react';
 import { startTransition } from 'react';
@@ -7,6 +7,7 @@ import { startTransition } from 'react';
 export function useStrategyEditor(existingRequest) {
   const { sendStrategyRequest } = useWebSocketConsumer();
   const registry = useRecoilValue(registrySelector);
+  const availableEntities = useRecoilValue(availableEntitiesSelector);
   const [, setRefreshTrigger] = useRecoilState(refreshTriggerAtom);
 
   const [requestObj, setRequestObj] = useState(() => {
@@ -40,6 +41,7 @@ export function useStrategyEditor(existingRequest) {
     requestObj,
     setRequestObj,
     registry,
+    availableEntities,
     executeStrategy,
     refresh,
   };

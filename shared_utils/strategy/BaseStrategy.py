@@ -787,7 +787,7 @@ class HTTPGetRequestStrategy(Strategy):
             }
         }
 
-class SerializeEntitiesStrategy(Strategy):
+class ExtractEntityDataStrategy(Strategy):
     """
     Serializes a list of entities by their IDs and stores the result as a dictionary
     mapping entity_id to serialized values in the specified result attribute of the entity passed into the strategy.

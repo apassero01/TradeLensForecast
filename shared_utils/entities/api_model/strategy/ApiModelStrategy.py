@@ -272,7 +272,7 @@ class CallApiModelStrategy(Strategy):
                 ret_val = request.ret_val
                 if 'entity' in ret_val:
                     del ret_val['entity']
-                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} with return data {json.dumps(ret_val)}")
+                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} with return data {json.dumps(ret_val)} This step is complete: Are there any further actions needed?")
                 self.add_to_message_history(entity, request_message)
                 messages.append(HumanMessage(content=request_message.content))
 

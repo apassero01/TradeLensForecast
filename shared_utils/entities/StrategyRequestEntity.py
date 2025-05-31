@@ -28,6 +28,7 @@ class StrategyRequestEntity(Entity):
         self.set_attribute('width', 700)
         self.set_attribute('height', 500)
         self.set_attribute('target_entity_ids', [])
+        self.set_attribute('hidden', True)  # Default to hidden
     def add_nested_request(self, request: 'StrategyRequestEntity'):
         """Add a nested strategy request"""
         if not isinstance(request, StrategyRequestEntity):

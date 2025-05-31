@@ -13,6 +13,7 @@ function StrategyEditor({ existingRequest, entityType, updateEntity, sendStrateg
     requestObj,
     setRequestObj,
     registry,
+    availableEntities,
     registryLoading,
     registryError,
     executeStrategy,
@@ -149,6 +150,7 @@ function StrategyEditor({ existingRequest, entityType, updateEntity, sendStrateg
           <EntitySelector
             value={param_config.entity_class || ''}
             onChange={handleEntityClassSelect}
+            entities={availableEntities}
           />
         </div>
       )}

@@ -1,29 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { entityApi } from '../../../api/entityApi';
+import React from 'react';
 
-const EntitySelector = ({ value, onChange }) => {
-  const [entities, setEntities] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const loadEntities = async () => {
-      try {
-        const availableEntities = await entityApi.fetchAvailableEntities();
-        console.log("availableEntities", availableEntities);
-        setEntities(availableEntities);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load entities');
-        setLoading(false);
-      }
-    };
-
-    loadEntities();
-  }, []);
-
-  if (loading) return <div className="text-gray-400">Loading entities...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
+const EntitySelector = ({ value, onChange, entities = {} }) => {
+  if (!entities || Object.keys(entities).length === 0) {
+    return <div className="text-gray-400">Loading entities...</div>;
+  }
 
   return (
     <div className="space-y-2">
