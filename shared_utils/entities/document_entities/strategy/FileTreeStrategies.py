@@ -66,6 +66,88 @@ class ScrapeFilePathStrategy(Strategy):
         } 
     
 
+class WriteToFilePath(Strategy):
+    """Strategy for writing text content to a file path"""
+    
+    entity_type = EntityEnum.ENTITY  # Will be DOCUMENT once added
+    strategy_description = 'Writes text content to a file path, creating or overwriting the file'
+
+    def verify_executable(self, entity: DocumentEntity, strategy_request: StrategyRequestEntity):
+        """Verify the file path is valid and writable"""
+        config = strategy_request.param_config
+        if 'file_path' not in config:
+            raise ValueError("param_config must include 'file_path'")
+        if 'text_content' not in config:
+            raise ValueError("param_config must include 'text_content'")
+            
+        file_path = config['file_path']
+        
+        # Check if parent directory exists
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            raise ValueError(f"Parent directory does not exist: {parent_dir}")
+        
+        # Check if path is a directory
+        if os.path.exists(file_path) and os.path.isdir(file_path):
+            raise ValueError(f"Path is a directory, not a file: {file_path}")
+        
+        return True
+
+    def apply(self, entity: DocumentEntity) -> StrategyRequestEntity:
+        """
+        Write text content to file path and update the document entity
+        
+        param_config requirements:
+        - file_path: Path to file to write to
+        - text_content: Text content to write to the file
+        """
+        file_path = self.strategy_request.param_config['file_path']
+        text_content = self.strategy_request.param_config['text_content']
+        
+        # Store the path
+        entity.set_attribute('path', file_path)
+        
+        try:
+            # Create parent directories if they don't exist
+            parent_dir = os.path.dirname(file_path)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
+            
+            # Write the content to the file
+            with open(file_path, 'w') as f:
+                f.write(text_content)
+            
+            # Update entity with the written content
+            entity.set_text(text_content)
+            entity.set_document_type('file')
+            entity.set_attribute('name', os.path.basename(file_path))
+            entity.set_attribute('status', 'written')
+            
+            self.strategy_request.ret_val['success'] = True
+            self.strategy_request.ret_val['message'] = f"Successfully wrote to {file_path}"
+            
+        except Exception as e:
+            print(f"Error writing to file {file_path}: {e}")
+            entity.set_document_type('file')
+            entity.set_text(f"Error writing file: {e}")
+            entity.set_attribute('status', 'error')
+            entity.set_attribute('error', str(e))
+            
+            self.strategy_request.ret_val['success'] = False
+            self.strategy_request.ret_val['message'] = f"Failed to write to {file_path}: {e}"
+        
+        # Save changes
+        self.strategy_request.ret_val['entity'] = entity
+        return self.strategy_request
+
+    @staticmethod
+    def get_request_config():
+        return {
+            'file_path': '',  # Path to file to write to
+            'text_content': '',  # Text content to write to the file
+        }
+
+
 class GetFilePathWithDepth(Strategy):
     """Strategy for creating a document tree from a directory by discovering all paths first"""
     

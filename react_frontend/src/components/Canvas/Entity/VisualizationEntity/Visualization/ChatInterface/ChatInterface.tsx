@@ -3,7 +3,7 @@ import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
 import { EntityTypes } from '../../../../Entity/EntityEnum';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
-import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoAdd, IoCopy, IoRefresh } from 'react-icons/io5';
+import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoAdd, IoCopy, IoRefresh, IoDocumentText } from 'react-icons/io5';
 import ReactMarkdown from 'react-markdown';
 import Editor from '../../../../../Input/Editor';
 import EntityRenderer from '../EntityRenderer/EntityRenderer';
@@ -29,7 +29,7 @@ interface ChatInterfaceData {
 }
 
 interface Message {
-    type: 'request' | 'response' | 'context';
+    type: 'ai' | 'human' | 'system' | 'tool';
     content: string;
     timestamp?: string;
 }
@@ -45,9 +45,13 @@ export default function ChatInterface({
     const [systemPrompt, setSystemPrompt] = useState(data?.system_prompt || '');
     const [showSettings, setShowSettings] = useState(data?.show_settings || false);
     const [fontSize, setFontSize] = useState(25);
-    const [displayMode, setDisplayMode] = useState<'all' | 'request' | 'response'>('all');
+    const [displayMode, setDisplayMode] = useState<'all' | 'ai' | 'human' | 'system' | 'tool'>('all');
     const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
+    const [createdDocumentIndex, setCreatedDocumentIndex] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showConfigModal, setShowConfigModal] = useState(false);
+    const [modelProvider, setModelProvider] = useState<'openai' | 'google_genai' | 'anthropic'>('openai');
+    const [modelName, setModelName] = useState('gpt-4o-mini');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -116,13 +120,20 @@ export default function ChatInterface({
     const configureApiModel = () => {
         if (!currentApiModel) return;
 
+        // Map provider to env_key
+        const envKeyMap = {
+            'openai': 'OPENAI_API_KEY',
+            'google_genai': 'GOOGLE_API_KEY',
+            'anthropic': 'ANTHROPIC_API_KEY'
+        };
+
         sendStrategyRequest(StrategyRequests.builder()
             .withStrategyName('ConfigureApiModelStrategy')
             .withTargetEntity(currentApiModel.entity_id)
             .withParams({
-                "env_key": "OPENAI_API_KEY",
-                "model_name": "o4-mini-2025-04-16",
-                "model_type": "openai",
+                "env_key": envKeyMap[modelProvider],
+                "model_name": modelName,
+                "model_type": modelProvider,
                 "model_config": {
                     "top_p": 1,
                     "stream": false,
@@ -132,6 +143,9 @@ export default function ChatInterface({
                 }
             })
             .build());
+
+        // Close the modal
+        setShowConfigModal(false);
     };
 
     const clearChatHistory = () => {
@@ -157,6 +171,43 @@ export default function ChatInterface({
             setTimeout(() => setCopiedMessageIndex(null), 2000);
         } catch (err) {
             console.error('Failed to copy text:', err);
+        }
+    };
+
+    const handleCreateDocument = async (content: string, index: number, messageType: string) => {
+        try {
+            // Generate a timestamp-based filename
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+            const messageLabel = messageType === 'response' ? 'assistant' : messageType === 'request' ? 'user' : messageType;
+            const fileName = `${messageLabel}_message_${timestamp}.md`;
+
+            // Create the document entity as a child of the API model
+            const targetEntityId = currentApiModel?.entity_id || parentEntityId;
+            
+            sendStrategyRequest(StrategyRequests.builder()
+                .withStrategyName('CreateEntityStrategy')
+                .withTargetEntity(targetEntityId)
+                .withParams({
+                    entity_class: 'shared_utils.entities.document_entities.DocumentEntity.DocumentEntity',
+                    initial_attributes: {
+                        name: fileName,
+                        text: content,
+                        document_type: 'file',
+                        is_folder: false,
+                        file_type: 'markdown',
+                        hidden: false,
+                        message_type: messageType,
+                        created_from: 'chat_interface'
+                    }
+                })
+                .withAddToHistory(false)
+                .build());
+
+            // Show feedback
+            setCreatedDocumentIndex(index);
+            setTimeout(() => setCreatedDocumentIndex(null), 2000);
+        } catch (err) {
+            console.error('Failed to create document:', err);
         }
     };
 
@@ -308,7 +359,7 @@ export default function ChatInterface({
                         {currentApiModel && (
                             <>
                                 <button
-                                    onClick={configureApiModel}
+                                    onClick={() => setShowConfigModal(true)}
                                     className="p-2 bg-blue-700 rounded hover:bg-blue-600 transition-colors"
                                     title="Configure API Model"
                                 >
@@ -413,9 +464,9 @@ export default function ChatInterface({
                             >
                                 <div
                                     className={`relative w-full max-w-none p-6 ${
-                                        message.type === 'response'
+                                        message.type === 'ai'
                                             ? 'bg-gray-800/30 border-l-2 border-gray-600/30'
-                                            : message.type === 'context'
+                                            : message.type === 'system'
                                                 ? 'bg-blue-900/20 border-l-2 border-blue-500/40'
                                                 : 'bg-gray-700/20 border-l-2 border-gray-500/30'
                                     }`}
@@ -434,17 +485,31 @@ export default function ChatInterface({
                                         )}
                                     </button>
 
+                                    {/* Create Document Button */}
+                                    <button
+                                        onClick={() => handleCreateDocument(message.content, index, message.type)}
+                                        className="absolute top-3 right-12 p-2 rounded-md hover:bg-gray-600/30 transition-colors opacity-0 group-hover:opacity-100"
+                                        title="Create document from message"
+                                    >
+                                        {createdDocumentIndex === index ? (
+                                            <span className="text-green-400 text-sm">✓</span>
+                                        ) : (
+                                            /* @ts-ignore */
+                                            <IoDocumentText className="text-gray-400 text-sm" />
+                                        )}
+                                    </button>
+
                                     {/* Message Type Badge */}
                                     <div className="flex items-center gap-3 mb-4">
                                         <span className={`text-sm font-semibold ${
-                                            message.type === 'response' 
+                                            message.type === 'ai' 
                                                 ? 'text-blue-400' 
-                                                : message.type === 'context'
+                                                : message.type === 'system'
                                                     ? 'text-purple-400'
                                                     : 'text-green-400'
                                         }`}>
-                                            {message.type === 'response' ? 'Assistant' : 
-                                             message.type === 'context' ? 'Context' : 'You'}
+                                            {message.type === 'ai' ? 'Assistant' : 
+                                             message.type === 'system' ? 'Context' : 'You'}
                                         </span>
                                         {message.timestamp && (
                                             <span className="text-xs text-gray-500">
@@ -513,6 +578,73 @@ export default function ChatInterface({
                     </div>
                 </form>
             </div>
+
+            {/* Configuration Modal */}
+            {showConfigModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowConfigModal(false)}>
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold mb-4 text-white">Configure API Model</h3>
+                        
+                        <div className="space-y-4">
+                            {/* Model Provider Selection */}
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-2">Model Provider</label>
+                                <select
+                                    value={modelProvider}
+                                    onChange={(e) => setModelProvider(e.target.value as any)}
+                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+                                >
+                                    <option value="openai">OpenAI</option>
+                                    <option value="google_genai">Google GenAI</option>
+                                    <option value="anthropic">Anthropic</option>
+                                </select>
+                            </div>
+
+                            {/* Model Name Input */}
+                            <div>
+                                <label className="block text-sm text-gray-300 mb-2">Model Name</label>
+                                <input
+                                    type="text"
+                                    value={modelName}
+                                    onChange={(e) => setModelName(e.target.value)}
+                                    placeholder={
+                                        modelProvider === 'openai' ? 'e.g., gpt-4o-mini, gpt-4' :
+                                        modelProvider === 'google_genai' ? 'e.g., gemini-1.5-pro' :
+                                        'e.g., claude-3-opus-20240229'
+                                    }
+                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400"
+                                />
+                            </div>
+
+                            {/* Helper text */}
+                            <div className="text-xs text-gray-400">
+                                Make sure you have the corresponding API key set in your environment:
+                                <br />
+                                {modelProvider === 'openai' && 'OPENAI_API_KEY'}
+                                {modelProvider === 'google_genai' && 'GOOGLE_API_KEY'}
+                                {modelProvider === 'anthropic' && 'ANTHROPIC_API_KEY'}
+                            </div>
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={() => setShowConfigModal(false)}
+                                className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors text-white"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={configureApiModel}
+                                disabled={!modelName.trim()}
+                                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white"
+                            >
+                                Configure
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 } 

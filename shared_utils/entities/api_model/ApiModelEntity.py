@@ -22,5 +22,5 @@ class ApiModelEntity(Entity):
         parent_dict = super().serialize()
         parent_dict['model_type'] = self.get_attribute('model_type')
         parent_dict['model_name'] = self.get_attribute('model_name')
-        parent_dict['message_history'] = [message.serialize() for message in self.get_attribute('message_history')]
+        parent_dict['message_history'] = [{'type': message.type, 'content': message.content} for message in self.get_attribute('message_history')]
         return parent_dict 

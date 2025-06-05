@@ -54,6 +54,7 @@ class StrategyDirectory:
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.ScrapeFilePathStrategy",
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.GetFilePathWithDepth",
                 "shared_utils.entities.document_entities.strategy.SearchDocumentsStrategy.SearchDocumentsStrategy",
+                "shared_utils.entities.document_entities.strategy.FileTreeStrategies.WriteToFilePath",
             ],  
             EntityEnum.API_MODEL.value: [
                 "shared_utils.entities.api_model.strategy.ApiModelStrategy.ConfigureApiModelStrategy",

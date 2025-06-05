@@ -1,3 +1,4 @@
+import datetime
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 
@@ -7,7 +8,7 @@ from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, AIMessage
 from typing import List
 from dataclasses import dataclass
 import json
@@ -17,16 +18,16 @@ from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class Message:
-    type: str
-    content: str
+# @dataclass
+# class Message:
+#     type: str
+#     content: str
 
-    def serialize(self):
-        return {
-            'type': self.type,
-            'content': self.content
-        }
+#     def serialize(self):
+#         return {
+#             'type': self.type,
+#             'content': self.content
+#         }
 
 
 class ConfigureApiModelStrategy(Strategy):
@@ -43,11 +44,6 @@ class ConfigureApiModelStrategy(Strategy):
         
         # Load environment variables
         load_dotenv()
-        
-        # Get API key from environment
-        api_key = os.getenv(config['env_key'])
-        if not api_key:
-            raise ValueError(f"API key not found in environment for key: {config['env_key']}")
 
         # Set model type
         model_type = config.get('model_type', 'openai')
@@ -59,6 +55,16 @@ class ConfigureApiModelStrategy(Strategy):
             if model_type == 'openai':
                 model_name = 'gpt-4o-mini'
         entity.set_attribute('model_name', model_name)
+
+        if model_type == 'openai':
+            env_var = 'OPENAI_API_KEY'
+        elif model_type == 'anthropic':
+            env_var = 'ANTHROPIC_API_KEY'
+        elif model_type == 'google_genai':
+            env_var = 'GOOGLE_API_KEY'
+        else:
+            raise ValueError(f"Unsupported model type: {model_type}")
+        api_key = os.getenv(env_var)
         
         # Set API key
         entity.set_attribute('api_key', api_key)
@@ -109,13 +115,24 @@ class CallApiModelStrategy(Strategy):
         """Form context from document children"""
         doc_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.DOCUMENT)
 
-        history = entity.get_attribute('message_history')
-        
         if not doc_ids:
             return ""
 
         contexts = []
 
+        instructions_doc_id = "c226b236-5567-49fe-98dc-26c65d50397a"
+        instructions_doc = self.entity_service.get_entity(instructions_doc_id)
+        if instructions_doc:
+            contexts.append(
+                f"{'='*50}\n"
+                f"SYSTEM INSTRUCTIONS DO NOT DEVIATE FROM THESE INSTRUCTIONS\n"
+                f"{'-'*50}\n"
+                f"{instructions_doc.get_attribute('text')}\n"
+                f"{'='*50}\n"
+            )
+        
+        if instructions_doc_id in doc_ids:
+            doc_ids.remove(instructions_doc_id)
 
         contexts.append("These documents may contain import instructions or other relevant information:")
         for doc_id in doc_ids:
@@ -161,15 +178,7 @@ class CallApiModelStrategy(Strategy):
                 f"{'='*50}\n"
             )
 
-        for i in range(len(history)-1, -1, -1):
-            message = history[i]
-            contexts.append(
-                f"{'='*50}\n"
-                f"Message Type: {message.type.upper()}\n"
-                f"{'-'*50}\n"
-                f"{message.content}\n"
-                f"{'='*50}\n"
-            )
+        contexts.append("HERE IS THE CURRENT DATE USE IT IF THE USER REQUESTS DATE RELEVANT INFORMATION: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
         return "\n".join(contexts)
 
@@ -237,30 +246,23 @@ class CallApiModelStrategy(Strategy):
         chat = chat.bind_tools([self.create_strategy_request, self.tasks_complete])
         tool_dict = {"create_strategy_request": self.create_strategy_request, "tasks_complete": self.tasks_complete}
 
-        messages = []
-        if system_prompt:
-            messages.append(SystemMessage(content=system_prompt))
-        messages.append(HumanMessage(content=combined_input))
+        context_list = []
+
+        context_list.append(SystemMessage(content=combined_input))
 
         MAX_ITERS = 25
         CUR_ITERS = 0
         # Use invoke() instead of __call__
 
-        self.add_to_message_history(entity, Message(type='request', content=user_input))
+        self.add_to_message_history(entity, HumanMessage(content=user_input))
         while CUR_ITERS < MAX_ITERS:
-            serialized_api_model = entity.serialize()
-            if 'message_history' in serialized_api_model:
-                # Remove message history to avoid duplicate context will need more refined context management later
-                del serialized_api_model['message_history']
-            messages.append(SystemMessage(json.dumps(serialized_api_model)))
             CUR_ITERS += 1
-            response = chat.invoke(messages)
-            content = "\n".join([str(item) for item in response.content]) if isinstance(response.content,                                                                                        list) else response.content
-            self.add_to_message_history(entity, Message(type='response', content=content))
+            model_input = context_list + [SystemMessage(content="HERE IS THE CURRENT CONVERSATION HISTORY: ")] + entity.get_attribute('message_history')
+            response = chat.invoke(model_input)
             if response.content != '':
-                messages.append(AIMessage(content=response.content))
-            else:
-                messages.append(AIMessage(content="No response from model.... please call tasks_complete() tool to end the conversation."))
+                self.add_to_message_history(entity, AIMessage(content=response.content))
+            if response.content == '' and response.tool_calls == []:
+                self.add_to_message_history(entity, AIMessage(content="No response from model.... please call tasks_complete() tool to end the conversation."))
 
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
@@ -270,33 +272,31 @@ class CallApiModelStrategy(Strategy):
                 selected_tool = tool_dict.get(tool_call['name'].lower())
                 tool_msg = selected_tool.invoke(tool_call)
                 child_request = tool_msg.artifact
-                request = self.execute_model_request(child_request, entity)
-                entity = self.entity_service.get_entity(entity.entity_id)
-                ret_val = request.ret_val
-                if 'entity' in ret_val:
-                    del ret_val['entity']
-                target_entity = self.entity_service.get_entity(request.target_entity_id)
-                request_message = Message(type='response', content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the tasks_complete() tool")
+                try:
+                    request = self.execute_model_request(child_request, entity)
+                    entity = self.entity_service.get_entity(entity.entity_id)
+                    ret_val = request.ret_val
+                    if 'entity' in ret_val:
+                        del ret_val['entity']
+                    target_entity = self.entity_service.get_entity(request.target_entity_id)
+                    request_message = SystemMessage(content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the tasks_complete() tool")
 
-                if target_entity.entity_id != entity.entity_id:
-                    updated_entity_message = Message(type='response',
-                                                     content=self.format_entity_response(target_entity.serialize()))
-                    request_message.content += f"\n\n{updated_entity_message.content}"
+                    if target_entity.entity_id != entity.entity_id:
+                        updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
+                        request_message.content += f"\n\n{updated_entity_message.content}"
 
-                self.add_to_message_history(entity, request_message)
-                messages.append(HumanMessage(content=request_message.content))
+                    self.add_to_message_history(entity, request_message)
+                except Exception as e:
+                    error_message = f"Error executing tool {tool_call['name']}: {str(e)}"
+                    logger.error(error_message)
+                    self.add_to_message_history(entity, SystemMessage(content=error_message))
+                    continue
 
 
 
 
         logger.info(f"Response from model: Message Received from APi model")
-
-        # self.parse_strategy_requests(response.content, entity)
         
-        entity.set_attribute('last_context', context)
-
-        self.strategy_request.ret_val['context_used'] = context
-        self.strategy_request.ret_val['entity'] = entity
         self.entity_service.save_entity(entity)
         
         return self.strategy_request
