@@ -59,6 +59,9 @@ COPY . /app/
 
 # Copy and set permissions for entrypoint script
 COPY docker/docker-entrypoint.sh /usr/local/bin/
+
+RUN sed -i 's/\r$//g' /usr/local/bin/docker-entrypoint.sh
+
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create necessary directories
