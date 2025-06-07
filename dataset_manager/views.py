@@ -1,4 +1,3 @@
-from turtledemo.penrose import start
 
 from django.shortcuts import render
 from dataset_manager.services import DataSetService, StockDataSetService, FeatureFactoryService, \

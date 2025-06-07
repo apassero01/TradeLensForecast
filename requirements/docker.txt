@@ -1,0 +1,11 @@
+# Main requirements file for Docker
+# This file includes all dependencies needed for the TradeLens backend
+
+# Base requirements (Django, Celery, etc.)
+-r base.txt
+
+# Machine Learning requirements
+-r ml.txt
+
+# LangChain and AI tools
+-r langchain.txt 

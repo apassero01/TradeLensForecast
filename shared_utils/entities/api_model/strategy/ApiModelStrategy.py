@@ -145,10 +145,10 @@ class CallApiModelStrategy(Strategy):
                     doc_type = f"{doc_type} - {doc.get_attribute('name')}"
                 contexts.append(
                     f"{'='*50}\n"
-                    f"Document Type and Name and Path : {doc_type.upper() + " DocumentID: "  + doc_id}\n"
-                    f"{'-'*50,'DOCUMENT_BEGIN'}\n"
+                    f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
+                    f"{'-'*50} DOCUMENT_BEGIN\n"
                     f"{doc.get_text()}\n"
-                    f"{'='*50,"DOCUMENT_END"}\n"
+                    f"{'='*50} DOCUMENT_END\n"
                 )
 
         if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
@@ -232,12 +232,13 @@ class CallApiModelStrategy(Strategy):
         )
         chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user])
         tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user}
+        tool_defs = [t.to_json() for t in tool_dict.values()]
 
         context_list = []
 
         context_list.append(SystemMessage(content=context))
 
-        MAX_ITERS = 25
+        MAX_ITERS = 10
         CUR_ITERS = 0
         # Use invoke() instead of __call__
 
@@ -246,16 +247,15 @@ class CallApiModelStrategy(Strategy):
             CUR_ITERS += 1
             model_input = context_list + [SystemMessage(content="HERE IS THE CURRENT CONVERSATION HISTORY: ")] + entity.get_attribute('message_history')
             response = chat.invoke(model_input)
-            if response.content != '':
-                self.add_to_message_history(entity, AIMessage(content=response.content))
-            if response.content == '' and response.tool_calls == []:
-                self.add_to_message_history(entity, AIMessage(content="No response from model.... please call yield_to_user() tool to end the conversation."))
+            self.add_to_message_history(entity, AIMessage(content=response.content))
+
 
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
                 if tool_call['name'].lower() == 'yield_to_user':
                     CUR_ITERS = MAX_ITERS
                     break
+                    # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
                 selected_tool = tool_dict.get(tool_call['name'].lower())
                 tool_msg = selected_tool.invoke(tool_call)
                 child_request = tool_msg.artifact
@@ -268,9 +268,9 @@ class CallApiModelStrategy(Strategy):
                     target_entity = self.entity_service.get_entity(request.target_entity_id)
                     request_message = SystemMessage(content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the yield_to_user() tool")
 
-                    if target_entity.entity_id != entity.entity_id:
-                        updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
-                        request_message.content += f"\n\n{updated_entity_message.content}"
+                    # if target_entity.entity_id != entity.entity_id:
+                    #     updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
+                    #     request_message.content += f"\n\n{updated_entity_message.content}"
 
                     self.add_to_message_history(entity, request_message)
                 except Exception as e:
@@ -364,7 +364,12 @@ class CallApiModelStrategy(Strategy):
     @tool
     def yield_to_user() -> str:
         '''
-        This tool is to yield control of the conversation back to the user when input is needed before further work.
+            T@tool(
+            name="yield_to_user",
+            description="Call this (no args) when you have finished everything "
+            "you can do without more input from the human. "
+            "It hands control back to the user."
+        )
         '''
         return ''
 

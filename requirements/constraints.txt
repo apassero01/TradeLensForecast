@@ -1,0 +1,14 @@
+# Constraints file to manage version conflicts
+# Use with: pip install -c requirements/constraints.txt -r requirements/docker.txt
+
+# TensorFlow 2.15 compatibility
+protobuf<6.0.0dev,>=3.20.3
+
+# Prevent numpy 2.0 which can break compatibility
+numpy<2.0.0
+
+# Pin urllib3 to avoid conflicts
+urllib3<2.0.0
+
+# Ensure compatible typing-extensions
+typing-extensions>=4.2.0,<5.0.0 

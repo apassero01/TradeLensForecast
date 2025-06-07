@@ -1,0 +1,17 @@
+# LangChain & AI Tools
+langchain==0.3.25
+langchain-anthropic==0.3.15
+langchain-community==0.3.24
+langchain-core==0.3.64
+langchain-google-genai==2.0.7
+langchain-openai==0.3.21
+langchain-text-splitters==0.3.8
+langsmith==0.3.45
+
+# AI Provider SDKs
+openai==1.84.0
+anthropic==0.52.1
+google-generativeai==0.8.3
+
+# Text Processing
+tiktoken==0.8.0 

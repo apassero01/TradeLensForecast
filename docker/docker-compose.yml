@@ -1,0 +1,59 @@
+services:
+  tradelens-backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: tradelens-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Django settings
+      - DJANGO_SETTINGS_MODULE=TradeLens.settings_docker
+      - DEBUG=True
+      
+      # Database settings - using host.docker.internal to connect to host services
+      - Postgres_HOST=host.docker.internal
+      - Postgres_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      
+      # Redis settings for cache and Celery
+      - REDIS_HOST=host.docker.internal
+      - REDIS_PORT=6379
+      
+      # Python settings
+      - PYTHONUNBUFFERED=1
+      
+      # Optional: API keys (add as needed)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      
+    volumes:
+      # Mount source code for development (optional - remove for production)
+      - ../:/app:ro
+      
+      # Persist data directories
+      - ../logs:/app/logs
+      - ../cache:/app/cache
+      - ../saved_models:/app/saved_models
+      - ../models:/app/models
+      
+    # Add extra_hosts for Linux compatibility (host.docker.internal doesn't work on Linux by default)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+# Optional: Define networks if needed
+networks:
+  default:
+    driver: bridge 
