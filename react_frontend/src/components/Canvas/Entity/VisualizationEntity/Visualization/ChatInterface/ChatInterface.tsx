@@ -466,7 +466,7 @@ export default function ChatInterface({
                                     className={`relative w-full max-w-none p-6 ${
                                         message.type === 'ai'
                                             ? 'bg-gray-800/30 border-l-2 border-gray-600/30'
-                                            : message.type === 'system'
+                                            : message.type === 'system' || message.type === 'tool'
                                                 ? 'bg-blue-900/20 border-l-2 border-blue-500/40'
                                                 : 'bg-gray-700/20 border-l-2 border-gray-500/30'
                                     }`}
@@ -509,7 +509,7 @@ export default function ChatInterface({
                                                     : 'text-green-400'
                                         }`}>
                                             {message.type === 'ai' ? 'Assistant' : 
-                                             message.type === 'system' ? 'Context' : 'You'}
+                                             message.type === 'tool' ? 'Tool' : 'You'}
                                         </span>
                                         {message.timestamp && (
                                             <span className="text-xs text-gray-500">

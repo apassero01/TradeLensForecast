@@ -7,6 +7,7 @@ from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, AIMessage
 from typing import List
@@ -43,7 +44,9 @@ class ConfigureApiModelStrategy(Strategy):
         config = self.strategy_request.param_config
         
         # Load environment variables
-        load_dotenv()
+        project_root = Path(__file__).resolve().parents[4]
+        dotenv_path = project_root / 'docker' / '.env'
+        load_dotenv(dotenv_path=dotenv_path)
 
         # Set model type
         model_type = config.get('model_type', 'openai')
@@ -120,19 +123,15 @@ class CallApiModelStrategy(Strategy):
 
         contexts = []
 
-        instructions_doc_id = "c226b236-5567-49fe-98dc-26c65d50397a"
-        instructions_doc = self.entity_service.get_entity(instructions_doc_id)
-        if instructions_doc:
+        with open("shared_utils/entities/api_model/strategy/instructions.txt", "r") as f:
+            instructions = f.read()
             contexts.append(
                 f"{'='*50}\n"
                 f"SYSTEM INSTRUCTIONS DO NOT DEVIATE FROM THESE INSTRUCTIONS\n"
                 f"{'-'*50}\n"
-                f"{instructions_doc.get_attribute('text')}\n"
+                f"{instructions}\n"
                 f"{'='*50}\n"
             )
-        
-        if instructions_doc_id in doc_ids:
-            doc_ids.remove(instructions_doc_id)
 
         contexts.append("These documents may contain import instructions or other relevant information:")
         for doc_id in doc_ids:
@@ -234,26 +233,30 @@ class CallApiModelStrategy(Strategy):
         tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user}
         tool_defs = [t.to_json() for t in tool_dict.values()]
 
-        context_list = []
 
-        context_list.append(SystemMessage(content=context))
-
-        MAX_ITERS = 10
+        MAX_ITERS = 5
         CUR_ITERS = 0
         # Use invoke() instead of __call__
 
         self.add_to_message_history(entity, HumanMessage(content=user_input))
         while CUR_ITERS < MAX_ITERS:
             CUR_ITERS += 1
-            model_input = context_list + [SystemMessage(content="HERE IS THE CURRENT CONVERSATION HISTORY: ")] + entity.get_attribute('message_history')
+            system_message = SystemMessage(content=context)
+            model_input = [system_message] + entity.get_attribute('message_history')
             response = chat.invoke(model_input)
-            self.add_to_message_history(entity, AIMessage(content=response.content))
+            self.add_to_message_history(entity, response)
 
 
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
                 if tool_call['name'].lower() == 'yield_to_user':
                     CUR_ITERS = MAX_ITERS
+                    tool_message = ToolMessage(
+                        content="Control Yielded Back to the user",
+                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                        name=tool_call["name"]
+                    )
+                    self.add_to_message_history(entity, tool_message)
                     break
                     # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
                 selected_tool = tool_dict.get(tool_call['name'].lower())
@@ -266,13 +269,26 @@ class CallApiModelStrategy(Strategy):
                     if 'entity' in ret_val:
                         del ret_val['entity']
                     target_entity = self.entity_service.get_entity(request.target_entity_id)
-                    request_message = SystemMessage(content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the yield_to_user() tool")
+                    # Compose your tool result as a string (or as JSON if required)
+                    tool_message_content = (
+                        f"Result of model executed strategy {request.strategy_name} "
+                        f"with config {request.param_config} on target entity {request.target_entity_id}. "
+                        f"This step is complete: Are there any further actions needed? "
+                        f"If yes, complete further actions, else let the user return additional information. "
+                        f"Be sure to call the yield_to_user() tool."
+                    )
+
+                    tool_message = ToolMessage(
+                        content=tool_message_content,
+                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                        name=tool_call["name"]
+                    )
 
                     # if target_entity.entity_id != entity.entity_id:
                     #     updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
                     #     request_message.content += f"\n\n{updated_entity_message.content}"
 
-                    self.add_to_message_history(entity, request_message)
+                    self.add_to_message_history(entity, tool_message)
                 except Exception as e:
                     error_message = f"Error executing tool {tool_call['name']}: {str(e)}"
                     logger.error(error_message)
