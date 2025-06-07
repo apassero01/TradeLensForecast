@@ -91,7 +91,7 @@ export default function IdeAppDashboard({
     };
     
     return collect;
-  }, [entityMap]);
+  }, [entityMap, allEntities]);
 
   // Get all documents recursively from the parent entity
   const allDocuments = useMemo(() => {

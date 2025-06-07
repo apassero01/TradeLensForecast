@@ -22,5 +22,22 @@ class ApiModelEntity(Entity):
         parent_dict = super().serialize()
         parent_dict['model_type'] = self.get_attribute('model_type')
         parent_dict['model_name'] = self.get_attribute('model_name')
-        parent_dict['message_history'] = [{'type': message.type, 'content': message.content} for message in self.get_attribute('message_history')]
-        return parent_dict 
+        parent_dict['message_history'] = self.serialize_message_history()
+        return parent_dict
+
+    def serialize_message_history(self) -> list:
+        messages = []
+        for message in self.get_attribute('message_history'):
+            if type(message.content) is list:
+                content = ''
+                for single_message in message.content:
+                    content += single_message + '\n'
+            else :
+                content = message.content
+
+            messages.append({
+                'type': message.type,
+                'content': content
+            })
+        return messages
+

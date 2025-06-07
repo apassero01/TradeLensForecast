@@ -217,20 +217,7 @@ class CallApiModelStrategy(Strategy):
 
         system_prompt = config.get('system_prompt', '')
         context_prefix = config.get('context_prefix', 'Here is the relevant context:')
-        
-        # Combine context with user input
-        if context:
-            combined_input = (
-                f"{context_prefix}\n\n"
-                f"{context}\n\n"
-                f"{'='*50}\n"
-                f"USER QUERY:\n"
-                f"{'-'*50}\n"
-                f"{user_input}\n"
-                f"{'='*50}"
-            )
-        else:
-            combined_input = user_input
+
 
         # # Initialize LangChain chat model
         # chat = ChatOpenAI(
@@ -243,12 +230,12 @@ class CallApiModelStrategy(Strategy):
             model_provider=entity.get_attribute('model_type'), 
             api_key=entity.get_attribute('api_key')
         )
-        chat = chat.bind_tools([self.create_strategy_request, self.tasks_complete])
-        tool_dict = {"create_strategy_request": self.create_strategy_request, "tasks_complete": self.tasks_complete}
+        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user])
+        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user}
 
         context_list = []
 
-        context_list.append(SystemMessage(content=combined_input))
+        context_list.append(SystemMessage(content=context))
 
         MAX_ITERS = 25
         CUR_ITERS = 0
@@ -262,11 +249,11 @@ class CallApiModelStrategy(Strategy):
             if response.content != '':
                 self.add_to_message_history(entity, AIMessage(content=response.content))
             if response.content == '' and response.tool_calls == []:
-                self.add_to_message_history(entity, AIMessage(content="No response from model.... please call tasks_complete() tool to end the conversation."))
+                self.add_to_message_history(entity, AIMessage(content="No response from model.... please call yield_to_user() tool to end the conversation."))
 
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
-                if tool_call['name'].lower() == 'tasks_complete':
+                if tool_call['name'].lower() == 'yield_to_user':
                     CUR_ITERS = MAX_ITERS
                     break
                 selected_tool = tool_dict.get(tool_call['name'].lower())
@@ -279,7 +266,7 @@ class CallApiModelStrategy(Strategy):
                     if 'entity' in ret_val:
                         del ret_val['entity']
                     target_entity = self.entity_service.get_entity(request.target_entity_id)
-                    request_message = SystemMessage(content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the tasks_complete() tool")
+                    request_message = SystemMessage(content=f"Result of Model Executed strategy {request.strategy_name} with config {request.param_config} on target entity {request.target_entity_id} This step is complete: Are there any further actions needed? If yes, complete further actions, else let the user return additional information be sure to call the yield_to_user() tool")
 
                     if target_entity.entity_id != entity.entity_id:
                         updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
@@ -375,10 +362,9 @@ class CallApiModelStrategy(Strategy):
 
     @staticmethod
     @tool
-    def tasks_complete() -> str:
+    def yield_to_user() -> str:
         '''
-        End the conversation with the model. This method will be called when the conversation
-        is over.
+        This tool is to yield control of the conversation back to the user when input is needed before further work.
         '''
         return ''
 
