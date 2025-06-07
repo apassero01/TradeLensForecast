@@ -4,6 +4,7 @@ Dev launcher for TradeLens:
   * Purges stale Celery tasks
   * Starts Daphne (ASGI) + Celery worker
   * Cleans up every child process on exit
+  * Supports PyCharm remote debugging
 """
 import os
 import sys
@@ -20,6 +21,33 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 log = logging.getLogger("runner")
+
+# ─── PyCharm Remote Debugging Setup ──────────────────────────────────────────
+def setup_pycharm_debugging():
+    """Setup PyCharm remote debugging if enabled."""
+    if os.environ.get("PYCHARM_DEBUG", "false").lower() == "true":
+        try:
+            import pydevd_pycharm
+            debug_host = os.environ.get("PYCHARM_DEBUG_HOST", "host.docker.internal")
+            debug_port = int(os.environ.get("PYCHARM_DEBUG_PORT", "5678"))
+            
+            log.info(f"Connecting to PyCharm debugger at {debug_host}:{debug_port}")
+            log.info("Make sure PyCharm is listening for remote connections!")
+            
+            pydevd_pycharm.settrace(
+                debug_host,
+                port=debug_port,
+                stdoutToServer=True,
+                stderrToServer=True,
+                suspend=False  # Don't suspend on connection
+            )
+            log.info("Successfully connected to PyCharm debugger")
+            
+        except ImportError:
+            log.warning("pydevd-pycharm not installed. Install it to enable PyCharm debugging.")
+        except Exception as e:
+            log.warning(f"Failed to connect to PyCharm debugger: {e}")
+            log.info("Continuing without debugger...")
 
 # ─── Paths / Django env ───────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
@@ -50,6 +78,9 @@ def _purge_celery():
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main() -> None:
+    # Setup PyCharm debugging first
+    setup_pycharm_debugging()
+    
     debug = os.environ.get("DEBUG_MODE") == "1"
     concurrency = "1" if debug else "4"
     pool = "solo" if debug else "threads"

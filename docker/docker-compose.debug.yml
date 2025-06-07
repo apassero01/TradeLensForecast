@@ -1,0 +1,21 @@
+services:
+  tradelens-backend:
+    environment:
+      # Enable PyCharm debugging
+      - PYCHARM_DEBUG=true
+      - DEBUG_MODE=1  # Enable debug mode in run.py
+      
+    # Override command to wait for debugger connection
+    command: ["python", "run/run.py"]
+    
+    # Keep container running even if main process exits
+    tty: true
+    stdin_open: true
+    
+    # Mount source code as read-write for debugging
+    volumes:
+      - ../:/app  # Remove :ro to allow file modifications during debugging
+      - ../logs:/app/logs
+      - ../cache:/app/cache
+      - ../saved_models:/app/saved_models
+      - ../models:/app/models 

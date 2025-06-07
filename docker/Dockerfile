@@ -51,6 +51,8 @@ RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir "numpy<2.0.0" "h5py==3.10.0" && \
     # Install PyTorch with CPU-only builds (may upgrade numpy but that's ok)
     pip install --no-cache-dir torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu && \
+    # Install PyCharm debugger for remote debugging
+    pip install --no-cache-dir pydevd-pycharm~=242.20224 && \
     # Install all other dependencies
     pip install --no-cache-dir -c requirements/constraints.txt -r requirements/docker.txt
 
@@ -67,15 +69,15 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Create necessary directories
 RUN mkdir -p logs cache saved_models models
 
-# Expose port for Django/Daphne
-EXPOSE 8000
+# Expose port for Django/Daphne and PyCharm debugger
+EXPOSE 8000 5678
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Set the entrypoint
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Default command
 CMD ["python", "run/run.py"] 

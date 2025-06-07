@@ -6,10 +6,16 @@ services:
     container_name: tradelens-backend
     ports:
       - "8000:8000"
+      - "5678:5678"  # PyCharm debugger port
     environment:
       # Django settings
       - DJANGO_SETTINGS_MODULE=TradeLens.settings_docker
       - DEBUG=True
+      
+      # PyCharm debugging settings
+      - PYCHARM_DEBUG=false
+      - PYCHARM_DEBUG_HOST=host.docker.internal
+      - PYCHARM_DEBUG_PORT=5678
       
       # Database settings - using host.docker.internal to connect to host services
       - Postgres_HOST=host.docker.internal
