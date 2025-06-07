@@ -292,7 +292,12 @@ class CallApiModelStrategy(Strategy):
                 except Exception as e:
                     error_message = f"Error executing tool {tool_call['name']}: {str(e)}"
                     logger.error(error_message)
-                    self.add_to_message_history(entity, SystemMessage(content=error_message))
+                    tool_message = ToolMessage(
+                        content=error_message,
+                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                        name=tool_call["name"]
+                    )
+                    self.add_to_message_history(entity, tool_message)
                     continue
 
 
