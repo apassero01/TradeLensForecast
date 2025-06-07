@@ -1,65 +1,61 @@
 name: TradeLens
 channels:
   - conda-forge
-  - defaults
-
 dependencies:
-  # --- Core Environment ---
-  - python=3.12
+  # --- Core ---
+  - python = 3.11
   - pip
+  - tzdata            # time-zone db
+  - python-tzdata     # tzinfo shim for pandas/Django
+  - packaging         # version parsing
 
-  # --- Web & Django Framework ---
+  # --- Web / Django ---
   - django
   - channels
   - daphne
   - asgiref
-  - channels-redis
 
-  # --- Data Science & Machine Learning ---
-  - pandas
+  # --- Data Science (conda builds exist) ---
   - numpy
+  - pandas
   - scipy
   - scikit-learn
   - statsmodels
-  - tensorflow
-  - keras
-  - pytorch
-  - torchvision
-  - torchaudio
-  - tslearn
   - numba
   - h5py
-
-  # --- Database & Caching ---
-  - psycopg2
-  - sqlalchemy
-  - redis-py # Conda package for 'redis'
-
-  # --- Asynchronous & Task Queues ---
-  - celery
-  - kombu
-  - billiard
-  - vine
-
-  # --- Jupyter Ecosystem ---
-  - jupyterlab
-  - notebook
-
-  # --- Plotting & Visualization ---
   - matplotlib
   - seaborn
   - plotly
   - mplfinance
 
-  # --- General Utilities ---
-  - boto3
+  # --- Jupyter ---
+  - jupyterlab
+  - notebook
+
+  # --- Databases & Cache ---
+  - psycopg2
+  - sqlalchemy
+  - redis-py        # Python client only
+
+  # --- Async / Task queue ---
+  - celery
+  - kombu
+  - billiard
+  - vine
+
+  # --- Utilities ---
   - requests
+  - boto3
   - beautifulsoup4
   - lxml
   - pillow
   - pyyaml
   - cryptography
 
-  # --- Pip Dependencies ---
+  # --- Pip-only heavyweights & extra deps ---
   - pip:
-    - -r requirements.txt
+      - torch==2.2.*       # brings torchvision/torchaudio wheels if CPU-only
+      - tensorflow==2.18.*
+      - keras==3.*
+      - channels-redis     # pure-python wheel
+      - -r requirements.txt
