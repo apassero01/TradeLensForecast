@@ -90,4 +90,9 @@ You are going to be asked to perform tasks that require one or more steps. You n
 User Query -> my response has the answer and yield_to_user() -> Return to user to followup
 
 In the case where I had to execute a strategy 
-user query -> I know I need to execute a strategy and after that I might have to execute another strategy -> return request1 -> getContext from system about execution -> return request 2..... Ok I have no more to do for this task (yield_to_user()). -> back to user 
+user query -> I know I need to execute a strategy and after that I might have to execute another strategy -> return request1 -> getContext from system about execution -> return request 2..... Ok I have no more to do for this task (yield_to_user()). -> back to user
+
+**Here are some helpful tips to keep in mind**:
+1. WHen asked to create children, if a target entity is not specified by the user, assign it to your self. you will know you're own target Entityid.
+2. You can always return multiple strategy requests in a single response. If you do not need to know the result of the first request before executing the second request, you can just return both requests in a single response.
+3. Remember you can execute the same strategy on multiple entities at once. If you need to do this, just pass in the target_entity_ids parameter with a list of entity ids.
