@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@types/ace": "^0.0.52",
-    "ace-builds": "^1.37.4",
-    "uuid": "^11.1.0"
-  }
-}

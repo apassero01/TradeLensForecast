@@ -3,12 +3,11 @@ import React, { useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../state/entitiesSelectors';
 import { EntityTypes } from './EntityEnum';
-import VisualizationEntity from './VisualizationEntity/VisualizationEntity';
 import InputEntity from './InputEntity'
 import StrategyRequestEntity from './StrategyRequestEntity';
 import EntityNode from './EntityNode';
 import { entityIdsAtom } from '../../../state/entityIdsAtom';
-import { useReactFlow, addEdge, useUpdateNodeInternals } from '@xyflow/react';
+import { useReactFlow } from '@xyflow/react';
 import ViewEntity from './ViewEntity/ViewEntity';
 import DocumentEntity from './DocumentEntity';
 import { useWebSocketConsumer } from '../../../hooks/useWebSocketConsumer';
@@ -16,7 +15,6 @@ import useUpdateFlowNodes from '../../../hooks/useUpdateFlowNodes';
 import RecipeEntity from './RecipeEntity';
 
 const componentMapping = {
-    [EntityTypes.VISUALIZATION]: VisualizationEntity,
     [EntityTypes.INPUT]: InputEntity,
     [EntityTypes.STRATEGY_REQUEST]: StrategyRequestEntity,
     [EntityTypes.VIEW]: ViewEntity,

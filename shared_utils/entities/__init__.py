@@ -12,7 +12,6 @@ def discover_entities():
     from .Entity import Entity
     from .StrategyRequestEntity import StrategyRequestEntity 
     from .api_model.ApiModelEntity import ApiModelEntity
-    from .VisualizationEntity import VisualizationEntity
     from model_stage.entities.ModelStageEntity import ModelStageEntity
     from .document_entities.DocumentEntity import DocumentEntity
     from .input_entity.InputEntity import InputEntity

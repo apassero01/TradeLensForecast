@@ -6,11 +6,8 @@ from typing import Optional, Dict, Any
 import numpy as np
 
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
-from shared_utils.entities.VisualizationEntity import VisualizationEntity
 from shared_utils.entities.view_entity.ViewEntity import ViewEntity
-from shared_utils.models import StrategyRequest
 from shared_utils.strategy.BaseStrategy import CreateEntityStrategy, SetAttributesStrategy
-from shared_utils.strategy.VisualizationStrategy import VisualizationStrategy
 
 
 class DocumentEntity(Entity):

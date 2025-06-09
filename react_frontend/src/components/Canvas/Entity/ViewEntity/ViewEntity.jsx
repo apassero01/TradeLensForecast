@@ -1,6 +1,6 @@
 import React, { memo, useState } from 'react';
 import EntityNodeBase from '../EntityNodeBase';
-import viewComponents from '../VisualizationEntity/Visualization/visualizationComponents';
+import viewComponents from './View/viewComponents';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../state/entitiesSelectors';
 import useRenderStoredView from '../../../../hooks/useRenderStoredView';

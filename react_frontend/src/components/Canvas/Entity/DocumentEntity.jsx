@@ -3,9 +3,7 @@ import EntityNodeBase from './EntityNodeBase';
 import { useRecoilValue } from 'recoil';
 import { childrenByTypeSelector } from '../../../state/entitiesSelectors';
 import { EntityTypes } from './EntityEnum';
-import  visualizationComponents  from '../Entity/VisualizationEntity/Visualization/visualizationComponents';
 import useRenderStoredView from '../../../hooks/useRenderStoredView';
-import StrategyRequests from '../../../utils/StrategyRequestBuilder';
 
 function DocumentEntity({ data, updateEntity, sendStrategyRequest }) {
 
