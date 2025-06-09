@@ -276,8 +276,8 @@ export default function IdeAppDashboard({
     );
   }
 
-  return (
-    <div className="flex flex-col h-full w-full bg-gray-900 text-white overflow-hidden">
+    return (
+    <div className="nodrag flex flex-col w-full h-full bg-gray-900 text-white overflow-x-auto">
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-gray-700">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -300,7 +300,7 @@ export default function IdeAppDashboard({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-grow min-h-0 flex">
         {/* Left Sidebar - File Tree */}
         <div className="w-80 border-r border-gray-700 flex flex-col">
           {/* Search Section */}
@@ -325,7 +325,7 @@ export default function IdeAppDashboard({
           </div>
 
           {/* File Tree Section */}
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 flex flex-col overflow-y-auto">
             <div className="p-3 border-b border-gray-700">
               <h2 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
                 {IoFolder({}) as React.JSX.Element}
@@ -348,7 +348,7 @@ export default function IdeAppDashboard({
         </div>
 
         {/* Editor Area */}
-        <div className="flex-1 bg-gray-800 flex flex-col">
+        <div className="flex-1 bg-gray-800 flex flex-col min-h-0">
           {/* Tab Bar */}
           {openTabs.length > 0 && (
             <div className="flex-shrink-0 bg-gray-800 border-b border-gray-700">
@@ -389,7 +389,7 @@ export default function IdeAppDashboard({
           )}
 
           {/* Editor Content */}
-          <div className="flex-1">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {activeTab && activeDocumentEntity ? (
               <AdvancedDocumentEditor
                 data={activeDocumentEntity.data}

@@ -85,7 +85,7 @@ function EntityNodeBase({ data, updateEntity, children }) {
 
       <Handle type="target" position={Position.Top} />
 
-      <div className="flex-grow h-full w-full p-4 flex items-center justify-center overflow-y-hidden overflow-x-hidden">
+      <div className="flex-grow h-full w-full p-4 flex flex-col overflow-hidden">
         {children({
           data: data,
           childrenRequests: strategyRequestChildren,

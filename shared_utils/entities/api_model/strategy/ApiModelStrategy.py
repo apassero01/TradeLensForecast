@@ -133,10 +133,22 @@ class CallApiModelStrategy(Strategy):
                 f"{'='*50}\n"
             )
 
+        contexts.append(
+            f"{'='*50}\n"
+            f"Entity Context THIS IS YOU, THE AGENT\n"
+            f"{'-'*50}\n"
+            f"{entity.entity_name} with id {entity.entity_id}\n"
+            f"{'='*50}\n"
+        )
+
         contexts.append("These documents may contain import instructions or other relevant information:")
         for doc_id in doc_ids:
             doc = self.entity_service.get_entity(doc_id)
             if doc and doc.has_attribute('text'):
+                text_to_add = doc.get_text()
+                if len(text_to_add) > 500:
+                    text_to_add = text_to_add[:500] + '... [TRUNCATED]'
+
                 doc_type = doc.get_document_type() or 'unknown'
                 if doc.has_attribute('path'):
                     doc_type = f"{doc_type} ({doc.get_attribute('path')})"
@@ -145,8 +157,9 @@ class CallApiModelStrategy(Strategy):
                 contexts.append(
                     f"{'='*50}\n"
                     f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
+                    f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
                     f"{'-'*50} DOCUMENT_BEGIN\n"
-                    f"{doc.get_text()}\n"
+                    f"{text_to_add}\n"
                     f"{'='*50} DOCUMENT_END\n"
                 )
 
@@ -234,7 +247,7 @@ class CallApiModelStrategy(Strategy):
         tool_defs = [t.to_json() for t in tool_dict.values()]
 
 
-        MAX_ITERS = 5
+        MAX_ITERS = 15
         CUR_ITERS = 0
         # Use invoke() instead of __call__
 

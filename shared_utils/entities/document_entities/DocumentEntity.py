@@ -23,6 +23,7 @@ class DocumentEntity(Entity):
         self.set_attribute('document_type', None)
         self.set_attribute('processed_text', '')
         self.set_attribute('tokens', [])
+        self.set_attribute('hidden', True)
 
     def on_create(self, param_config: Optional[Dict[str, Any]] = None) -> list[StrategyRequestEntity]:
         """Override this method to handle entity creation logic"""

@@ -132,7 +132,7 @@ export default function ChatInterface({
             .withTargetEntity(currentApiModel.entity_id)
             .withParams({
                 "env_key": envKeyMap[modelProvider],
-                "model_name": modelName,
+                "model_name": modelName.trim(),
                 "model_type": modelProvider,
                 "model_config": {
                     "top_p": 1,

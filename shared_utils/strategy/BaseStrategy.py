@@ -872,12 +872,12 @@ class ExtractEntityDataStrategy(Strategy):
     @staticmethod
     def get_request_config():
         """
-        Default config for SerializeEntitiesStrategy.
+        Default config for ExtractEntityDataStrategy.
          - 'entity_ids': List of entity IDs to serialize
          - 'result_attribute': The attribute under which we store the serialized results
         """
         return {
-            "strategy_name": "SerializeEntitiesStrategy",
+            "strategy_name": "ExtractEntityDataStrategy",
             "strategy_path": None,
             "param_config": {
                 "entity_ids": [],
