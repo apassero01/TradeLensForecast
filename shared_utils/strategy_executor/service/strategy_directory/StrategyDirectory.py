@@ -35,11 +35,6 @@ class StrategyDirectory:
             EntityEnum.SEQUENCE_SET.value: [
                 "sequenceset_manager.strategy.SequenceSetStrategy.PopulateDataBundleStrategy",
             ],
-            EntityEnum.VISUALIZATION.value: [
-                "shared_utils.strategy.VisualizationStrategy.HistogramStrategy",
-                "shared_utils.strategy.VisualizationStrategy.LineGraphStrategy",
-                "shared_utils.strategy.VisualizationStrategy.VisualizationStrategy",
-            ],
             EntityEnum.MODEL_STAGE.value: [
                 "model_stage.strategy.ModelStageStrategy.CreateModelStrategy",
                 "model_stage.strategy.ModelStageStrategy.ConfigureModelStageStrategy",
