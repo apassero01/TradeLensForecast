@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRecoilValue } from 'recoil';
-import { childrenByTypeSelector, nodeSelectorFamily, allEntitiesSelector } from '../../../../../../state/entitiesSelectors';
+import { childrenByTypeSelector, nodeSelectorFamily, recursiveEntitiesByTypeSelector } from '../../../../../../state/entitiesSelectors';
 import { EntityTypes } from '../../../../Entity/EntityEnum';
 import useRenderStoredView from '../../../../../../hooks/useRenderStoredView';
 import { IoFolder, IoDocumentText, IoSearch, IoClose } from 'react-icons/io5';
@@ -42,117 +42,139 @@ export default function IdeAppDashboard({
     childrenByTypeSelector({ parentId: parentEntityId, type: EntityTypes.VIEW })
   ) as any[];
 
-  // Get all entities to work with
-  const allEntities = useRecoilValue(allEntitiesSelector) as any[];
-  
-  // Create a lookup map for quick entity access
-  const entityMap = useMemo(() => {
-    const map = new Map();
-    if (Array.isArray(allEntities)) {
-      allEntities.forEach(entity => {
-        if (entity?.data?.entity_id) {
-          map.set(entity.data.entity_id, entity.data);
-        }
-      });
-    }
-    return map;
-  }, [allEntities]);
+  // Get the document tree structure using the new recursive selector
+  const documentTree = useRecoilValue(
+    recursiveEntitiesByTypeSelector({ parentId: parentEntityId, type: EntityTypes.DOCUMENT })
+  );
 
-  // Function to recursively collect all documents from an entity tree
-  const collectAllDocuments = useMemo(() => {
-    const collect = (entityId: string, visited = new Set<string>()): any[] => {
-      if (visited.has(entityId)) {
+  const handleSelectDocument = (entityId: string) => {
+        // Set new selection
+    
+    // Mark the document as selected by this IDE instance
+    sendStrategyRequest(StrategyRequests.builder()
+      .withStrategyName('SetAttributesStrategy')
+      .withTargetEntity(entityId)
+      .withParams({
+        attribute_map: { [`ide_selected_by_${parentEntityId}`]: true }
+      })
+      .build());
+    
+    console.log('Selected document:', entityId);
+    setActiveTabId(entityId);
+  };
+
+  // Function to flatten the document tree into a list of all documents
+  const allDocuments = useMemo(() => {
+    const flattenDocuments = (tree: any, visited = new Set<string>()): any[] => {
+      if (!tree || !tree.data) return [];
+      
+      // Prevent duplicate processing of the same entity
+      if (visited.has(tree.data.entity_id)) {
         return [];
       }
-      
-      visited.add(entityId);
-      const entityData = entityMap.get(entityId);
-      
-      if (!entityData) {
-        return [];
-      }
+      visited.add(tree.data.entity_id);
       
       const documents: any[] = [];
       
-      // If this entity is a document, include it
-      if (entityData.entity_type === EntityTypes.DOCUMENT) {
-        documents.push(entityData);
+      // If this node is a document, add it
+      if (tree.data.entity_type === EntityTypes.DOCUMENT) {
+        documents.push(tree.data);
       }
       
-      // Recursively process all children
-      if (entityData.child_ids && Array.isArray(entityData.child_ids)) {
-        entityData.child_ids.forEach((childId: string) => {
-          const childDocuments = collect(childId, new Set(visited));
-          documents.push(...childDocuments);
+      // Recursively process children
+      if (tree.children && typeof tree.children === 'object') {
+        Object.values(tree.children).forEach((child: any) => {
+          documents.push(...flattenDocuments(child, new Set(visited)));
         });
       }
       
       return documents;
     };
     
-    return collect;
-  }, [entityMap, allEntities]);
-
-  // Get all documents recursively from the parent entity
-  const allDocuments = useMemo(() => {
-    try {
-      return collectAllDocuments(parentEntityId);
-    } catch (error) {
-      console.warn('Error collecting documents recursively:', error);
-      return [];
-    }
-  }, [parentEntityId, collectAllDocuments]);
+    const documents = flattenDocuments(documentTree);
+    
+    // Additional deduplication by entity_id just to be safe
+    const uniqueDocuments = documents.filter((doc, index, arr) => 
+      arr.findIndex(d => d.entity_id === doc.entity_id) === index
+    );
+    
+    return uniqueDocuments;
+  }, [documentTree]);
 
   // Find all selected documents - look for ones with ide_selected_by_<parentEntityId> attribute
   const selectedDocuments = useMemo(() => {
     const selectionAttribute = `ide_selected_by_${parentEntityId}`;
-    return allDocuments.filter(doc => doc[selectionAttribute] === true);
+    const selected = allDocuments.filter(doc => doc[selectionAttribute] === true);
+    
+    // Debug logging
+    console.log('IdeAppDashboard Debug:', {
+      allDocumentsCount: allDocuments.length,
+      selectedDocumentsCount: selected.length,
+      selectedDocumentIds: selected.map(doc => doc.entity_id),
+      duplicateCheck: selected.length !== new Set(selected.map(doc => doc.entity_id)).size
+    });
+    
+    return selected;
+
   }, [allDocuments, parentEntityId]);
 
   // Sync open tabs with selected documents
   useEffect(() => {
-    const newTabs: DocumentTab[] = [];
-    
-    selectedDocuments.forEach(doc => {
-      const existingTab = openTabs.find(tab => tab.id === doc.entity_id);
-      if (existingTab) {
-        newTabs.push({
-          ...existingTab,
-          documentData: doc,
-          name: doc.docName || doc.name || 'Untitled'
-        });
-      } else {
-        newTabs.push({
-          id: doc.entity_id,
-          name: doc.docName || doc.name || 'Untitled',
-          documentData: doc,
-          entityData: null
-        });
-      }
-    });
-
-    const tabsChanged = 
-      newTabs.length !== openTabs.length ||
-      newTabs.some(tab => !openTabs.find(existing => existing.id === tab.id));
-
-    if (tabsChanged) {
-      setOpenTabs(newTabs);
+    setOpenTabs(prevOpenTabs => {
+      const newTabs: DocumentTab[] = [];
+      const processedIds = new Set<string>();
       
-      // Determine which tabs were newly added in this cycle
-      // These are tabs in `newTabs` whose IDs were not in `openTabs` (from the closure, before this update)
-      const newlyAddedTabs = newTabs.filter(nt => !openTabs.find(ot => ot.id === nt.id));
+      selectedDocuments.forEach(doc => {
+        // Skip if we've already processed this document (prevents duplicates)
+        if (processedIds.has(doc.entity_id)) {
+          return;
+        }
+        processedIds.add(doc.entity_id);
+        
+        const existingTab = prevOpenTabs.find(tab => tab.id === doc.entity_id);
+        if (existingTab) {
+          newTabs.push({
+            ...existingTab,
+            documentData: doc,
+            name: doc.docName || doc.name || 'Untitled'
+          });
+        } else {
+          newTabs.push({
+            id: doc.entity_id,
+            name: doc.docName || doc.name || 'Untitled',
+            documentData: doc,
+            entityData: null
+          });
+        }
+      });
 
-      if (newlyAddedTabs.length > 0) {
-        // If new tabs were added, make the last one added the active tab
-        setActiveTabId(newlyAddedTabs[newlyAddedTabs.length - 1].id);
-      } else if (!activeTabId || !newTabs.find(tab => tab.id === activeTabId)) {
-        // If no new tabs were added, but the current activeTabId is invalid 
-        // (e.g., its tab was closed or was never set), set to the first available tab or null.
-        setActiveTabId(newTabs.length > 0 ? newTabs[0].id : null);
+      const tabsChanged = 
+        newTabs.length !== prevOpenTabs.length ||
+        newTabs.some(tab => !prevOpenTabs.find(existing => existing.id === tab.id));
+
+      if (tabsChanged) {
+        // Determine which tabs were newly added in this cycle
+        const newlyAddedTabs = newTabs.filter(nt => !prevOpenTabs.find(ot => ot.id === nt.id));
+
+        if (newlyAddedTabs.length > 0) {
+          // If new tabs were added, make the last one added the active tab
+          setActiveTabId(newlyAddedTabs[newlyAddedTabs.length - 1].id);
+        } else {
+          // Check if current active tab is still valid
+          setActiveTabId(prevActiveTabId => {
+            if (prevActiveTabId && newTabs.find(tab => tab.id === prevActiveTabId)) {
+              return prevActiveTabId; // Keep current active tab if it's still valid
+            }
+            return newTabs.length > 0 ? newTabs[0].id : null;
+          });
+        }
+        
+        return newTabs;
       }
-      // If no new tabs were added and activeTabId is still valid, it remains the active tab.
-    }
-  }, [selectedDocuments, parentEntityId, openTabs, activeTabId]);
+      
+      return prevOpenTabs;
+    });
+  }, [selectedDocuments, parentEntityId]);
 
   // Get entity data for the active tab
   const activeTab = openTabs.find(tab => tab.id === activeTabId);
@@ -259,7 +281,10 @@ export default function IdeAppDashboard({
   const renderedFileTreeView = useRenderStoredView(
     fileTreeView?.entity_id,
     sendStrategyRequest,
-    updateEntity
+    updateEntity,
+    {
+      handleSelect: handleSelectDocument
+    }
   );
 
   const renderedSearchView = useRenderStoredView(
@@ -277,7 +302,7 @@ export default function IdeAppDashboard({
   }
 
     return (
-    <div className="nodrag flex flex-col w-full h-full bg-gray-900 text-white overflow-x-auto">
+    <div className="nodrag flex flex-col w-full h-full bg-gray-900 text-white">
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-gray-700">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -285,7 +310,7 @@ export default function IdeAppDashboard({
           {data.name || 'Document IDE'}
         </h1>
         <p className="text-gray-400 text-sm mt-1">
-          {allDocuments.length} documents
+          {allDocuments.length} documents • {selectedDocuments.length} selected
           {openTabs.length > 0 && (
             <span className="ml-2">
               • {openTabs.length} open tab{openTabs.length !== 1 ? 's' : ''}
@@ -348,17 +373,17 @@ export default function IdeAppDashboard({
         </div>
 
         {/* Editor Area */}
-        <div className="flex-1 bg-gray-800 flex flex-col min-h-0">
+        <div className="flex-1 bg-gray-800 flex flex-col min-h-0 overflow-x-auto overflow-y-auto">
           {/* Tab Bar */}
           {openTabs.length > 0 && (
             <div className="flex-shrink-0 bg-gray-800 border-b border-gray-700">
-              <div className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+              <div className="flex w-full min-w-0 overflow-x-auto scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500">
                 {openTabs.map((tab) => (
                   <div
                     key={tab.id}
                     className={`
                       flex items-center px-4 py-2 border-r border-gray-700 cursor-pointer
-                      min-w-0 max-w-48 group transition-colors duration-150
+                      min-w-36 max-w-48 group transition-colors duration-150
                       ${activeTabId === tab.id 
                         ? 'bg-gray-700 text-white border-b-2 border-blue-400' 
                         : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'

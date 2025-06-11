@@ -65,6 +65,54 @@ export const allEntitiesSelector = selector({
   },
 });
 
+export const recursiveEntitiesByTypeSelector = selectorFamily({
+  key: 'recursiveEntitiesByTypeSelector',
+  get: ({ parentId, type }) => ({ get }) => {
+    const collectEntitiesByType = (entityId, targetType, visited = new Set()) => {
+      // Prevent infinite loops
+      if (visited.has(entityId)) {
+        return null;
+      }
+      visited.add(entityId);
+
+      const entity = get(nodeSelectorFamily(entityId));
+      if (!entity || !entity.data) {
+        return null;
+      }
+
+      const result = {
+        entity_id: entityId,
+        data: entity.data,
+        children: {}
+      };
+
+      // If this entity has children, recursively process them
+      if (entity.data.child_ids && Array.isArray(entity.data.child_ids)) {
+        entity.data.child_ids.forEach(childId => {
+          const childResult = collectEntitiesByType(childId, targetType, new Set(visited));
+          
+          // If the child is of the target type OR has descendants of the target type, include it
+          if (childResult && (
+            childResult.data.entity_type === targetType || 
+            Object.keys(childResult.children).length > 0
+          )) {
+            result.children[childId] = childResult;
+          }
+        });
+      }
+
+      // Return this entity if it's of the target type OR if it has children of the target type
+      if (entity.data.entity_type === targetType || Object.keys(result.children).length > 0) {
+        return result;
+      }
+
+      return null;
+    };
+
+    return collectEntitiesByType(parentId, type);
+  },
+});
+
 const calculateNewPosition = (entity, get) => {
   const parent_ids = entity.parent_ids;
   if (parent_ids && parent_ids.length > 0) {

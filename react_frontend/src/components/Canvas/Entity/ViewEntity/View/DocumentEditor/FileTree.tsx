@@ -21,6 +21,7 @@ interface FileTreeProps {
   updateEntity: (entityId: string, data: any) => void;
   viewEntityId: string;
   parentEntityId: string;
+  handleSelect?: (entityId: string) => void;
 }
 
 interface FileTreeData {
@@ -454,6 +455,7 @@ export default function FileTree({
   updateEntity,
   viewEntityId,
   parentEntityId,
+  handleSelect,
 }: FileTreeProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set([parentEntityId]));
@@ -474,7 +476,16 @@ export default function FileTree({
     setExpandedNodes(newExpanded);
   };
 
-  const handleSelect = (entityId: string) => {
+  const handleSelectDocument = (entityId: string) => {
+    if (handleSelect) {
+      handleSelect(entityId);
+      setSelectedId(entityId);
+    } else {
+      handleSelectInternal(entityId);
+    }
+  };
+  
+  const handleSelectInternal = (entityId: string) => {
 
     // Set new selection
     setSelectedId(entityId);
@@ -573,7 +584,7 @@ export default function FileTree({
             key={child.entity_id}
             entityId={child.entity_id}
             level={0}
-            onSelect={handleSelect}
+            onSelect={handleSelectDocument}
             selectedId={selectedId}
             expandedNodes={expandedNodes}
             toggleExpanded={toggleExpanded}

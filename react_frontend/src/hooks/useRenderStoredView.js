@@ -11,7 +11,7 @@ import ErrorBoundary from '../components/common/ErrorBoundary'; // Adjust path
  * @param {string | null} entityId The ID of the entity whose stored view should be rendered. Can be null/undefined.
  * @returns {React.ReactNode | null} The rendered view component or a fallback/null.
  */
-function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity) {
+function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity, props) {
     // --- Call hook unconditionally at the top ---
     // Pass entityId directly. Recoil's atomFamily usually provides a default state
     // for unknown/new IDs. If entityId is null/undefined, this might behave unexpectedly
@@ -85,7 +85,7 @@ function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity) {
                 </div>
             )}
         >
-            <ViewComponent visualization= {visualization} data={viewData} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} viewEntityId={viewEntityId} parentEntityId={parentEntityStore?.data?.entity_id} />
+            <ViewComponent visualization= {visualization} data={viewData} sendStrategyRequest={sendStrategyRequest} updateEntity={updateEntity} viewEntityId={viewEntityId} parentEntityId={parentEntityStore?.data?.entity_id} {...props} />
         </ErrorBoundary>
     );
 }

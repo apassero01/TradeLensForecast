@@ -119,7 +119,7 @@ export default function AdvancedDocumentEditor({
 
 
   const getEditorLanguage = () => {
-    const fileType = data?.file_type || 'text';
+    const fileType = data?.name?.split('.').pop() || 'text';
     const languageMap: { [key: string]: string } = {
       python: 'python',
       py: 'python',

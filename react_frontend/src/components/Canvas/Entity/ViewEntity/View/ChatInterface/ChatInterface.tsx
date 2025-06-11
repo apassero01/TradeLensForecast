@@ -52,6 +52,7 @@ export default function ChatInterface({
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [modelProvider, setModelProvider] = useState<'openai' | 'google_genai' | 'anthropic'>('openai');
     const [modelName, setModelName] = useState('gpt-4o-mini');
+    const [textareaHeight, setTextareaHeight] = useState('3rem');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -82,6 +83,40 @@ export default function ChatInterface({
 
         return () => clearTimeout(timeoutId);
     }, [messages, scrollToBottom]);
+
+    // Auto-resize textarea function
+    const autoResizeTextarea = useCallback(() => {
+        const textarea = inputRef.current;
+        if (!textarea) return;
+
+        // Temporarily reset height and overflow to get accurate scrollHeight
+        textarea.style.height = 'auto';
+        textarea.style.overflowY = 'hidden';
+        
+        // Calculate new height based on content
+        const scrollHeight = textarea.scrollHeight;
+        const minHeight = 48; // 3rem in pixels (assuming 1rem = 16px)
+        const maxHeight = 240; // 15rem in pixels - maximum height before scrolling
+        
+        const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+        
+        // Set the height
+        textarea.style.height = `${newHeight}px`;
+        
+        // Only show scrollbar if content exceeds max height
+        if (scrollHeight > maxHeight) {
+            textarea.style.overflowY = 'auto';
+        } else {
+            textarea.style.overflowY = 'hidden';
+        }
+        
+        setTextareaHeight(`${newHeight}px`);
+    }, []);
+
+    // Auto-resize when input changes
+    useEffect(() => {
+        autoResizeTextarea();
+    }, [currentInput, autoResizeTextarea]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -547,8 +582,11 @@ export default function ChatInterface({
                                 }
                                 disabled={!currentApiModel || isSubmitting}
                                 className="w-full p-4 pr-14 bg-gray-700/50 border border-gray-600/50 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:outline-none disabled:opacity-50 text-gray-100 placeholder-gray-400"
-                                rows={2}
-                                style={{ minHeight: '3rem' }}
+                                style={{ 
+                                    height: textareaHeight,
+                                    minHeight: '3rem',
+                                    maxHeight: '15rem'
+                                }}
                             />
 
                             <button
