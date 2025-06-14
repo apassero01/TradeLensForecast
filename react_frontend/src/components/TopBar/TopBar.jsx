@@ -43,10 +43,10 @@ const TopBar = () => {
       };
 
     return (
-        <div className="bg-gray-800 border-b border-gray-700">
-            {/* If there's an error, show it in a small banner */}
+        <div className="bg-gray-800 border-b border-gray-700 relative">
+            {/* If there's an error, show it in a small banner positioned absolutely */}
             {error && (
-                <div className="bg-red-600 text-white p-2 text-sm flex justify-between items-center">
+                <div className="absolute top-0 left-0 right-0 bg-red-600 text-white p-2 text-sm flex justify-between items-center z-10 transform -translate-y-full">
                 <span>{error}</span>
                 <button
                     onClick={dismissError}

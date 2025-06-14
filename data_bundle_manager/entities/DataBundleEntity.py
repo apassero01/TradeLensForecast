@@ -29,6 +29,7 @@ class DataBundleEntity(Entity):
                 'X_train_scaled') else None,
             'X_test_scaled': self.get_attribute('X_test_scaled').shape if self.has_attribute('X_test_scaled') else None,
         }
+        sup_dict['y_train'] = self.get_attribute('y_train') if self.has_attribute('y_train') else None,
 
         return sup_dict
 

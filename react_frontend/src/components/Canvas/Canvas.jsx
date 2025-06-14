@@ -239,7 +239,7 @@ function Canvas() {
   }, []);
 
   return (
-    <div style={{ width: '100%', height: '100vh', flex: 1 }}>
+    <div className="w-full h-full">
       <ReactFlow
         ref={reactFlowRef}
         nodes={nodes}

@@ -118,9 +118,6 @@ class CallApiModelStrategy(Strategy):
         """Form context from document children"""
         doc_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.DOCUMENT)
 
-        if not doc_ids:
-            return ""
-
         contexts = []
 
         with open("shared_utils/entities/api_model/strategy/instructions.txt", "r") as f:
@@ -142,6 +139,7 @@ class CallApiModelStrategy(Strategy):
         )
 
         contexts.append("These documents may contain import instructions or other relevant information:")
+        doc_ids = set(doc_ids)
         for doc_id in doc_ids:
             doc = self.entity_service.get_entity(doc_id)
             if doc and doc.has_attribute('text'):
@@ -272,36 +270,38 @@ class CallApiModelStrategy(Strategy):
                     self.add_to_message_history(entity, tool_message)
                     break
                     # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
-                selected_tool = tool_dict.get(tool_call['name'].lower())
-                tool_msg = selected_tool.invoke(tool_call)
-                child_request = tool_msg.artifact
+
                 try:
-                    request = self.execute_model_request(child_request, entity)
-                    entity = self.entity_service.get_entity(entity.entity_id)
-                    ret_val = request.ret_val
-                    if 'entity' in ret_val:
-                        del ret_val['entity']
-                    target_entity = self.entity_service.get_entity(request.target_entity_id)
-                    # Compose your tool result as a string (or as JSON if required)
-                    tool_message_content = (
-                        f"Result of model executed strategy {request.strategy_name} "
-                        f"with config {request.param_config} on target entity {request.target_entity_id}. "
-                        f"This step is complete: Are there any further actions needed? "
-                        f"If yes, complete further actions, else let the user return additional information. "
-                        f"Be sure to call the yield_to_user() tool."
-                    )
+                    selected_tool = tool_dict.get(tool_call['name'].lower())
+                    tool_msg = selected_tool.invoke(tool_call)
+                    child_request = tool_msg.artifact
+                    if child_request:
+                        request = self.execute_model_request(child_request, entity)
+                        entity = self.entity_service.get_entity(entity.entity_id)
+                        ret_val = request.ret_val
+                        if 'entity' in ret_val:
+                            del ret_val['entity']
+                        target_entity = self.entity_service.get_entity(request.target_entity_id)
+                        # Compose your tool result as a string (or as JSON if required)
+                        tool_message_content = (
+                            f"Result of model executed strategy {request.strategy_name} "
+                            f"with config {request.param_config} on target entity {request.target_entity_id}. "
+                            f"This step is complete: Are there any further actions needed? "
+                            f"If yes, complete further actions, else let the user return additional information. "
+                            f"Be sure to call the yield_to_user() tool."
+                        )
 
-                    tool_message = ToolMessage(
-                        content=tool_message_content,
-                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
-                        name=tool_call["name"]
-                    )
+                        tool_message = ToolMessage(
+                            content=tool_message_content,
+                            tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                            name=tool_call["name"]
+                        )
 
-                    # if target_entity.entity_id != entity.entity_id:
-                    #     updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
-                    #     request_message.content += f"\n\n{updated_entity_message.content}"
+                        # if target_entity.entity_id != entity.entity_id:
+                        #     updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
+                        #     request_message.content += f"\n\n{updated_entity_message.content}"
 
-                    self.add_to_message_history(entity, tool_message)
+                        self.add_to_message_history(entity, tool_message)
                 except Exception as e:
                     error_message = f"Error executing tool {tool_call['name']}: {str(e)}"
                     logger.error(error_message)
