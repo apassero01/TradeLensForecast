@@ -17,4 +17,6 @@ class EntityEnum(Enum):
     VIEW = "view"
     RECIPE = "recipe"
     MEAL_PLAN = "meal_plan"
+    CALENDAR_EVENT = "calendar_event"
+    CALENDAR = "calendar"
 

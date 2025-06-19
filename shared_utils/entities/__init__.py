@@ -18,3 +18,6 @@ def discover_entities():
     from .view_entity.ViewEntity import ViewEntity
     from .meal_planner.RecipeEntity import RecipeEntity
     from .meal_planner.MealPlanEntity import MealPlanEntity
+    from .calendar.CalendarEventEntity import CalendarEventEntity
+    from .calendar.CalendarEntity import CalendarEntity
+
