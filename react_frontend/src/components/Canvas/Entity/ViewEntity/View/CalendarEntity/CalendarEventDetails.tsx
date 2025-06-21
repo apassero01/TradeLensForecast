@@ -22,17 +22,14 @@ interface CalendarEventData {
 export default function CalendarEventDetails({
   data,
   sendStrategyRequest,
-  updateEntity,
-  viewEntityId,
   parentEntityId,
+  viewEntityId,
+  updateEntity,
 }: CalendarEventDetailsProps) {
+  console.log(data);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(data || {});
 
-  const handleSave = () => {
-    updateEntity(parentEntityId, editedData);
-    setIsEditing(false);
-  };
 
   const handleCancel = () => {
     setEditedData(data || {});

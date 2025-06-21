@@ -49,16 +49,21 @@ export default function CalendarMonthlyView({
         childrenByTypeSelector({ parentId: parentEntityId, type: EntityTypes.CALENDAR_EVENT })
     ) as any[];
 
+    console.log('CalendarMonthlyView - eventChildren:', eventChildren);
+    console.log('CalendarMonthlyView - parentEntityId:', parentEntityId);
+
     // Create a mapping of events by date string (YYYY-MM-DD)
     const eventsByDate = React.useMemo(() => {
         const map: { [key: string]: any[] } = {};
         eventChildren.forEach(event => {
-            const eventDate = new Date(event.start_time);
-            const dateKey = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD
-            if (!map[dateKey]) {
+            // Use the date field from CalendarEventEntity instead of start_time
+            const dateKey = event.date || event.data?.date;
+            if (dateKey && !map[dateKey]) {
                 map[dateKey] = [];
             }
-            map[dateKey].push(event);
+            if (dateKey) {
+                map[dateKey].push(event);
+            }
         });
         return map;
     }, [eventChildren]);
@@ -96,8 +101,8 @@ export default function CalendarMonthlyView({
 
     const renderEventsForDay = (day: CalendarDay) => {
         return day.events.map(event => (
-            <div key={event.entity_id} className="text-xs bg-blue-500 rounded p-1 mb-1 truncate" title={event.title}>
-                {event.title}
+            <div key={event.entity_id} className="text-xs bg-blue-500 rounded p-1 mb-1 truncate" title={event.title || event.data?.title}>
+                {event.title || event.data?.title || 'Untitled Event'}
             </div>
         ));
     };
