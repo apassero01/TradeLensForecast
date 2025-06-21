@@ -51,18 +51,24 @@ export default function CalendarMonthlyView({
 
     console.log('CalendarMonthlyView - eventChildren:', eventChildren);
     console.log('CalendarMonthlyView - parentEntityId:', parentEntityId);
+    console.log('CalendarMonthlyView - EntityTypes.CALENDAR_EVENT:', EntityTypes.CALENDAR_EVENT);
+    
+    // Let's also check what EntityTypes.CALENDAR_EVENT actually is
+    console.log('CalendarMonthlyView - All EntityTypes:', EntityTypes);
 
     // Create a mapping of events by date string (YYYY-MM-DD)
     const eventsByDate = React.useMemo(() => {
         const map: { [key: string]: any[] } = {};
-        eventChildren.forEach(event => {
-            // Use the date field from CalendarEventEntity instead of start_time
-            const dateKey = event.date || event.data?.date;
+        eventChildren.forEach(eventNode => {
+            // eventNode is a node object, so we need to access eventNode.data
+            const eventData = eventNode.data;
+            // Use the date field from CalendarEventEntity
+            const dateKey = eventData?.date;
             if (dateKey && !map[dateKey]) {
                 map[dateKey] = [];
             }
             if (dateKey) {
-                map[dateKey].push(event);
+                map[dateKey].push(eventData); // Push the actual entity data, not the node
             }
         });
         return map;
@@ -101,8 +107,8 @@ export default function CalendarMonthlyView({
 
     const renderEventsForDay = (day: CalendarDay) => {
         return day.events.map(event => (
-            <div key={event.entity_id} className="text-xs bg-blue-500 rounded p-1 mb-1 truncate" title={event.title || event.data?.title}>
-                {event.title || event.data?.title || 'Untitled Event'}
+            <div key={event.entity_id} className="text-xs bg-blue-500 rounded p-1 mb-1 truncate" title={event.title}>
+                {event.title || 'Untitled Event'}
             </div>
         ));
     };
