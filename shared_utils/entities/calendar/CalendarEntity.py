@@ -30,8 +30,8 @@ class CalendarEntity(Entity):
         monthly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
             ViewEntity.get_class_path(),
-            entity_uuid=event_details_child_id,
-            initial_attributes=event_details_view_attributes
+            entity_uuid=monthly_child_id,
+            initial_attributes=monthly_view_attributes
         )
         requests.append(monthly_view_request)
 
@@ -46,8 +46,8 @@ class CalendarEntity(Entity):
         weekly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
             ViewEntity.get_class_path(),
-            entity_uuid=event_details_child_id,
-            initial_attributes=event_details_view_attributes
+            entity_uuid=weekly_child_id,
+            initial_attributes=weekly_view_attributes
         )
         requests.append(weekly_view_request)
 
@@ -62,8 +62,8 @@ class CalendarEntity(Entity):
         yearly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
             ViewEntity.get_class_path(),
-            entity_uuid=event_details_child_id,
-            initial_attributes=event_details_view_attributes
+            entity_uuid=yearly_child_id,
+            initial_attributes=yearly_view_attributes
         )
         requests.append(yearly_view_request)
 

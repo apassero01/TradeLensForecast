@@ -151,13 +151,13 @@ export default function CalendarMonthlyView({
 
     return (
         <div className="flex flex-col h-full w-full bg-gray-800 text-white p-4 overflow-hidden">
-            <div className="flex-shrink-0 mb-6">
+            <div className="flex-shrink-0 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
-                    <button onClick={() => changeMonth('previous')} className="text-white">Previous</button>
+                    <button onClick={() => changeMonth('previous')} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Previous</button>
                     <h1 className="text-2xl font-bold text-white mb-2">
                         Your Events for {new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(currentYear, currentMonth))} {currentYear}
                     </h1>
-                    <button onClick={() => changeMonth('next')} className="text-white">Next</button>
+                    <button onClick={() => changeMonth('next')} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Next</button>
                 </div>
                 <div className = "grid grid-cols-7 gap-2">
                     {DAYS_OF_WEEK.map((day) => (
