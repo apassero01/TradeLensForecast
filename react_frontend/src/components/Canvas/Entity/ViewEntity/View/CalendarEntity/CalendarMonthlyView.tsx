@@ -85,8 +85,8 @@ export default function CalendarMonthlyView({
         { key: 'saturday', label: 'Saturday' },
     ];
 
-    const firstDayOfMonth = startOfMonth(data?.currentMonth? new Date(data.currentMonth) : new Date());
-    const lastDayOfMonth = endOfMonth(data?.currentMonth? new Date(data.currentMonth) : new Date());
+    const firstDayOfMonth = startOfMonth(new Date(currentYear, currentMonth));
+    const lastDayOfMonth = endOfMonth(new Date(currentYear, currentMonth));
 
     // Then modify createCalendarDays to use this map
     const createCalendarDays = (firstDayOfMonth: Date, lastDayOfMonth: Date): CalendarDay[] => {
@@ -113,10 +113,33 @@ export default function CalendarMonthlyView({
         ));
     };
 
+    const changeMonth = (direction: 'previous' | 'next') => {
+        if (direction === 'previous') {
+            if (currentMonth === 0) {
+                // January -> December of previous year
+                setCurrentMonth(11);
+                setCurrentYear(currentYear - 1);
+            } else {
+                setCurrentMonth(currentMonth - 1);
+            }
+        } else {
+            if (currentMonth === 11) {
+                // December -> January of next year
+                setCurrentMonth(0);
+                setCurrentYear(currentYear + 1);
+            } else {
+                setCurrentMonth(currentMonth + 1);
+            }
+        }
+    };
+
     // Use it in your component
     const calendarDays = createCalendarDays(firstDayOfMonth, lastDayOfMonth);
 
-    const startingDayIndex = startOfWeek(firstDayOfMonth);
+    // Calculate the starting day offset (0 = Sunday, 1 = Monday, etc.)
+    const startingDayOffset = firstDayOfMonth.getDay();
+    const endingDayOffset = lastDayOfMonth.getDay();
+
 
     if (!data) {
         return (
@@ -129,23 +152,33 @@ export default function CalendarMonthlyView({
     return (
         <div className="flex flex-col h-full w-full bg-gray-800 text-white p-4 overflow-hidden">
             <div className="flex-shrink-0 mb-6">
-                <h1 className="text-2xl font-bold text-white mb-2">
-                    Event Calendar
-                </h1>
+                <div className="flex items-center justify-between">
+                    <button onClick={() => changeMonth('previous')} className="text-white">Previous</button>
+                    <h1 className="text-2xl font-bold text-white mb-2">
+                        Your Events for {new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(currentYear, currentMonth))} {currentYear}
+                    </h1>
+                    <button onClick={() => changeMonth('next')} className="text-white">Next</button>
+                </div>
                 <div className = "grid grid-cols-7 gap-2">
                     {DAYS_OF_WEEK.map((day) => (
                         <div key={day.key} className="text-center text-sm font-medium text-gray-400">
                             {day.label}
                         </div>
                     ))}
-                    {Array.from({ length: startingDayIndex.getDay() }).map((_, index) => (
-                        <div key={`empty-${index}`} className="border border-gray-600 text-center text-sm font-medium text-gray-400"></div>
+
+                    {Array.from({ length: startingDayOffset }).map((_, index) => (
+                        <div key={`empty-${index}`} className="border border-gray-600 text-center text-sm font-medium text-gray-400 bg-gray-700"></div>
                     ))}
+
                     {calendarDays.map((day) => (
                         <div 
+                            key={day.date.toISOString()}
                             className={clsx(
                                 "border border-gray-600 p-2 min-h-[100px] flex flex-col",
-                                day.date.getDate() === currentDate.getDate() && "bg-gray-500"
+                                day.date.getDate() === currentDate.getDate() && 
+                                day.date.getMonth() === currentDate.getMonth() && 
+                                day.date.getFullYear() === currentDate.getFullYear() && 
+                                "bg-gray-500"
                             )}
                         >
                             <div className="text-sm font-medium text-gray-400 flex-shrink-0">
@@ -156,9 +189,13 @@ export default function CalendarMonthlyView({
                             </div>
                         </div>
                     ))}
+
+                    {Array.from({ length: 6 - endingDayOffset }).map((_, index) => (
+                        <div key={`empty-${index}`} className="border border-gray-600 text-center text-sm font-medium text-gray-400 bg-gray-700"></div>
+                    ))}
+
+
                 </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
             </div>
         </div>
     );
