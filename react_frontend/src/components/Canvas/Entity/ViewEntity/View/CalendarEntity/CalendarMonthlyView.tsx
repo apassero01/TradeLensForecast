@@ -6,7 +6,6 @@ import { eachDayOfInterval, endOfMonth, startOfMonth, startOfWeek } from 'date-f
 import clsx from 'clsx';
 
 import useRenderStoredView from '../../../../../../hooks/useRenderStoredView';
-import { IoClose, IoCheckbox, IoSquareOutline } from 'react-icons/io5';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
 
 interface CalendarMonthlyViewProps {
@@ -39,10 +38,8 @@ export default function CalendarMonthlyView({
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
     const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth()); // 0 = Ja
-    const [showEventModal, setShowEventModal] = useState(false);
     const [showDayModal, setShowDayModal] = useState(false);
-    const [selectedDay, setSelectedDay] = useState<string>('');
-    const [draggedOverDay, setDraggedOverDay] = useState<string | null>(null); // For drag-over visual feedback
+    const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
 
     // Get all event children of the calendar
     const eventChildren = useRecoilValue(
@@ -52,9 +49,6 @@ export default function CalendarMonthlyView({
     console.log('CalendarMonthlyView - eventChildren:', eventChildren);
     console.log('CalendarMonthlyView - parentEntityId:', parentEntityId);
     console.log('CalendarMonthlyView - EntityTypes.CALENDAR_EVENT:', EntityTypes.CALENDAR_EVENT);
-    
-    // Let's also check what EntityTypes.CALENDAR_EVENT actually is
-    console.log('CalendarMonthlyView - All EntityTypes:', EntityTypes);
 
     // Create a mapping of events by date string (YYYY-MM-DD)
     const eventsByDate = React.useMemo(() => {
@@ -71,6 +65,14 @@ export default function CalendarMonthlyView({
                 map[dateKey].push(eventData); // Push the actual entity data, not the node
             }
         });
+        
+        // Sort events within each date by startTime
+        Object.keys(map).forEach(dateKey => {
+            map[dateKey].sort((a, b) => {
+                return a.startTime?.localeCompare(b.startTime) || 0;
+            });
+        });
+        
         return map;
     }, [eventChildren]);
 
@@ -105,6 +107,8 @@ export default function CalendarMonthlyView({
         });
     };
 
+
+    
     const renderEventsForDay = (day: CalendarDay) => {
         return day.events.map(event => (
             <div key={event.entity_id} className="text-xs bg-blue-500 rounded p-1 mb-1 truncate" title={event.title}>
@@ -131,6 +135,12 @@ export default function CalendarMonthlyView({
                 setCurrentMonth(currentMonth + 1);
             }
         }
+    };
+
+    const openEventDetailsView = (event: any) => {
+
+            //todo: open event details view
+        
     };
 
     // Use it in your component
@@ -174,12 +184,17 @@ export default function CalendarMonthlyView({
                         <div 
                             key={day.date.toISOString()}
                             className={clsx(
-                                "border border-gray-600 p-2 min-h-[100px] flex flex-col",
+                                "border border-gray-600 p-2 min-h-[100px] flex flex-col cursor-pointer transition-colors duration-200",
                                 day.date.getDate() === currentDate.getDate() && 
                                 day.date.getMonth() === currentDate.getMonth() && 
                                 day.date.getFullYear() === currentDate.getFullYear() && 
-                                "bg-gray-500"
+                                "bg-gray-500",
+                                "hover:bg-gray-600 hover:border-gray-400"
                             )}
+                            onClick={() => {
+                                setSelectedDay(day);
+                                setShowDayModal(true);
+                            }}
                         >
                             <div className="text-sm font-medium text-gray-400 flex-shrink-0">
                                 {day.date.getDate()}
@@ -197,6 +212,76 @@ export default function CalendarMonthlyView({
 
                 </div>
             </div>
+            
+            {/* Day Events Modal */}
+            {showDayModal && selectedDay && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold text-white">
+                                {selectedDay.date.toLocaleDateString('en-US', { 
+                                    weekday: 'long', 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                })}
+                            </h2>
+                            <button 
+                                onClick={() => setShowDayModal(false)}
+                                className="text-gray-400 hover:text-white text-2xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            {selectedDay.events.length === 0 ? (
+                                <p className="text-gray-400 text-center py-4">No events scheduled for this day</p>
+                            ) : (
+                                selectedDay.events.map((event, index) => (
+                                    <div key={event.entity_id || index} 
+                                    className={clsx(
+                                        "bg-gray-700 rounded-lg p-4",
+                                        "hover:bg-gray-600 hover:border-gray-400 cursor-pointer"
+                                    )}
+                                    onClick={() => openEventDetailsView(event)}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="font-semibold text-white">
+                                                {event.title || 'Untitled Event'}
+                                            </h3>
+                                            {event.startTime && (
+                                                <span className="text-sm text-gray-300 bg-gray-600 px-2 py-1 rounded">
+                                                    {event.startTime}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {event.description && (
+                                            <p className="text-gray-300 text-sm">
+                                                {event.description}
+                                            </p>
+                                        )}
+                                        {event.location && (
+                                            <p className="text-gray-400 text-sm mt-1">
+                                                📍 {event.location}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        
+                        <div className="mt-6 flex justify-end">
+                            <button 
+                                onClick={() => setShowDayModal(false)}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
