@@ -16,7 +16,12 @@ app = Celery('TradeLens')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Auto-discover tasks in all installed Django apps.
-app.autodiscover_tasks()
+app.autodiscover_tasks([
+    "shared_utils",                # still loads shared_utils.tasks
+    "shared_utils.embedding_tasks" # 👍  explicitly load embedding file
+])
+
+CELERY_IMPORTS = ("shared_utils.embedding_tasks",)
 
 def worker_process_init(sender=None, **kwargs):
     # Handle shutdown when receiving termination signals
@@ -24,7 +29,7 @@ def worker_process_init(sender=None, **kwargs):
     signal.signal(signal.SIGINT, worker_process_shutdown)
 
 def worker_process_shutdown(signal, frame):
-    # Perform any cleanup needed
+    # Perform any cleanup needed``
     worker = app.Worker()
     worker.stop()
 

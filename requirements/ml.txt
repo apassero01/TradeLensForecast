@@ -20,6 +20,7 @@ keras==2.15.0  # Matching TensorFlow version
 torch==2.2.2
 torchvision==0.17.2
 torchaudio==2.2.2
+sentence-transformers==4.1.0
 
 # Financial Data
 yfinance==0.2.54

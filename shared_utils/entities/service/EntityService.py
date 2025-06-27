@@ -8,6 +8,10 @@ from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.EntityModel import EntityModel
 import logging
+from celery import current_app as celery_app
+from pgvector.django import vector
+from pgvector.django import CosineDistance
+from shared_utils.entities.service.embedding_model import _embed_sync
 
 logger = logging.getLogger(__name__)
 
@@ -48,16 +52,12 @@ class EntityService:
             self.clear_entity(entity.entity_id)
             return
         # Broadcast update
-        # if not socket_exists:
-        # No socket exists, broadcast to global to establish connection
-        # print(f"No socket exists for entity {entity.entity_id}, broadcasting to global")
         self._broadcast_to_global_socket({
             entity.entity_id: entity.serialize()
         })
-        # else:
-            # Socket exists, send update through entity-specific socket
-        print(f"Socket exists for entity {entity.entity_id}, broadcasting to entity socket")
-        self._broadcast_to_entity_socket(entity)
+
+        # Save to database
+        self.save_to_db(entity)
             
         print(f"Entity {entity.entity_id} saved and broadcast")
 
@@ -295,6 +295,60 @@ class EntityService:
         except EntityModel.DoesNotExist:
             logger.error(f"Entity with ID {entity_id} not found in database")
             return None
+        
+    def save_to_db(self, entity):
+        """Save an entity to database"""
+        try:
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, use thread executor for sync database operations
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._save_to_db_sync, entity)
+                        future.result()
+                        return
+            except RuntimeError:
+                pass
+            
+            # We're in a sync context, still use the sync method directly
+            self._save_to_db_sync(entity)
+            
+        except Exception as e:
+            # If we get async/sync mixing errors, fall back to thread executor
+            if "async event loop" in str(e) or "AsyncToSync" in str(e):
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._save_to_db_sync, entity)
+                    future.result()
+            else:
+                logger.error(f"Error saving entity {entity.entity_id} to database: {str(e)}")
+                raise
+    def _save_to_db_sync(self, entity):
+        """Synchronous version of save_to_db for use in thread executor"""
+        try:
+            serialized_entity = entity.serialize()
+            model = entity.to_db()
+            model.save()
+            celery_app.send_task(
+                "shared_utils.embedding_tasks.enqueue_embedding_task",
+                args=[model.pk, serialized_entity],
+            )
+        except Exception as e:
+            logger.error(f"Error saving entity {entity.entity_id} to database: {str(e)}")
+            raise
+        
+    def vector_search(self, queries, k=10):
+        """Vector search for entities"""
+        q_vec = vector(_embed_sync(queries))
+        nearest = (
+            EntityModel.objects
+            .filter(embedding__isnull=False)
+            .annotate(score=CosineDistance("embedding", q_vec))
+            .order_by("score")[:k]                    # lower score → more similar
+        )
+        return nearest
 
     def clear_entities(self, entity_ids):
         """Remove multiple entities from cache"""
