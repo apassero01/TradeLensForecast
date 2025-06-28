@@ -161,6 +161,7 @@ export default function MealPlanView({
             .build());
         }
       }
+      
     } else {
       // Fallback: Drag from external source (e.g., RecipeList)
       const recipeId = event.dataTransfer.getData('text/plain');
