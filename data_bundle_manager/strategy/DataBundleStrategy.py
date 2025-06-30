@@ -54,6 +54,7 @@ class DataBundleStrategy(Strategy):
 
 class CreateFeatureSetsStrategy(DataBundleStrategy):
     name = "CreateFeatureSets"
+    strategy_description = 'Creates and configures multiple FeatureSetEntity children for data preprocessing pipelines. Takes feature_set_configs specifying scaler types, feature lists, and scaling behaviors, generates child entities via CreateEntityStrategy, configures each with scaler objects and feature mappings, assigns X_feature_dict and y_feature_dict from parent bundle, and saves all entities. Manages nested strategy execution and ensures proper parent-child relationships for downstream data processing workflows.'
 
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
@@ -132,6 +133,8 @@ class CreateFeatureSetsStrategy(DataBundleStrategy):
 
 class SplitBundleDateStrategy(DataBundleStrategy):
     name = "SplitBundleDate"
+    strategy_description = 'Performs temporal data splitting based on a specified date threshold for time series data. Reads X, y, row_ids, and seq_end_dates from data bundle, converts split_date to timezone-naive datetime, iterates through sequence end dates to classify data as training (before split_date) or testing (after split_date), creates separate numpy arrays for X_train, X_test, y_train, y_test, and corresponding row ID lists, then stores all split datasets back in the data bundle for downstream model training and evaluation.'
+    
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
 
@@ -205,6 +208,8 @@ class SplitBundleDateStrategy(DataBundleStrategy):
 
 class ScaleByFeatureSetsStrategy(DataBundleStrategy):
     name = "ScaleByFeatureSets"
+    strategy_description = 'Applies feature-wise scaling transformations to training and testing datasets using configured FeatureSetEntity scalers. Retrieves child feature sets and categorizes them by type (X, y, or Xy), initializes scaled array containers, applies scaler.fit_transform() on training data and scaler.transform() on test data (with optional fit_test behavior), handles multi-dimensional feature indexing through feature dictionaries, and stores X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled back in the data bundle. Supports complex Xy feature sets that combine input and output features for joint scaling operations.'
+    
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
 
@@ -352,6 +357,7 @@ class ScaleByFeatureSetsStrategy(DataBundleStrategy):
 
 class InverseScaleByFeatureSetsStrategy(Strategy):
     name = "InverseScaleByFeatureSets"
+    strategy_description = 'Reverses scaling transformations on predicted or processed data to restore original value ranges. Takes a target_array_attribute from entity containing scaled data, retrieves feature sets from entity children, categorizes them into y and Xy types, applies inverse_transform() using stored scalers with proper feature indexing via y_feature_dict, handles both simple y feature sets and complex Xy feature sets requiring 2D reshaping, and stores the inverse-transformed array in a configurable output_attribute. Essential for converting model predictions back to interpretable real-world scales.'
 
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
@@ -488,6 +494,8 @@ class InverseScaleByFeatureSetsStrategy(Strategy):
 
 class CombineDataBundlesStrategy(DataBundleStrategy):
     name = "CombineDataBundles"
+    strategy_description = 'Merges multiple DataBundleEntity instances into a unified dataset for expanded training or analysis. Validates that all input bundles have matching attribute keys, preserves feature dictionaries from the first bundle, concatenates arrays along batch dimension for X, y, row_ids, and train/test splits, creates a new DataBundleEntity with merged data, transfers child entities from the first bundle to maintain feature set relationships, and returns the combined bundle in strategy return values. Enables scaling up datasets by combining data from multiple sources or time periods.'
+    
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
 

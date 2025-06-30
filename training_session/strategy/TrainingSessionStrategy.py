@@ -49,6 +49,7 @@ class GetSequenceSetsStrategy(TrainingSessionStrategy):
     '''
     url = 'http://localhost:8000/sequenceset_manager/get_sequence_data/'
     name = "GetSequenceSets"
+    strategy_description = 'Orchestrates the creation and population of SequenceSetEntity children by fetching time series data from external APIs. Takes model_set_configs with sequence parameters, X_features, y_features, and dataset_type, creates SequenceSetEntity children via CreateEntityStrategy, configures each with metadata and feature lists, sends POST requests to localhost:8000/sequenceset_manager/get_sequence_data/ with streaming JSON responses, processes returned sequence data by filtering NaN values and creating Sequence objects, stores sequences with end timestamps in each SequenceSetEntity, and saves all entities. Manages the complete pipeline from configuration to populated sequence sets ready for data bundle creation.'
     def __init__(self, strategy_executor, strategy_request):
         super().__init__(strategy_executor, strategy_request)
 
