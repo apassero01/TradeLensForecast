@@ -23,17 +23,25 @@ class EntityService:
     def get_entity(self, entity_id):
         """Get an entity by its ID from cache or database"""
         logger.info(f"Getting entity {entity_id}")
-        entity = self.load_from_cache(entity_id)
+        cached_entity = self.load_from_cache(entity_id)
         logger.info(f"Entity {entity_id} loaded from cache")
-        if entity is None:
-            logger.info(f"Entity {entity_id} not found in cache, loading from database")
-            entity = self.load_from_db(entity_id)
 
-        if entity is None:
+        db_entity = None
+        if cached_entity is None:
+            logger.info(f"Entity {entity_id} not found in cache, loading from database")
+            db_entity = self.load_from_db(entity_id)
+
+        if cached_entity is None and db_entity is None:
             logger.info(f"Entity {entity_id} not found in database")
             raise ValueError(f"Entity with ID {entity_id} not found")
 
-        return entity
+        if cached_entity:
+            return cached_entity
+        if db_entity:
+            self.cache_service.set(entity_id, db_entity)
+            return db_entity
+
+        return None
 
     def delete_entity(self, entity_id):
         self.clear_entity(entity_id)
@@ -328,7 +336,7 @@ class EntityService:
     def _save_to_db_sync(self, entity):
         """Synchronous version of save_to_db for use in thread executor"""
         try:
-            serialized_entity = entity.serialize()
+            serialized_entity = entity.embidify()
             model = entity.to_db()
             model.save()
             celery_app.send_task(
@@ -341,14 +349,17 @@ class EntityService:
         
     def vector_search(self, queries, k=10):
         """Vector search for entities"""
-        q_vec = vector(_embed_sync(queries))
+        q_vec = _embed_sync(queries)[0]
         nearest = (
             EntityModel.objects
             .filter(embedding__isnull=False)
+            .exclude(class_path__contains="StrategyRequestEntity")
             .annotate(score=CosineDistance("embedding", q_vec))
-            .order_by("score")[:k]                    # lower score → more similar
+            .order_by("score")[:k]
         )
-        return nearest
+        entity_ids = nearest.values_list('entity_id', flat=True)
+
+        return [self.get_entity(entity_id) for entity_id in entity_ids]
 
     def clear_entities(self, entity_ids):
         """Remove multiple entities from cache"""

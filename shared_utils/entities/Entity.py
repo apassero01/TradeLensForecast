@@ -142,11 +142,30 @@ class Entity():
             'entity_type': self.entity_name.value,
             'child_ids': self.get_children(),
             'parent_ids': self.get_parents(),
-            'strategy_requests': [request.serialize() for request in self.strategy_requests],
+            # 'strategy_requests': [request.serialize() for request in self.strategy_requests],
             'position': self.get_attribute('position') if self.has_attribute('position') else None,
             'width': self.get_attribute('width') if self.has_attribute('width') else None,
             'height': self.get_attribute('height') if self.has_attribute('height') else None,
             'hidden': self.get_attribute('hidden') if self.has_attribute('hidden') else False,
+        }
+        
+    def embidify(self):
+        attributes = {}
+        for key, value in self.get_attributes().items():
+            try:
+                # will raise TypeError (or ValueError) if value contains
+                # anything that json can’t handle
+                val = json.dumps(value)
+                attributes[key] = val
+            except (TypeError, ValueError):
+                print(f"Skipping non-serializable attribute {key}: {value} (type {type(value).__name__})")
+                logger.debug(
+                    "Skipping non-serializable attribute %r: %r (type %s)",
+                    key, value, type(value).__name__
+                )
+        return {
+            'entity_name': self.entity_name.value,
+            'attributes': attributes,
         }
 
     def to_db(self, model=None):

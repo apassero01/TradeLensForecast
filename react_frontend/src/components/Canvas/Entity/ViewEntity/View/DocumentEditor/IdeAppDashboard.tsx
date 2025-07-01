@@ -57,6 +57,7 @@ export default function IdeAppDashboard({
       .withParams({
         attribute_map: { [`ide_selected_by_${parentEntityId}`]: true }
       })
+      .withAddToHistory(false)
       .build());
     
     console.log('Selected document:', entityId);
