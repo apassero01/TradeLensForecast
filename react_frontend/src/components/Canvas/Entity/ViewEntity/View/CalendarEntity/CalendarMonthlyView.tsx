@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
 import { childrenByTypeSelector } from '../../../../../../state/entitiesSelectors';
 import { EntityTypes } from '../../../../Entity/EntityEnum';
@@ -42,7 +42,8 @@ export default function CalendarMonthlyView({
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const selectedEventDetailView = useEntityView(selectedEventId, sendStrategyRequest, updateEntity, {}, 'calendar_event_details');
     const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
-    const calendarContainerRef = React.useRef<HTMLDivElement>(null);
+    const calendarContainerRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
 
     // Get all event children of the calendar
     const eventChildren = useRecoilValue(
@@ -160,6 +161,21 @@ export default function CalendarMonthlyView({
     const startingDayOffset = firstDayOfMonth.getDay();
     const endingDayOffset = lastDayOfMonth.getDay();
 
+    // Close popup when clicking outside
+    useEffect(() => {
+        if (!popupPosition || !selectedEventId) return;
+
+        function handleClickOutside(event: MouseEvent) {
+            if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+                setSelectedEventId(null);
+                setPopupPosition(null);
+            }
+        }
+        document.addEventListener('pointerdown', handleClickOutside);
+        return () => {
+            document.removeEventListener('pointerdown', handleClickOutside);
+        };
+    }, [popupPosition, selectedEventId]);
 
     if (!data) {
         return (
@@ -301,6 +317,7 @@ export default function CalendarMonthlyView({
             )}
             {popupPosition && selectedEventId && (
                 <div
+                    ref={popupRef}
                     style={{
                         position: 'absolute',
                         top: popupPosition.top,
