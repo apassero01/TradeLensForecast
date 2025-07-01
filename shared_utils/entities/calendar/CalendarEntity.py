@@ -25,7 +25,7 @@ class CalendarEntity(Entity):
             'parent_attributes': {
                 "title": "title",
             },
-            'view_component_type': 'calendarmonthlydisplay',
+            'view_component_type': 'calendarmonthlyview',
         }
         monthly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
@@ -41,7 +41,7 @@ class CalendarEntity(Entity):
             'parent_attributes': {
                 "title": "title",
             },
-            'view_component_type': 'calendarweeklydisplay',
+            'view_component_type': 'calendarweeklyview',
         }
         weekly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
@@ -57,7 +57,7 @@ class CalendarEntity(Entity):
             'parent_attributes': {
                 "title": "title",
             },
-            'view_component_type': 'calendaryearlydisplay',
+            'view_component_type': 'calendaryearlyview',
         }
         yearly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,

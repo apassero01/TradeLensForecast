@@ -13,7 +13,7 @@ class CalendarEventEntity(Entity):
     def __init__(self, entity_id: Optional[str] = None):
         super().__init__(entity_id)
         # Initialize basic calendar event attributes
-        today = datetime.now().date().isoformat()
+        created_date = datetime.now().date().isoformat()
         
         # Set attributes
         self.set_attribute('title', '')
@@ -21,7 +21,7 @@ class CalendarEventEntity(Entity):
         self.set_attribute('end_time', '')
         self.set_attribute('description', '')
         self.set_attribute('location', '')
-        self.set_attribute('date', today) 
+        self.set_attribute('date', created_date) 
         self.set_attribute('hidden', False)
 
     def on_create(self, param_config: Optional[dict] = None) -> list:

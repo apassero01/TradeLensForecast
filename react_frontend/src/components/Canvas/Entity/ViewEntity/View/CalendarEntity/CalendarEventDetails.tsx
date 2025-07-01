@@ -25,7 +25,6 @@ export default function CalendarEventDetails({
   viewEntityId,
   updateEntity,
 }: CalendarEventDetailsProps) {
-  console.log(data);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: data?.title || '',
@@ -57,21 +56,21 @@ export default function CalendarEventDetails({
   };
 
   const handleSubmit = async(e: React.FormEvent) => {
+
     e.preventDefault();
-    
-    // Update each attribute individually
+
+    const updated_attributes = {};
     Object.entries(formData).forEach(([key, value]) => {
-      if (value !== data?.[key as keyof CalendarEventData]) {
-        sendStrategyRequest(StrategyRequests.builder()
+      updated_attributes[key] = value;
+    });
+
+    sendStrategyRequest(StrategyRequests.builder()
           .withStrategyName('SetAttributesStrategy')
           .withTargetEntity(parentEntityId)
           .withParams({
-            attribute_map: { [key]: value }
+            attribute_map: updated_attributes
           })
           .build());
-      }
-    });
-    
     setIsEditing(false);
   };
 

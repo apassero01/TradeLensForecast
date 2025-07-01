@@ -4,9 +4,7 @@ import { childrenByTypeSelector } from '../../../../../../state/entitiesSelector
 import { EntityTypes } from '../../../../Entity/EntityEnum';
 import { eachDayOfInterval, endOfMonth, startOfMonth, startOfWeek } from 'date-fns';
 import clsx from 'clsx';
-
-import useRenderStoredView from '../../../../../../hooks/useRenderStoredView';
-import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
+import useEntityView from '../../../../../../hooks/useEntityView';
 
 interface CalendarMonthlyViewProps {
     data?: CalendarMonthlyViewData;
@@ -40,15 +38,16 @@ export default function CalendarMonthlyView({
     const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth()); // 0 = Ja
     const [showDayModal, setShowDayModal] = useState(false);
     const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
+    const [showEventSidebar, setShowEventSidebar] = useState(false);
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+    const selectedEventDetailView = useEntityView(selectedEventId, sendStrategyRequest, updateEntity, {}, 'calendar_event_details');
+    const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
+    const calendarContainerRef = React.useRef<HTMLDivElement>(null);
 
     // Get all event children of the calendar
     const eventChildren = useRecoilValue(
         childrenByTypeSelector({ parentId: parentEntityId, type: EntityTypes.CALENDAR_EVENT })
     ) as any[];
-
-    console.log('CalendarMonthlyView - eventChildren:', eventChildren);
-    console.log('CalendarMonthlyView - parentEntityId:', parentEntityId);
-    console.log('CalendarMonthlyView - EntityTypes.CALENDAR_EVENT:', EntityTypes.CALENDAR_EVENT);
 
     // Create a mapping of events by date string (YYYY-MM-DD)
     const eventsByDate = React.useMemo(() => {
@@ -106,12 +105,29 @@ export default function CalendarMonthlyView({
             };
         });
     };
-
-
     
     const renderEventsForDay = (day: CalendarDay) => {
         return day.events.map(event => (
-            <div key={event.entity_id} className="text-xs bg-blue-500 rounded p-1 mb-1 truncate" title={event.title}>
+            <div
+                key={event.entity_id}
+                className="text-xs bg-blue-500 rounded p-1 mb-1 truncate cursor-pointer"
+                onClick={e => {
+                    setSelectedEventId(event.entity_id);
+                    setShowEventSidebar(true);
+                    const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
+                    const container = calendarContainerRef.current;
+                    if (dayCell && container) {
+                        // Use offsetTop/offsetLeft for zoom-independent positioning
+                        const offsetTop = dayCell.offsetTop;
+                        const offsetLeft = dayCell.offsetLeft + dayCell.offsetWidth; // to the right of the cell
+                        setPopupPosition({
+                            top: offsetTop,
+                            left: offsetLeft,
+                        });
+                    }
+                }}
+                title={event.title}
+            >
                 {event.title || 'Untitled Event'}
             </div>
         ));
@@ -137,12 +153,6 @@ export default function CalendarMonthlyView({
         }
     };
 
-    const openEventDetailsView = (event: any) => {
-
-            //todo: open event details view
-        
-    };
-
     // Use it in your component
     const calendarDays = createCalendarDays(firstDayOfMonth, lastDayOfMonth);
 
@@ -160,7 +170,10 @@ export default function CalendarMonthlyView({
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-gray-800 text-white p-4 overflow-hidden">
+        <div
+            ref={calendarContainerRef}
+            className="flex flex-col h-full w-full bg-gray-800 text-white p-4 overflow-hidden relative"
+        >
             <div className="flex-shrink-0 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
                     <button onClick={() => changeMonth('previous')} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Previous</button>
@@ -184,6 +197,7 @@ export default function CalendarMonthlyView({
                         <div 
                             key={day.date.toISOString()}
                             className={clsx(
+                                "calendar-day-cell",
                                 "border border-gray-600 p-2 min-h-[100px] flex flex-col cursor-pointer transition-colors duration-200",
                                 day.date.getDate() === currentDate.getDate() && 
                                 day.date.getMonth() === currentDate.getMonth() && 
@@ -191,7 +205,7 @@ export default function CalendarMonthlyView({
                                 "bg-gray-500",
                                 "hover:bg-gray-600 hover:border-gray-400"
                             )}
-                            onClick={() => {
+                            onDoubleClick={() => {
                                 setSelectedDay(day);
                                 setShowDayModal(true);
                             }}
@@ -244,7 +258,10 @@ export default function CalendarMonthlyView({
                                         "bg-gray-700 rounded-lg p-4",
                                         "hover:bg-gray-600 hover:border-gray-400 cursor-pointer"
                                     )}
-                                    onClick={() => openEventDetailsView(event)}
+                                    onClick={() => {
+                                        setSelectedEventId(event.entity_id);
+                                        setShowEventSidebar(true);
+                                    }}
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="font-semibold text-white">
@@ -280,6 +297,17 @@ export default function CalendarMonthlyView({
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            {popupPosition && selectedEventId && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: popupPosition.top,
+                        left: popupPosition.left + 10,
+                    }}
+                >
+                    {selectedEventDetailView}
                 </div>
             )}
         </div>

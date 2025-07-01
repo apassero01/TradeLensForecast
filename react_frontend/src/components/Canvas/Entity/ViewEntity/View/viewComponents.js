@@ -43,7 +43,7 @@ const viewComponents = {
   document_search: DocumentSearch,
   advanced_document_editor: AdvancedDocumentEditor,
   calendar_event_details: CalendarEventDetails,
-  calendar_monthly_display: CalendarMonthlyView,
+  calendar_monthly_view: CalendarMonthlyView,
 };
 
 export default viewComponents;
