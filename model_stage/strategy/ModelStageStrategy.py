@@ -34,7 +34,7 @@ class ModelStageStrategy(Strategy):
     
 
 class CreateModelStrategy(ModelStageStrategy):
-    
+    strategy_description = 'Instantiates and configures a Transformer neural network model for time series processing. Takes architectural parameters including num_layers, d_model, num_heads, d_ff, encoder_input_dim, and decoder_input_dim from param_config, creates a Transformer model instance with these specifications, initializes empty training and validation loss tracking lists, stores the model in entity attributes, and prepares the ModelStageEntity for subsequent training workflows. Essential first step in machine learning pipelines that establishes the neural network architecture before data loading and training.'
 
     def apply(self, entity: ModelStageEntity):
         param_config = self.strategy_request.param_config
@@ -427,6 +427,7 @@ class ComparePredictionsStrategy(ModelStageStrategy):
     It computes the element-wise difference: (predicted - actual)
     and stores the result in a new entity attribute: 'prediction_difference'.
     """
+    strategy_description = 'Performs element-wise comparison between model predictions and ground truth values for analysis and evaluation. Takes predicted_attribute_name and actual_attribute_name from param_config to identify entity attributes containing prediction and actual arrays, validates both arrays have matching shapes (typically batch, time_steps, 1), computes the element-wise difference (predicted - actual), and stores the resulting difference array in the entity under "prediction_difference" attribute. Provides essential functionality for error analysis, model performance assessment, and identifying prediction biases across different samples and time steps.'
 
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
         config = strategy_request.param_config
@@ -492,6 +493,7 @@ class SaveModelWeightsStrategy(ModelStageStrategy):
     """
     Strategy that saves the weights of the model to a file.
     """
+    strategy_description = 'Persists trained model weights to disk for later reuse and deployment. Takes save_name from param_config to generate file path, retrieves the trained model from entity attributes, uses torch.save() to serialize model.state_dict() to {BASE_DIR}/saved_models/{save_name}.pt, stores the complete file path back in entity model_path attribute for future loading operations. Critical for model persistence, enabling trained models to be reloaded without retraining, supporting model versioning, and facilitating deployment workflows.'
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
         if not entity.has_attribute('model'):
             raise ValueError('Model not found in entity.')
@@ -516,6 +518,7 @@ class LoadModelWeightsStrategy(ModelStageStrategy):
     """
     Strategy that loads the weights of the model from a file.
     """
+    strategy_description = 'Restores previously saved model weights from disk to resume training or enable inference. Retrieves model_path from entity attributes containing the file location of saved weights, loads the state dictionary using torch.load() from the specified path, applies the loaded weights to the existing model using model.load_state_dict(), effectively restoring the model to its previously trained state. Essential for continuing training from checkpoints, deploying pre-trained models, and implementing model versioning workflows where models need to be restored from persistent storage.'
     def verify_executable(self, entity: Entity, strategy_request: StrategyRequestEntity):
         if not entity.has_attribute('model'):
             raise ValueError('Model not found in entity.')

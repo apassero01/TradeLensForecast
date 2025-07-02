@@ -97,10 +97,10 @@ def api_save_session(request):
                     continue
                 try:
                     child  = entity_service.get_entity(child_id)
+                    entity_service.save_entity(child)
                 except Exception as e:
                     continue
                 children.extend(child.get_children())
-                child.to_db()
                 traversed_children.append(child_id)
 
             
@@ -145,23 +145,6 @@ def api_load_session(request, session_id):
                 session_entity = TrainingSessionEntity.from_db(session_model)
                 entity_service.cache_service.clear_all()
                 cache.set('current_session_id', session_entity.entity_id)
-                entity_service.save_entity(session_entity)
-
-                children = deepcopy(session_entity.get_children())
-                traversed_children = []
-                while children:
-                    child_id = children.pop()
-                    if child_id in traversed_children:
-                        continue
-                    try:
-                        child_model = EntityModel.objects.get(entity_id=child_id)
-                    except EntityModel.DoesNotExist:
-                        continue
-                    child_entity_class = child_model.class_path
-                    child = create_instance_from_path(child_entity_class).from_db(child_model)
-                    children.extend(child.get_children())
-                    entity_service.save_entity(child)
-                    traversed_children.append(child_id)
 
             serialized = serialize_entity_and_children(entity_id)
             # Store in cache

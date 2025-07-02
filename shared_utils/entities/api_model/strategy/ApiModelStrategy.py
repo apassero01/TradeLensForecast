@@ -138,28 +138,28 @@ class CallApiModelStrategy(Strategy):
             f"{'='*50}\n"
         )
 
-        contexts.append("These documents may contain import instructions or other relevant information:")
-        doc_ids = set(doc_ids)
-        for doc_id in doc_ids:
-            doc = self.entity_service.get_entity(doc_id)
-            if doc and doc.has_attribute('text'):
-                text_to_add = doc.get_text()
-                if len(text_to_add) > 500:
-                    text_to_add = text_to_add[:500] + '... [TRUNCATED]'
-
-                doc_type = doc.get_document_type() or 'unknown'
-                if doc.has_attribute('path'):
-                    doc_type = f"{doc_type} ({doc.get_attribute('path')})"
-                if doc.has_attribute('name'):
-                    doc_type = f"{doc_type} - {doc.get_attribute('name')}"
-                contexts.append(
-                    f"{'='*50}\n"
-                    f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
-                    f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
-                    f"{'-'*50} DOCUMENT_BEGIN\n"
-                    f"{text_to_add}\n"
-                    f"{'='*50} DOCUMENT_END\n"
-                )
+        # contexts.append("These documents may contain import instructions or other relevant information:")
+        # doc_ids = set(doc_ids)
+        # for doc_id in doc_ids:
+        #     doc = self.entity_service.get_entity(doc_id)
+        #     if doc and doc.has_attribute('text'):
+        #         text_to_add = doc.get_text()
+        #         if len(text_to_add) > 500:
+        #             text_to_add = text_to_add[:500] + '... [TRUNCATED]'
+        #
+        #         doc_type = doc.get_document_type() or 'unknown'
+        #         if doc.has_attribute('path'):
+        #             doc_type = f"{doc_type} ({doc.get_attribute('path')})"
+        #         if doc.has_attribute('name'):
+        #             doc_type = f"{doc_type} - {doc.get_attribute('name')}"
+        #         contexts.append(
+        #             f"{'='*50}\n"
+        #             f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
+        #             f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
+        #             f"{'-'*50} DOCUMENT_BEGIN\n"
+        #             f"{text_to_add}\n"
+        #             f"{'='*50} DOCUMENT_END\n"
+        #         )
 
         if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
             entity_graph = self.serialize_entity_and_children(entity.entity_id)
@@ -250,6 +250,7 @@ class CallApiModelStrategy(Strategy):
         # Use invoke() instead of __call__
 
         self.add_to_message_history(entity, HumanMessage(content=user_input))
+        # related_documents = self.entity_service.vector_search([user_input], 50)
         while CUR_ITERS < MAX_ITERS:
             CUR_ITERS += 1
             system_message = SystemMessage(content=context)
@@ -343,7 +344,11 @@ class CallApiModelStrategy(Strategy):
             'response_attribute': 'strategy_registry'
         }
         strategy_request = self.executor_service.execute_request(strategy_request)
-        return strategy_request.ret_val['strategy_registry']
+        registry = strategy_request.ret_val['strategy_registry']
+        registry_flattened = [d for group in registry.values() for d in group]
+        for strategy in registry_flattened:
+            del strategy['source']
+        return registry_flattened
 
     def get_available_entities(self, entity: 'Entity'):
         strategy_request = StrategyRequestEntity()

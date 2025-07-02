@@ -46,13 +46,14 @@ class Strategy(ABC):
             'name': cls.__name__,
             'entity_type': cls.entity_type.value,
             'config': cls.get_request_config(),
-            'source': inspect.getsource(cls)
+            'source': inspect.getsource(cls),
+            'description': cls.strategy_description,
         }
 
 class GetEntityStrategy(Strategy):
     """Generic strategy for getting an entity from anywhere (cache, db, etc.)"""
 
-    strategy_description = 'Retrieves an entity from the cache'
+    strategy_description = 'Retrieves an entity from the EntityService cache and makes it available in strategy return values. Simply takes the provided entity parameter, stores it in the strategy request ret_val under "entity" key, and returns the strategy request. Serves as a foundational strategy for entity access patterns and is commonly used as a building block in more complex strategy chains where entity retrieval and passing is required.'
 
     def verify_executable(self, entity, strategy_request):
         pass
@@ -68,7 +69,7 @@ class GetEntityStrategy(Strategy):
 
 class SaveEntityStrategy(Strategy):
     """Generic strategy for saving an entity to anywhere (cache, db, etc.)"""
-    strategy_description = 'Saves an entity to the cache'
+    strategy_description = 'Persists an entity to the EntityService storage system for permanent retention and future retrieval. Takes the provided entity and calls entity_service.save_entity() to store all entity data including attributes, relationships, and metadata in the underlying storage mechanism. Essential for data persistence workflows ensuring that entity modifications, new attributes, and relationship changes are durably stored and available across system sessions and strategy executions.'
 
     def verify_executable(self, entity, strategy_request):
         pass
@@ -85,7 +86,7 @@ class SaveEntityStrategy(Strategy):
 
 class CreateEntityStrategy(Strategy):
     """Generic strategy for creating any entity type"""
-    strategy_description = 'Creates a new entity and adds it as a child to the parent entity'
+    strategy_description = 'Dynamically instantiates new entity instances with proper parent-child relationships and UUID management. Takes entity_class path and optional entity_uuid from param_config, attempts to retrieve existing entity by UUID or creates new instance via dynamic module import, establishes parent-child relationship by adding new entity to parent and vice versa, handles initial attribute assignment if provided, triggers entity on_create() lifecycle callbacks for custom initialization logic, executes any returned strategy requests, saves both parent and child entities, and returns the created child entity in ret_val. Critical for expanding entity graphs and implementing entity creation patterns with proper relationship management and UUID consistency for historical recreation.'
     
     def verify_executable(self, entity, strategy_request):
         return 'entity_class' in strategy_request.param_config
@@ -173,7 +174,7 @@ class CreateEntityStrategy(Strategy):
 class AssignAttributesStrategy(Strategy):
     """Generic strategy for assigning attributes between entities"""
 
-    strategy_description = 'Assigns attributes from parent to child entity based on mapping'
+    strategy_description = 'Transfers attribute values between entities using configurable mapping rules for data flow and synchronization. Takes assign_id to identify target entity and attribute_map defining source-to-target attribute name mappings, retrieves values from source entity using mapped source names, assigns these values to target entity using mapped target names, saves target entity to persist changes, creates a fake nested request for frontend update notifications, and manages entity synchronization workflows. Essential for data propagation between related entities, ensuring consistent state across entity hierarchies and enabling complex data flow patterns in multi-entity operations.'
         
     def verify_executable(self, entity, strategy_request):
         config = strategy_request.param_config
@@ -221,7 +222,7 @@ class AssignAttributesStrategy(Strategy):
 class GetAttributesStrategy(Strategy):
     """Generic strategy for getting attributes from an entity"""
 
-    strategy_description = 'Retrieves attributes from an entity and stores them in the request'
+    strategy_description = 'Extracts specific attribute values from an entity and makes them available in strategy return values for downstream processing or analysis. Takes attribute_names list from param_config specifying which attributes to retrieve, iterates through each name to call entity.get_attribute(), stores each retrieved value in strategy request ret_val using the attribute name as key, enabling selective data extraction without full entity serialization. Commonly used for accessing specific data points, preparing inputs for other strategies, or collecting targeted information for reporting and analysis workflows.'
 
     def verify_executable(self, entity, strategy_request):
         return 'attribute_names' in strategy_request.param_config
@@ -252,7 +253,7 @@ class GetAttributesStrategy(Strategy):
 class SetAttributesStrategy(Strategy):
     """Generic strategy for setting attributes on an entity"""
 
-    strategy_description = 'Sets attributes on an entity'
+    strategy_description = 'Updates entity state by setting multiple attributes simultaneously using a configurable mapping. Takes attribute_map from param_config containing key-value pairs where keys are attribute names and values are the data to store, iterates through the mapping to call entity.set_attribute() for each pair, persists changes by saving the entity via EntityService, and provides a fundamental mechanism for bulk attribute updates. Essential for entity state management, configuration updates, data assignment workflows, and any scenario requiring programmatic modification of entity attributes with atomic persistence.'
 
 
     def verify_executable(self, entity, strategy_request):
@@ -295,7 +296,7 @@ class SetAttributesStrategy(Strategy):
 class AddChildStrategy(Strategy):
     """Generic strategy for adding a child entity to its parent"""
 
-    strategy_description = 'Adds a child entity to its parent'
+    strategy_description = 'Establishes parent-child relationships by adding an existing entity as a child of the target entity. Takes child_id from param_config to identify the entity to be added as child, retrieves the child entity via EntityService, calls entity.add_child() to establish the relationship, saves both parent and child entities to persist the relationship changes, and manages bidirectional parent-child linkages in the entity graph. Critical for building entity hierarchies, organizing related entities, and implementing containment patterns where entities need to maintain structured relationships for navigation and data organization.'
 
     def apply(self, entity: Entity) -> StrategyRequestEntity:
         child_id = self.strategy_request.param_config.get('child_id')
@@ -317,7 +318,7 @@ class AddChildStrategy(Strategy):
 class RemoveChildStrategy(Strategy):
     """Generic strategy for removing a child entity from its parent"""
 
-    strategy_description = 'Removes a child entity from its parent'
+    strategy_description = 'Dissolves parent-child relationships by removing specified child entities from the target parent entity. Takes child_id from param_config to identify which child to remove, calls entity.remove_child_by_id() to break the parent-to-child link, retrieves the child entity and calls child.remove_parent() to break the bidirectional relationship, saves both entities to persist the changes, and ensures clean relationship dissolution without orphaning entities. Essential for entity graph management, reorganizing hierarchies, and implementing dynamic relationship patterns where parent-child associations need to be modified or removed based on changing business logic.'
 
     def apply(self, entity: Entity) -> StrategyRequestEntity:
 
@@ -342,7 +343,7 @@ class RemoveChildStrategy(Strategy):
 class UpdateChildrenStrategy(Strategy):
     """Generic strategy for updating all children of an entity"""
 
-    strategy_description = 'Updates all children of an entity'
+    strategy_description = 'Replaces the complete children collection of an entity with a new set of child IDs for bulk relationship management. Takes child_ids list from param_config containing the new complete set of child entity IDs, directly assigns this list to entity.children_ids to replace all existing child relationships, and provides a mechanism for wholesale relationship restructuring. Used for scenarios requiring complete child collection replacement rather than incremental additions or removals, such as reordering children, bulk relationship updates, or resetting entity hierarchies based on external configurations or computed relationship structures.'
 
     def apply(self, entity: Entity) -> StrategyRequestEntity:
         child_ids = self.strategy_request.param_config.get('child_ids', [])
@@ -357,7 +358,7 @@ class UpdateChildrenStrategy(Strategy):
 class ExecuteRequestChildren(Strategy):
     """Generic strategy for executing another strategy request"""
 
-    strategy_description = 'Executes another strategy request'
+    strategy_description = 'Orchestrates strategy execution on child entities by identifying and executing StrategyRequestEntity children. Retrieves all child entities of the target entity, filters for StrategyRequestEntity types using EntityService, iterates through each strategy request child, executes the strategy using StrategyExecutorService, saves the updated strategy request entity, and enables hierarchical strategy execution patterns. Provides a mechanism for cascading strategy execution down entity hierarchies, implementing parent-driven child processing workflows, and managing complex multi-entity operation sequences where parent entities coordinate strategy execution across their child strategy collections.'
 
     def verify_executable(self, entity, strategy_request):
         return 'request' in strategy_request.param_config
@@ -386,7 +387,7 @@ class ExecuteRequestChildren(Strategy):
 class RemoveEntityStrategy(Strategy):
     """Generic strategy for removing an entity"""
 
-    strategy_description = 'Removes an entity from the parent entity'
+    strategy_description = 'Performs comprehensive entity deletion with cascading relationship cleanup and orphan management. Iterates through all parent entities to create and execute RemoveChildStrategy requests for proper parent-child link removal, recursively processes all child entities to either remove them completely if they would become orphans (single parent) or just remove the parent relationship if they have multiple parents, marks the target entity as deleted rather than physical removal, stores the deleted entity in ret_val for potential recovery or logging, and ensures clean entity graph maintenance without dangling references or orphaned entities. Critical for safe entity deletion that maintains graph integrity and referential consistency.'
 
     def verify_executable(self, entity, strategy_request):
         pass
@@ -426,7 +427,7 @@ class RemoveEntityStrategy(Strategy):
 class MergeEntitiesStrategy(Strategy):
     """Generic strategy for merging multiple entities"""
 
-    strategy_description = 'Merges multiple entities into the single parent entity'
+    strategy_description = 'Combines data from multiple entities into a single target entity using configurable merge operations and attribute consolidation rules. Takes entities list and merge_config specifying merge methods (like concatenation) and target attributes, retrieves attributes from all source entities including the target entity via GetAttributesStrategy execution, applies merge operations such as numpy array concatenation or list combination based on merge method configurations, handles different data types (numpy arrays, lists) appropriately for concatenation operations, and stores the merged results as attributes on the target entity. Essential for data aggregation workflows, combining datasets from multiple sources, and implementing entity consolidation patterns where distributed data needs to be unified for processing or analysis.'
 
     def verify_executable(self, entity, strategy_request):
         if 'entities' not in strategy_request.param_config:
@@ -510,6 +511,8 @@ class ClusterStrategy(Strategy):
     but tslearn will throw an error if the input shape is invalid for time-series clustering.
     """
 
+    strategy_description = 'Performs time series clustering on a specified entity attribute using k-means algorithm. Takes a NumPy array from the entity, applies TimeSeriesKMeans clustering with configurable number of clusters (k), and stores the resulting cluster centers in a target attribute. Supports euclidean distance metric and includes parameter validation for array existence and cluster type compatibility.'
+
     # Choose whichever entity_type is appropriate in your system
     entity_type = EntityEnum.MODEL_STAGE
 
@@ -588,6 +591,8 @@ class RetreiveSequencesStrategy(Strategy):
     API call used by Get_Sequence_Sets. The data is stored as-is (list order
     matching the input IDs) in an entity attribute defined by 'target_attribute_name'.
     """
+
+    strategy_description = 'Fetches sequence data from a hardcoded API endpoint by sending POST requests with sequence IDs and feature configurations. Reads sequence ID list from entity attribute, constructs API payload with feature lists, sends streaming HTTP requests to localhost:8000/sequenceset_manager/get_sequences_by_ids/, processes chunked JSON responses, and stores the complete sequence data in the target entity attribute maintaining original order.'
 
     entity_type = EntityEnum.ENTITY  # Adjust if necessary
 
@@ -691,6 +696,8 @@ class ExecuteCodeStrategy(Strategy):
     The result of the code execution is stored in the entity under 'result_attribute'.
     """
 
+    strategy_description = 'Executes arbitrary Python code in an isolated namespace with full entity access and NumPy imports available. Takes a code string from param_config, creates a local execution environment with the entity and np (NumPy) accessible as variables, executes the code using exec(), and optionally stores results in the entity under a specified result_attribute. Provides a powerful way to perform custom data transformations and calculations directly on entity attributes.'
+
     entity_type = EntityEnum.ENTITY  # Adjust if necessary
 
     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
@@ -751,6 +758,8 @@ class HTTPGetRequestStrategy(Strategy):
     Executes an HTTP GET request to the specified URL.
     The response is stored in the entity under 'response_attribute'.
     """
+
+    strategy_description = 'Performs HTTP GET requests to specified URLs and processes JSON responses. Takes a URL from param_config, sends GET request using requests library, validates response status, parses JSON response data, and stores both in entity attribute and strategy return values under configurable response_attribute name. Includes error handling for failed requests with detailed status code and error message reporting.'
 
     entity_type = EntityEnum.ENTITY  # Adjust if necessary
 
@@ -814,6 +823,8 @@ class ExtractEntityDataStrategy(Strategy):
 
     where serialized_value_i is the result of calling serialize() on the entity with ID i. and the entity passed into the strategy is entity 100
     """
+
+    strategy_description = 'Bulk serializes multiple entities by their IDs and returns structured data mapping. Takes a list of entity IDs from param_config, iterates through each ID to retrieve entities via EntityService, calls serialize() method on each valid entity, handles missing entities gracefully with null values, and constructs a dictionary mapping entity_id to serialized_data stored in strategy return values. Provides comprehensive entity data extraction for analysis or export purposes with error logging for failed serializations.'
 
     entity_type = EntityEnum.ENTITY  # Adjust if necessary
 
