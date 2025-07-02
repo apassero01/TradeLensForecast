@@ -14,7 +14,7 @@ def _load_model() -> SentenceTransformer:
     with _LOCK:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         return SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2",
+            "sentence-transformers/all-MiniLM-L12-v2",
             device=device,              # ✅ correct way
             trust_remote_code=True,
             model_kwargs={"low_cpu_mem_usage": False}

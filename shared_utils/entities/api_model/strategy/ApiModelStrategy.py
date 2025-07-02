@@ -245,8 +245,8 @@ class CallApiModelStrategy(Strategy):
         tool_defs = [t.to_json() for t in tool_dict.values()]
 
 
-        MAX_ITERS = 0
-        CUR_ITERS = 15
+        MAX_ITERS = 15
+        CUR_ITERS = 0
         # Use invoke() instead of __call__
 
         self.add_to_message_history(entity, HumanMessage(content=user_input))
