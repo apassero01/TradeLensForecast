@@ -5,6 +5,8 @@ import { EntityTypes } from '../../../../Entity/EntityEnum';
 import { eachDayOfInterval, endOfMonth, startOfMonth, startOfWeek } from 'date-fns';
 import clsx from 'clsx';
 import useEntityView from '../../../../../../hooks/useEntityView';
+import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
+
 
 interface CalendarMonthlyViewProps {
     data?: CalendarMonthlyViewData;
@@ -44,6 +46,7 @@ export default function CalendarMonthlyView({
     const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
     const calendarContainerRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
+    const [pendingEventDate, setPendingEventDate] = useState<string | null>(null);
 
     // Get all event children of the calendar
     const eventChildren = useRecoilValue(
@@ -113,6 +116,7 @@ export default function CalendarMonthlyView({
                 key={event.entity_id}
                 className="text-xs bg-blue-500 rounded p-1 mb-1 truncate cursor-pointer"
                 onClick={e => {
+                    e.stopPropagation();
                     setSelectedEventId(event.entity_id);
                     setShowEventSidebar(true);
                     const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
@@ -177,6 +181,19 @@ export default function CalendarMonthlyView({
         };
     }, [popupPosition, selectedEventId]);
 
+    useEffect(() => {
+        if (pendingEventDate) {
+            // Find the most recent event for the pending date
+            const events = eventsByDate[pendingEventDate];
+            if (events) {
+                const newestEvent = events[events.length - 1];
+                setSelectedEventId(newestEvent.entity_id);
+                setShowEventSidebar(true);
+                setPendingEventDate(null);
+            }
+        }
+    }, [pendingEventDate, eventsByDate]);
+
     if (!data) {
         return (
         <div className="flex items-center justify-center h-full text-gray-500">
@@ -214,16 +231,41 @@ export default function CalendarMonthlyView({
                             key={day.date.toISOString()}
                             className={clsx(
                                 "calendar-day-cell",
-                                "border border-gray-600 p-2 min-h-[100px] flex flex-col cursor-pointer transition-colors duration-200",
+                                "border border-gray-600 p-2 min-h-[150px] flex flex-col cursor-pointer transition-colors duration-200",
                                 day.date.getDate() === currentDate.getDate() && 
                                 day.date.getMonth() === currentDate.getMonth() && 
                                 day.date.getFullYear() === currentDate.getFullYear() && 
                                 "bg-gray-500",
                                 "hover:bg-gray-600 hover:border-gray-400"
                             )}
-                            onDoubleClick={() => {
-                                setSelectedDay(day);
-                                setShowDayModal(true);
+
+                            onClick={e => {
+                                const dateString = day.date.toISOString().split('T')[0];
+                                const request = StrategyRequests.createEntity(
+                                    parentEntityId,
+                                    "shared_utils.entities.calendar.CalendarEventEntity.CalendarEventEntity",
+                                    {
+                                        date: dateString,
+                                        title: "New Event",
+                                        description: "",
+                                        location: "",
+                                        start_time: "00:00",
+                                        end_time: "00:00",
+                                    }
+                                );
+                                sendStrategyRequest(request);
+                                setPendingEventDate(dateString);
+                                const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
+                                const container = calendarContainerRef.current;
+                                if (dayCell && container) {
+                                    // Use offsetTop/offsetLeft for zoom-independent positioning
+                                    const offsetTop = dayCell.offsetTop;
+                                    const offsetLeft = dayCell.offsetLeft + dayCell.offsetWidth; // to the right of the cell
+                                    setPopupPosition({
+                                        top: offsetTop,
+                                        left: offsetLeft,
+                                    });
+                                }
                             }}
                         >
                             <div className="text-sm font-medium text-gray-400 flex-shrink-0">
