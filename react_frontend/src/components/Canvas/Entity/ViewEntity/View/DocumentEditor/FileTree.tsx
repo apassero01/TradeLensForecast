@@ -353,7 +353,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg py-1 z-10 min-w-[160px]"
             onMouseLeave={() => setShowContextMenu(false)}
           >
-            {isFolder && (
+            {(isDirectory || hasChildren) && (
               <>
                 <button
                   onClick={(e) => {

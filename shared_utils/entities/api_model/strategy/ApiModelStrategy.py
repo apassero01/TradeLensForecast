@@ -343,7 +343,11 @@ class CallApiModelStrategy(Strategy):
             'response_attribute': 'strategy_registry'
         }
         strategy_request = self.executor_service.execute_request(strategy_request)
-        return strategy_request.ret_val['strategy_registry']
+        registry = strategy_request.ret_val['strategy_registry']
+        registry_flattened = [d for group in registry.values() for d in group]
+        for strategy in registry_flattened:
+            del strategy['source']
+        return registry_flattened
 
     def get_available_entities(self, entity: 'Entity'):
         strategy_request = StrategyRequestEntity()
