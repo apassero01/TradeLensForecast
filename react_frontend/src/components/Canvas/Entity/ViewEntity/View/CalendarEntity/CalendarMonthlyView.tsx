@@ -47,6 +47,7 @@ export default function CalendarMonthlyView({
     const calendarContainerRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
     const [pendingEventDate, setPendingEventDate] = useState<string | null>(null);
+    const [selectedEventDayOfWeek, setSelectedEventDayOfWeek] = useState<number | null>(null);
 
     // Get all event children of the calendar
     const eventChildren = useRecoilValue(
@@ -124,11 +125,16 @@ export default function CalendarMonthlyView({
                     if (dayCell && container) {
                         // Use offsetTop/offsetLeft for zoom-independent positioning
                         const offsetTop = dayCell.offsetTop;
+
+
                         const offsetLeft = dayCell.offsetLeft + dayCell.offsetWidth; // to the right of the cell
                         setPopupPosition({
                             top: offsetTop,
                             left: offsetLeft,
                         });
+                        
+                        // Store the day of week
+                        setSelectedEventDayOfWeek(event.date ? new Date(event.date).getDay() : null);
                     }
                 }}
                 title={event.title}
@@ -173,6 +179,7 @@ export default function CalendarMonthlyView({
             if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
                 setSelectedEventId(null);
                 setPopupPosition(null);
+                setSelectedEventDayOfWeek(null);
             }
         }
         document.addEventListener('pointerdown', handleClickOutside);
@@ -205,7 +212,7 @@ export default function CalendarMonthlyView({
     return (
         <div
             ref={calendarContainerRef}
-            className="flex flex-col h-full w-full bg-gray-800 text-white p-4 overflow-hidden relative"
+            className="flex flex-col h-full w-full bg-gray-800 text-white p-4  relative"
         >
             <div className="flex-shrink-0 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -285,86 +292,17 @@ export default function CalendarMonthlyView({
                 </div>
             </div>
             
-            {/* Day Events Modal */}
-            {showDayModal && selectedDay && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-white">
-                                {selectedDay.date.toLocaleDateString('en-US', { 
-                                    weekday: 'long', 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                })}
-                            </h2>
-                            <button 
-                                onClick={() => setShowDayModal(false)}
-                                className="text-gray-400 hover:text-white text-2xl"
-                            >
-                                ×
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-3">
-                            {selectedDay.events.length === 0 ? (
-                                <p className="text-gray-400 text-center py-4">No events scheduled for this day</p>
-                            ) : (
-                                selectedDay.events.map((event, index) => (
-                                    <div key={event.entity_id || index} 
-                                    className={clsx(
-                                        "bg-gray-700 rounded-lg p-4",
-                                        "hover:bg-gray-600 hover:border-gray-400 cursor-pointer"
-                                    )}
-                                    onClick={() => {
-                                        setSelectedEventId(event.entity_id);
-                                        setShowEventSidebar(true);
-                                    }}
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-semibold text-white">
-                                                {event.title || 'Untitled Event'}
-                                            </h3>
-                                            {event.startTime && (
-                                                <span className="text-sm text-gray-300 bg-gray-600 px-2 py-1 rounded">
-                                                    {event.startTime}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {event.description && (
-                                            <p className="text-gray-300 text-sm">
-                                                {event.description}
-                                            </p>
-                                        )}
-                                        {event.location && (
-                                            <p className="text-gray-400 text-sm mt-1">
-                                                📍 {event.location}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        
-                        <div className="mt-6 flex justify-end">
-                            <button 
-                                onClick={() => setShowDayModal(false)}
-                                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
             {popupPosition && selectedEventId && (
                 <div
                     ref={popupRef}
                     style={{
                         position: 'absolute',
                         top: popupPosition.top,
-                        left: popupPosition.left + 10,
+                        left: selectedEventDayOfWeek === 5
+                            ? popupPosition.left - 600 // Saturday: pop out to the right
+                            : popupPosition.left + 10, // Other days: pop out to the left (adjust -310 as needed for your modal width)
                     }}
+                    className={clsx('border border-gray-400')}
                 >
                     {selectedEventDetailView}
                 </div>
