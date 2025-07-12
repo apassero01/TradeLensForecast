@@ -21,11 +21,12 @@ function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity, pr
     // Correct calling pattern: const view = useRenderStoredView(entityId); ... if (!entityId) return <Fallback/>
     // We will proceed assuming the hook might receive null/undefined but check *after* the call.
     const viewEntityStore = useRecoilValue(nodeSelectorFamily(viewEntityId));
-    const parentEntityStore = useRecoilValue(nodeSelectorFamily(viewEntityStore?.data?.parent_ids?.[0]));
-
+    const parentEntityStore = useRecoilValue(
+        nodeSelectorFamily(viewEntityStore?.data?.parent_ids?.[0] || '')
+    );
     const viewData = useMemo(() => {
-        if (!parentEntityStore || !parentEntityStore.data || !viewEntityStore?.data?.parent_attributes) {
-            return {};
+        if (!viewEntityStore || !parentEntityStore || !parentEntityStore.data || !viewEntityStore?.data?.parent_attributes) {
+            return null;
         }
         return Object.entries(viewEntityStore.data.parent_attributes).reduce((acc, [parentAttrKey, newKey]) => {
             if (parentEntityStore.data.hasOwnProperty(parentAttrKey)) {

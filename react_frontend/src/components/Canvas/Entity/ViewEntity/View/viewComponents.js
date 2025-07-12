@@ -19,6 +19,8 @@ import FileTree from './DocumentEditor/FileTree';
 import DocumentSearch from './DocumentEditor/DocumentSearch';
 import AdvancedDocumentEditor from './DocumentEditor/AdvancedDocumentEditor';
 import DocumentListItem from './DocumentEditor/DocumentListItem';
+import CalendarEventDetails from './CalendarEntity/CalendarEventDetails';
+import CalendarMonthlyView from './CalendarEntity/CalendarMonthlyView';
 
 const viewComponents = {
   histogram: Histogram,
@@ -40,6 +42,8 @@ const viewComponents = {
   file_tree: FileTree,
   document_search: DocumentSearch,
   advanced_document_editor: AdvancedDocumentEditor,
+  calendar_event_details: CalendarEventDetails,
+  calendar_monthly_view: CalendarMonthlyView,
 };
 
 export default viewComponents;

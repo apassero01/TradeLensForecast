@@ -61,7 +61,7 @@ the view/entity/strategy combinations that will do different things and you will
     •  CallApiModelStrategy → have the LLM translate user intent into further strategy calls  
     •  yield_to_user → signal “I’m yielding control of the conversation back to the user.”  
 
-5.  Example: Add a Recipe into a Meal Plan  
+5.  Example 1: Add a Recipe into a Meal Plan  
     1.  create_strategy_request(  
             strategy_name="CreateEntityStrategy",  
             target_entity_id=MEAL_PLAN_ID,  
@@ -85,7 +85,31 @@ the view/entity/strategy combinations that will do different things and you will
         )  
     4.  yield_to_user()  
 
-6.  Final Advice  
+6.  Example 2: Add a Calendar Event to a Calendar  
+    1.  create_strategy_request(  
+            strategy_name="CreateEntityStrategy",  
+            target_entity_id=CALENDAR_EVENT_ID,  
+            param_config={  
+              "entity_class":"shared_utils.entities.calendar.CalendarEventEntity.CalendarEventEntity",  
+              "initial_attributes":{  
+                "title":"Dental Appointment",  
+                "start_time":"10:00",
+                "end_time":"11:00",  
+                "description":"Annual teeth cleaning."
+                "location":"100 Main Street",
+                "date":"2025-06-30",
+              }  
+            }  
+        )  
+    2.  capture new_calendar_id = response.ret_val.child_entity.entity_id  
+    3.  create_strategy_request(  
+            strategy_name="AddChildStrategy",  
+            target_entity_id=CALENDAR_EVENT_ID,  
+            param_config={"child_id":new_calendar_id}  
+        )  
+    4.  yield_to_user()  
+
+7.  Final Advice  
     •  Always think “Which strategy am I calling, on which entity, and with what parameters?”  
     •  Use the entity graph and history to trace what you’ve already done.  
     •  When in doubt, fetch attributes back with GetAttributesStrategy to confirm state.  
