@@ -120,6 +120,7 @@ the view/entity/strategy combinations that will do different things and you will
    instead of deleting and recreating. you must try to be clever accross all operations so that you can efficiently be a helpful assistant to the user
 
 
+
 7.  Final Advice  
     •  Always think “Which strategy am I calling, on which entity, and with what parameters?”  
     •  Use the entity graph and history to trace what you’ve already done.  
