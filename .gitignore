@@ -54,6 +54,7 @@ frontend/dist/
 yarn-debug.log*
 yarn-error.log*
 npm-debug.log*
+node_modules/
 
 # Ignore lockfiles (optional, depending on package manager)
 frontend/package-lock.json
