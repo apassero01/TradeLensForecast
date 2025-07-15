@@ -69,7 +69,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   const { name, docName, document_type, file_type, path } = entity.data;
   const displayName = docName || name || 'Unnamed';
-  const isFolder = document_type === 'directory';
+  const isDirectory = document_type === 'directory';
+  const hasChildren = documentChildren.length > 0;
+  const isFolder = isDirectory || hasChildren; // Treat as folder if it's a directory OR has children
   const isExpanded = expandedNodes.has(entityId);
   const isSelected = selectedId === entityId;
 
@@ -157,9 +159,15 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   };
 
   const handleClick = () => {
-    if (isFolder) {
+    if (isDirectory) {
+      // Pure directory - just toggle expansion
       toggleExpanded(entityId);
+    } else if (hasChildren) {
+      // Document with children - both toggle expansion AND select the document
+      toggleExpanded(entityId);
+      onSelect(entityId);
     } else {
+      // Regular document - just select it
       onSelect(entityId);
     }
   };
@@ -237,13 +245,24 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   };
 
   const getFileIcon = () => {
-    if (isFolder) {
+    if (isDirectory) {
       return isExpanded ? (
         /* @ts-ignore */
         <IoFolderOpen className="text-blue-400" />
       ) : (
         /* @ts-ignore */
         <IoFolder className="text-blue-400" />
+      );
+    }
+    
+    // If it's a document with children (but not a directory), show a special icon
+    if (hasChildren) {
+      return isExpanded ? (
+        /* @ts-ignore */
+        <IoFolderOpen className="text-purple-400" />
+      ) : (
+        /* @ts-ignore */
+        <IoFolder className="text-purple-400" />
       );
     }
     
@@ -328,6 +347,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           <span className="flex-1 text-sm truncate">
             {displayName}
             {docName && <span className="text-gray-500 ml-1 text-xs">({name})</span>}
+            {/* Show indicator for documents with children that aren't directories */}
+            {hasChildren && !isDirectory && (
+              <span className="text-purple-400 ml-1 text-xs">[+{documentChildren.length}]</span>
+            )}
             {/* Show child count for debugging */}
             {isFolder && process.env.NODE_ENV === 'development' && (
               <span className="text-gray-600 ml-2 text-xs">({documentChildren.length})</span>
@@ -353,7 +376,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg py-1 z-10 min-w-[160px]"
             onMouseLeave={() => setShowContextMenu(false)}
           >
-            {isFolder && (
+            {(isDirectory || hasChildren) && (
               <>
                 <button
                   onClick={(e) => {

@@ -65,6 +65,7 @@ class SequenceSetStrategy(Strategy):
 
 class PopulateDataBundleStrategy(SequenceSetStrategy):
     name = 'PopulateDataBundle'
+    strategy_description = 'Transforms raw sequence data into structured 3D numpy arrays suitable for machine learning models and populates associated DataBundleEntity. Reads X_features and y_features from SequenceSetEntity, creates feature dictionaries mapping feature names to indices, extracts sequence data into X array (batch, time_steps, features) and y array (batch, features, 1) using the last timestep for targets, filters out sequences containing NaN values, generates row_ids from sequence IDs, creates separate X and y feature dictionaries, assigns all arrays and metadata to the SequenceSetEntity, then transfers this data to its child DataBundleEntity via AssignAttributesStrategy. Essential preprocessing step that converts time series sequences into ML-ready tensor formats.'
     def __init__(self, strategy_executor, strategy_request: StrategyRequestEntity):
         super().__init__(strategy_executor, strategy_request)
         self.strategy_request = strategy_request
