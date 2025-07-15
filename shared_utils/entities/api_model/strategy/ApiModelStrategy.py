@@ -1,7 +1,9 @@
 import datetime
+import pytz
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 
+from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, HTTPGetRequestStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
@@ -138,28 +140,28 @@ class CallApiModelStrategy(Strategy):
             f"{'='*50}\n"
         )
 
-        contexts.append("These documents may contain import instructions or other relevant information:")
-        doc_ids = set(doc_ids)
-        for doc_id in doc_ids:
-            doc = self.entity_service.get_entity(doc_id)
-            if doc and doc.has_attribute('text'):
-                text_to_add = doc.get_text()
-                if len(text_to_add) > 500:
-                    text_to_add = text_to_add[:500] + '... [TRUNCATED]'
+        # contexts.append("These documents may contain import instructions or other relevant information:")
+        # doc_ids = set(doc_ids)
+        # for doc_id in doc_ids:
+        #     doc = self.entity_service.get_entity(doc_id)
+        #     if doc and doc.has_attribute('text'):
+        #         text_to_add = doc.get_text()
+        #         if len(text_to_add) > 500:
+        #             text_to_add = text_to_add[:500] + '... [TRUNCATED]'
 
-                doc_type = doc.get_document_type() or 'unknown'
-                if doc.has_attribute('path'):
-                    doc_type = f"{doc_type} ({doc.get_attribute('path')})"
-                if doc.has_attribute('name'):
-                    doc_type = f"{doc_type} - {doc.get_attribute('name')}"
-                contexts.append(
-                    f"{'='*50}\n"
-                    f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
-                    f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
-                    f"{'-'*50} DOCUMENT_BEGIN\n"
-                    f"{text_to_add}\n"
-                    f"{'='*50} DOCUMENT_END\n"
-                )
+        #         doc_type = doc.get_document_type() or 'unknown'
+        #         if doc.has_attribute('path'):
+        #             doc_type = f"{doc_type} ({doc.get_attribute('path')})"
+        #         if doc.has_attribute('name'):
+        #             doc_type = f"{doc_type} - {doc.get_attribute('name')}"
+        #         contexts.append(
+        #             f"{'='*50}\n"
+        #             f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
+        #             f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
+        #             f"{'-'*50} DOCUMENT_BEGIN\n"
+        #             f"{text_to_add}\n"
+        #             f"{'='*50} DOCUMENT_END\n"
+        #         )
 
         if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
             entity_graph = self.serialize_entity_and_children(entity.entity_id)
@@ -188,7 +190,9 @@ class CallApiModelStrategy(Strategy):
                 f"{'='*50}\n"
             )
 
-        contexts.append("HERE IS THE CURRENT DATE USE IT IF THE USER REQUESTS DATE RELEVANT INFORMATION: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        est_tz = pytz.timezone('US/Eastern')
+        current_time_est = datetime.datetime.now(est_tz)
+        contexts.append("HERE IS THE CURRENT DATE USE IT IF THE USER REQUESTS DATE RELEVANT INFORMATION: " + current_time_est.strftime("%A, %Y-%m-%d %H:%M:%S %Z"))
 
         return "\n".join(contexts)
 
@@ -240,8 +244,8 @@ class CallApiModelStrategy(Strategy):
             model_provider=entity.get_attribute('model_type'), 
             api_key=entity.get_attribute('api_key')
         )
-        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user])
-        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user}
+        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user, self.serialize_entities])
+        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user, "serialize_entities": self.serialize_entities}
         tool_defs = [t.to_json() for t in tool_dict.values()]
 
 
@@ -270,7 +274,21 @@ class CallApiModelStrategy(Strategy):
                     self.add_to_message_history(entity, tool_message)
                     break
                     # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
-
+                elif tool_call['name'].lower() == 'serialize_entities':
+                    tool = tool_dict.get(tool_call['name'].lower())
+                    tool_msg = tool.invoke(tool_call)
+                    serialized_entities = tool_msg.artifact
+                    tool_message_content = ''
+                    for ser_entity in serialized_entities:
+                        entity_message = self.format_entity_response(ser_entity)
+                        tool_message_content += f"{entity_message}\n\n"
+                    tool_message = ToolMessage(
+                        content=tool_message_content,
+                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                        name=tool_call["name"]
+                    )
+                    self.add_to_message_history(entity, tool_message)
+                    break
                 try:
                     selected_tool = tool_dict.get(tool_call['name'].lower())
                     tool_msg = selected_tool.invoke(tool_call)
@@ -291,15 +309,16 @@ class CallApiModelStrategy(Strategy):
                             f"Be sure to call the yield_to_user() tool."
                         )
 
+                        # if target_entity.entity_id != entity.entity_id:
+                        #     updated_entity_message = self.format_entity_response(target_entity.serialize())
+                        #     tool_message_content += f"\n\n{updated_entity_message}"
+
                         tool_message = ToolMessage(
                             content=tool_message_content,
                             tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
                             name=tool_call["name"]
                         )
 
-                        # if target_entity.entity_id != entity.entity_id:
-                        #     updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
-                        #     request_message.content += f"\n\n{updated_entity_message.content}"
 
                         self.add_to_message_history(entity, tool_message)
                 except Exception as e:
@@ -385,18 +404,34 @@ class CallApiModelStrategy(Strategy):
 
         return return_dict
 
-    @tool()
-    def serialize_entities(self,entities: List[str]) -> List[dict]:
+    @staticmethod
+    @tool(response_format="content_and_artifact")
+    def serialize_entities(entities: List[str]) -> List[dict]:
         '''
-        Serialize a list of entities. If the model needs to know about entities with
-        specific ids, this method will return more information about the entities.
+        Serialize a list of entity ids into a list of dictionaries.
+        @param entities: List of entity ids to serialize
+        @return: List of serialized entities
         '''
+        entity_service = EntityService()
         serialized_entities = []
         for entity_id in entities:
-            entity = self.entity_service.get_entity(entity_id)
+            entity = entity_service.get_entity(entity_id)
             if entity:
                 serialized_entities.append(entity.serialize())
-        return serialized_entities
+        return "Serialized Entities", serialized_entities
+
+    # @staticmethod
+    # @tool(response_format="content_and_artifact")
+    # def form_plan(self, ):
+    #     '''
+    #     T@tool(
+    #         name="form_plan",
+    #         description="Call these with a list of entity ids to retrieve context for the entities you will need to work with as well as the plans for the next steps"
+    #         "You will then create a plan for the next steps based on the context and the entities you have been given."
+    #         ""
+    #     )
+    #     '''
+    #     return 'Please provide a plan for the next steps.'
 
     @staticmethod
     @tool

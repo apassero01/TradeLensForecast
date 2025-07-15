@@ -217,8 +217,8 @@ class EntityAdapter:
                     json.dumps(value)
                 except (TypeError, ValueError):
                     logger.debug(
-                        "Skipping non-serializable attribute %r: %r (type %s)",
-                        key, value, type(value).__name__
+                        "Skipping non-serializable attribute %r (type %s)",
+                        key, type(value).__name__
                     )
                 else:
                     attributes[key] = value
