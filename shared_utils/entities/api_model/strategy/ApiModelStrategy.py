@@ -116,6 +116,25 @@ class CallApiModelStrategy(Strategy):
         required_attrs = ['model_type', 'model_name', 'api_key', 'serialize_entities_and_strategies']
         return all(entity.has_attribute(attr) for attr in required_attrs)
 
+    def extract_entity_ids_from_obj(self, obj):
+        """Extract entity IDs (UUIDs) from various object types"""
+        import re
+        uuid_pattern = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        
+        if isinstance(obj, str):
+            return re.findall(uuid_pattern, obj)
+        elif isinstance(obj, dict):
+            ids = []
+            for v in obj.values():
+                ids.extend(self.extract_entity_ids_from_obj(v))
+            return ids
+        elif isinstance(obj, list):
+            ids = []
+            for item in obj:
+                ids.extend(self.extract_entity_ids_from_obj(item))
+            return ids
+        return []
+
     def form_context(self, entity) -> str:
         """Form context from document children"""
         doc_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.DOCUMENT)
@@ -278,10 +297,19 @@ class CallApiModelStrategy(Strategy):
                     tool = tool_dict.get(tool_call['name'].lower())
                     tool_msg = tool.invoke(tool_call)
                     serialized_entities = tool_msg.artifact
+                    
+                    # Extract entity IDs from the tool call
+                    entities_arg = tool_call.get('args', {}).get('entities', [])
+                    
                     tool_message_content = ''
                     for ser_entity in serialized_entities:
                         entity_message = self.format_entity_response(ser_entity)
                         tool_message_content += f"{entity_message}\n\n"
+                    
+                    # Add entity IDs tag if we have them
+                    if entities_arg:
+                        tool_message_content += f"\n```entities\n{json.dumps(entities_arg)}\n```"
+                    
                     tool_message = ToolMessage(
                         content=tool_message_content,
                         tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
@@ -289,38 +317,53 @@ class CallApiModelStrategy(Strategy):
                     )
                     self.add_to_message_history(entity, tool_message)
                     break
+                    
                 try:
                     selected_tool = tool_dict.get(tool_call['name'].lower())
                     tool_msg = selected_tool.invoke(tool_call)
-                    child_request = tool_msg.artifact
-                    if child_request:
-                        request = self.execute_model_request(child_request, entity)
-                        entity = self.entity_service.get_entity(entity.entity_id)
-                        ret_val = request.ret_val
-                        if 'entity' in ret_val:
-                            del ret_val['entity']
-                        target_entity = self.entity_service.get_entity(request.target_entity_id)
-                        # Compose your tool result as a string (or as JSON if required)
-                        tool_message_content = (
-                            f"Result of model executed strategy {request.strategy_name} "
-                            f"with config {request.param_config} on target entity {request.target_entity_id}. "
-                            f"This step is complete: Are there any further actions needed? "
-                            f"If yes, complete further actions, else let the user return additional information. "
-                            f"Be sure to call the yield_to_user() tool."
-                        )
-
-                        # if target_entity.entity_id != entity.entity_id:
-                        #     updated_entity_message = self.format_entity_response(target_entity.serialize())
-                        #     tool_message_content += f"\n\n{updated_entity_message}"
-
-                        tool_message = ToolMessage(
-                            content=tool_message_content,
-                            tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
-                            name=tool_call["name"]
-                        )
-
-
-                        self.add_to_message_history(entity, tool_message)
+                    
+                    if tool_call['name'].lower() == 'create_strategy_request':
+                        child_request = tool_msg.artifact
+                        if child_request:
+                            request = self.execute_model_request(child_request, entity)
+                            entity = self.entity_service.get_entity(entity.entity_id)
+                            ret_val = request.ret_val
+                            if 'entity' in ret_val:
+                                del ret_val['entity']
+                            target_entity = self.entity_service.get_entity(request.target_entity_id)
+                            
+                            # Collect affected entity IDs
+                            affected_entity_ids = []
+                            affected_entity_ids.append(request.target_entity_id)
+                            
+                            # Extract entity IDs from param_config
+                            if request.param_config:
+                                affected_entity_ids.extend(self.extract_entity_ids_from_obj(request.param_config))
+                            
+                            # Add target_entity_ids if present
+                            if hasattr(request, 'target_entity_ids') and request.target_entity_ids:
+                                affected_entity_ids.extend(request.target_entity_ids)
+                            
+                            # Remove duplicates
+                            affected_entity_ids = list(set(affected_entity_ids))
+                            
+                            # Compose your tool result as a string (or as JSON if required)
+                            tool_message_content = (
+                                f"Result of model executed strategy {request.strategy_name} "
+                                f"with config {request.param_config} on target entity {request.target_entity_id}. "
+                                f"This step is complete: Are there any further actions needed? "
+                                f"If yes, complete further actions, else let the user return additional information. "
+                                f"Be sure to call the yield_to_user() tool.\n\n"
+                                f"```entities\n{json.dumps(affected_entity_ids)}\n```"
+                            )
+                            
+                            tool_message = ToolMessage(
+                                content=tool_message_content,
+                                tool_call_id=tool_call["id"],
+                                name=tool_call["name"]
+                            )
+                            
+                            self.add_to_message_history(entity, tool_message)
                 except Exception as e:
                     error_message = f"Error executing tool {tool_call['name']}: {str(e)}"
                     logger.error(error_message)

@@ -6,8 +6,7 @@ import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder
 import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoAdd, IoCopy, IoRefresh, IoDocumentText } from 'react-icons/io5';
 import ReactMarkdown from 'react-markdown';
 import Editor from '../../../../../Input/Editor';
-import EntityRenderer from '../EntityRenderer/EntityRenderer';
-import useEntityExtractor from '../../../../../../hooks/useEntityExtractor';
+import EntityViewRenderer from './EntityViewRenderer';
 
 interface ChatInterfaceProps {
     data?: ChatInterfaceData;
@@ -246,49 +245,41 @@ export default function ChatInterface({
         }
     };
 
-    const { extractEntityData } = useEntityExtractor();
-
-    const renderEntityView = (entityData: any, index: number) => {
-        return (
-            <div className="my-4">
-                <EntityRenderer
-                    entityData={entityData}
-                    sendStrategyRequest={sendStrategyRequest}
-                    updateEntity={updateEntity}
-                    showBorder={true}
-                />
-            </div>
-        );
-    };
 
     const renderMessageContent = (content: string) => {
-        // First check for serialized entity data
-        const entityData = extractEntityData(content);
-        if (entityData) {
-            return (
-                <div>
-                    {renderEntityView(entityData, 0)}
-                    {/* Also render the rest of the content if there's more */}
-                    {content.includes('Entity Graph') ? (
-                        <div className="mt-4 text-gray-300">
-                            <ReactMarkdown>{content.replace(/\s*={50}\r?\n\s*Entity Graph\r?\n\s*-{50}\r?\n\s*\{[\s\S]*?\}\s*\r?\n\s*={50}/, '')}</ReactMarkdown>
-                        </div>
-                    ) : null}
-                </div>
-            );
+        // First extract entity IDs from ```entities``` tags
+        let entityIds: string[] = [];
+        const entityTagRegex = /```entities\n([\s\S]*?)```/g;
+        let contentWithoutEntityTags = content;
+        let entityMatch;
+        
+        while ((entityMatch = entityTagRegex.exec(content)) !== null) {
+            try {
+                const ids = JSON.parse(entityMatch[1]);
+                if (Array.isArray(ids)) {
+                    entityIds = entityIds.concat(ids);
+                }
+                // Remove the entity tag from content
+                contentWithoutEntityTags = contentWithoutEntityTags.replace(entityMatch[0], '');
+            } catch (e) {
+                console.error('Failed to parse entity IDs:', e);
+            }
         }
-
-        // Existing code block handling
+        
+        // Remove duplicates
+        entityIds = [...new Set(entityIds)];
+        
+        // Parse remaining content for code blocks
         const codeBlockRegex = /```([\w]*)\n?([\s\S]*?)```/g;
         const parts = [];
         let lastIndex = 0;
         let match;
 
-        while ((match = codeBlockRegex.exec(content)) !== null) {
+        while ((match = codeBlockRegex.exec(contentWithoutEntityTags)) !== null) {
             if (match.index > lastIndex) {
                 parts.push({
                     type: 'markdown',
-                    content: content.slice(lastIndex, match.index)
+                    content: contentWithoutEntityTags.slice(lastIndex, match.index)
                 });
             }
 
@@ -303,52 +294,72 @@ export default function ChatInterface({
             lastIndex = match.index + match[0].length;
         }
 
-        if (lastIndex < content.length) {
+        if (lastIndex < contentWithoutEntityTags.length) {
             parts.push({
                 type: 'markdown',
-                content: content.slice(lastIndex)
+                content: contentWithoutEntityTags.slice(lastIndex)
             });
         }
 
-        return parts.map((part, index) => {
-            if (part.type === 'markdown') {
-                return (
-                    <div key={index} className="prose prose-invert max-w-none">
-                        <ReactMarkdown>{part.content}</ReactMarkdown>
-                    </div>
-                );
-            } else {
-                const editorType = part.language === 'StrategyRequest' ? 'json' : part.language;
-                const editorTitle = part.language === 'StrategyRequest'
-                    ? 'Strategy Request'
-                    : `${part.language.toUpperCase()} Code Block`;
+        return (
+            <>
+                {/* Render message content first */}
+                {parts.map((part, index) => {
+                    if (part.type === 'markdown') {
+                        return (
+                            <div key={index} className="prose prose-invert max-w-none">
+                                <ReactMarkdown>{part.content}</ReactMarkdown>
+                            </div>
+                        );
+                    } else {
+                        const editorType = part.language === 'StrategyRequest' ? 'json' : part.language;
+                        const editorTitle = part.language === 'StrategyRequest'
+                            ? 'Strategy Request'
+                            : `${part.language.toUpperCase()} Code Block`;
 
-                const editorVisualization = {
-                    data: part.content,
-                    config: {
-                        type: editorType,
-                        title: editorTitle,
-                        readOnly: true
+                        const editorVisualization = {
+                            data: part.content,
+                            config: {
+                                type: editorType,
+                                title: editorTitle,
+                                readOnly: true
+                            }
+                        };
+
+                        const numberOfLines = part.content.split('\n').length;
+                        const lineHeight = 20;
+                        const headerHeight = 56;
+                        const minHeight = 100;
+                        const height = Math.max(minHeight, (numberOfLines * lineHeight) + headerHeight);
+
+                        return (
+                            <div
+                                key={index}
+                                className="my-4 border border-gray-700 rounded-lg overflow-hidden"
+                                style={{ height }}
+                            >
+                                <Editor visualization={editorVisualization} />
+                            </div>
+                        );
                     }
-                };
-
-                const numberOfLines = part.content.split('\n').length;
-                const lineHeight = 20;
-                const headerHeight = 56;
-                const minHeight = 100;
-                const height = Math.max(minHeight, (numberOfLines * lineHeight) + headerHeight);
-
-                return (
-                    <div
-                        key={index}
-                        className="my-4 border border-gray-700 rounded-lg overflow-hidden"
-                        style={{ height }}
-                    >
-                        <Editor visualization={editorVisualization} />
+                })}
+                
+                {/* Render entity views if any */}
+                {entityIds.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Affected Entities:</div>
+                        {entityIds.map((entityId, index) => (
+                            <EntityViewRenderer
+                                key={`${entityId}-${index}`}
+                                entityId={entityId}
+                                sendStrategyRequest={sendStrategyRequest}
+                                updateEntity={updateEntity}
+                            />
+                        ))}
                     </div>
-                );
-            }
-        });
+                )}
+            </>
+        );
     };
 
     const filteredMessages = messages.filter(message => {
