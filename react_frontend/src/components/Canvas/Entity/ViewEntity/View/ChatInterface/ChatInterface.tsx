@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
-import { EntityTypes } from '../../../../Entity/EntityEnum';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
-import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoAdd, IoCopy, IoRefresh, IoDocumentText } from 'react-icons/io5';
+import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoRefresh } from 'react-icons/io5';
 import { VariableSizeList as List } from 'react-window';
 import EntityViewRenderer from './EntityViewRenderer';
 import MessageItem from './MessageItem';
@@ -99,39 +98,6 @@ export default function ChatInterface({
         }
     }, []);
 
-    const renderMessage = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-        const message = filteredMessages[index];
-        
-        return (
-            <div style={style}>
-                <div
-                    ref={(el) => {
-                        if (el) {
-                            const height = el.getBoundingClientRect().height;
-                            if (height > 0 && height !== itemSizes.current[index]) {
-                                setItemSize(index, height);
-                            }
-                        }
-                    }}
-                >
-                    <MessageItem
-                        message={message}
-                        index={index}
-                        fontSize={fontSize}
-                        sendStrategyRequest={sendStrategyRequest}
-                        updateEntity={updateEntity}
-                        currentApiModel={currentApiModel}
-                        parentEntityId={parentEntityId}
-                        onCopy={handleCopy}
-                        onCreateDocument={handleCreateDocument}
-                        copiedMessageIndex={copiedMessageIndex}
-                        createdDocumentIndex={createdDocumentIndex}
-                        setModalEntity={setModalEntity}
-                    />
-                </div>
-            </div>
-        );
-    }, [filteredMessages, fontSize, sendStrategyRequest, updateEntity, currentApiModel, parentEntityId, handleCopy, handleCreateDocument, copiedMessageIndex, createdDocumentIndex, setModalEntity, setItemSize]);
 
     // Handle window resize for List
     useEffect(() => {
@@ -307,7 +273,39 @@ export default function ChatInterface({
         }
     };
 
-
+    const renderMessage = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+        const message = filteredMessages[index];
+        
+        return (
+            <div style={style}>
+                <div
+                    ref={(el) => {
+                        if (el) {
+                            const height = el.getBoundingClientRect().height;
+                            if (height > 0 && height !== itemSizes.current[index]) {
+                                setItemSize(index, height);
+                            }
+                        }
+                    }}
+                >
+                    <MessageItem
+                        message={message}
+                        index={index}
+                        fontSize={fontSize}
+                        sendStrategyRequest={sendStrategyRequest}
+                        updateEntity={updateEntity}
+                        currentApiModel={currentApiModel}
+                        parentEntityId={parentEntityId}
+                        onCopy={handleCopy}
+                        onCreateDocument={handleCreateDocument}
+                        copiedMessageIndex={copiedMessageIndex}
+                        createdDocumentIndex={createdDocumentIndex}
+                        setModalEntity={setModalEntity}
+                    />
+                </div>
+            </div>
+        );
+    }, [filteredMessages, fontSize, sendStrategyRequest, updateEntity, currentApiModel, parentEntityId, handleCopy, handleCreateDocument, copiedMessageIndex, createdDocumentIndex, setModalEntity, setItemSize]);
 
     if (!data) {
         return (

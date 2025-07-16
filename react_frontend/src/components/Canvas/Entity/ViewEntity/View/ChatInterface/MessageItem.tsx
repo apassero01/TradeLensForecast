@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo } from 'react';
 import { IoCopy, IoDocumentText } from 'react-icons/io5';
 import ReactMarkdown from 'react-markdown';
 import Editor from '../../../../../Input/Editor';
@@ -196,6 +196,7 @@ const MessageItem = memo(({
                     {copiedMessageIndex === index ? (
                         <span className="text-green-400 text-sm">✓</span>
                     ) : (
+                        /* @ts-ignore */
                         <IoCopy className="text-gray-400 text-sm" />
                     )}
                 </button>
@@ -209,6 +210,7 @@ const MessageItem = memo(({
                     {createdDocumentIndex === index ? (
                         <span className="text-green-400 text-sm">✓</span>
                     ) : (
+                        /* @ts-ignore */
                         <IoDocumentText className="text-gray-400 text-sm" />
                     )}
                 </button>
