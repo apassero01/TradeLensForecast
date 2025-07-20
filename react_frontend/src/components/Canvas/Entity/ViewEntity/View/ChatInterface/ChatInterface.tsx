@@ -3,7 +3,6 @@ import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
 import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoRefresh } from 'react-icons/io5';
-import { VariableSizeList as List } from 'react-window';
 import EntityViewRenderer from './EntityViewRenderer';
 import MessageItem from './MessageItem';
 
@@ -56,8 +55,6 @@ export default function ChatInterface({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
-    const listRef = useRef<List>(null);
-    const itemSizes = useRef<{ [key: number]: number }>({});
 
     // Get the parent entity directly - it should be the API model
     const parentEntity = useRecoilValue(nodeSelectorFamily(parentEntityId)) as any;
@@ -74,10 +71,12 @@ export default function ChatInterface({
     });
 
     const scrollToBottom = useCallback((smooth = false) => {
-        if (listRef.current && data?.auto_scroll !== false && filteredMessages.length > 0) {
-            listRef.current.scrollToItem(filteredMessages.length - 1, 'end');
+        if (messagesEndRef.current && data?.auto_scroll !== false) {
+            messagesEndRef.current.scrollIntoView({ 
+                behavior: smooth ? 'smooth' : 'auto' 
+            });
         }
-    }, [data?.auto_scroll, filteredMessages.length]);
+    }, [data?.auto_scroll]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -86,30 +85,6 @@ export default function ChatInterface({
 
         return () => clearTimeout(timeoutId);
     }, [messages, scrollToBottom]);
-
-    const getItemSize = useCallback((index: number) => {
-        return itemSizes.current[index] || 200; // Default height
-    }, []);
-
-    const setItemSize = useCallback((index: number, size: number) => {
-        itemSizes.current[index] = size;
-        if (listRef.current) {
-            listRef.current.resetAfterIndex(index);
-        }
-    }, []);
-
-
-    // Handle window resize for List
-    useEffect(() => {
-        const handleResize = () => {
-            if (listRef.current) {
-                listRef.current.resetAfterIndex(0);
-            }
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     // Auto-resize textarea function
     const autoResizeTextarea = useCallback(() => {
@@ -273,40 +248,6 @@ export default function ChatInterface({
         }
     };
 
-    const renderMessage = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-        const message = filteredMessages[index];
-        
-        return (
-            <div style={style}>
-                <div
-                    ref={(el) => {
-                        if (el) {
-                            const height = el.getBoundingClientRect().height;
-                            if (height > 0 && height !== itemSizes.current[index]) {
-                                setItemSize(index, height);
-                            }
-                        }
-                    }}
-                >
-                    <MessageItem
-                        message={message}
-                        index={index}
-                        fontSize={fontSize}
-                        sendStrategyRequest={sendStrategyRequest}
-                        updateEntity={updateEntity}
-                        currentApiModel={currentApiModel}
-                        parentEntityId={parentEntityId}
-                        onCopy={handleCopy}
-                        onCreateDocument={handleCreateDocument}
-                        copiedMessageIndex={copiedMessageIndex}
-                        createdDocumentIndex={createdDocumentIndex}
-                        setModalEntity={setModalEntity}
-                    />
-                </div>
-            </div>
-        );
-    }, [filteredMessages, fontSize, sendStrategyRequest, updateEntity, currentApiModel, parentEntityId, handleCopy, handleCreateDocument, copiedMessageIndex, createdDocumentIndex, setModalEntity, setItemSize]);
-
     if (!data) {
         return (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -425,7 +366,7 @@ export default function ChatInterface({
 
             {/* Messages */}
             <div
-                className="nowheel flex-grow min-h-0 overflow-hidden"
+                className="nowheel flex-grow min-h-0 overflow-y-auto p-4"
                 ref={chatContainerRef}
             >
                 {filteredMessages.length === 0 ? (
@@ -441,17 +382,26 @@ export default function ChatInterface({
                         </p>
                     </div>
                 ) : (
-                    <List
-                        ref={listRef}
-                        height={chatContainerRef.current?.clientHeight || 400}
-                        itemCount={filteredMessages.length}
-                        itemSize={getItemSize}
-                        overscanCount={5}
-                        width="100%"
-                        style={{ padding: '16px' }}
-                    >
-                        {renderMessage}
-                    </List>
+                    <div className="space-y-4">
+                        {filteredMessages.map((message, index) => (
+                            <MessageItem
+                                key={index}
+                                message={message}
+                                index={index}
+                                fontSize={fontSize}
+                                sendStrategyRequest={sendStrategyRequest}
+                                updateEntity={updateEntity}
+                                currentApiModel={currentApiModel}
+                                parentEntityId={parentEntityId}
+                                onCopy={handleCopy}
+                                onCreateDocument={handleCreateDocument}
+                                copiedMessageIndex={copiedMessageIndex}
+                                createdDocumentIndex={createdDocumentIndex}
+                                setModalEntity={setModalEntity}
+                            />
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
                 )}
             </div>
 

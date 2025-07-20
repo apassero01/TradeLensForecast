@@ -212,7 +212,7 @@ export default function CalendarMonthlyView({
     return (
         <div
             ref={calendarContainerRef}
-            className="flex flex-col h-full w-full bg-gray-800 text-white p-4 overflow-hidden relative"
+            className="flex flex-col h-full w-full bg-gray-800 text-white nowheel p-4 overflow-y-auto relative"
         >
             <div className="flex-shrink-0 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
