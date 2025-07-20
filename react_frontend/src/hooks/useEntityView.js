@@ -17,6 +17,6 @@ import useRenderStoredView from "./useRenderStoredView";
  */
 export default function useEntityView(entityId, sendStrategyRequest, updateEntity, props, viewComponentType) {
     const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: entityId, type: EntityTypes.VIEW })) || [];
-    const view = viewChildren.find((child) => child.data.view_component_type === viewComponentType);
+    const view = viewComponentType ? viewChildren.find((child) => child.data.view_component_type === viewComponentType) : viewChildren[0];
     return useRenderStoredView(view?.entity_id, sendStrategyRequest, updateEntity, props);
 }

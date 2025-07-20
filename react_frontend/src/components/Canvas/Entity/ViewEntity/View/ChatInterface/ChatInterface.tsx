@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
-import { EntityTypes } from '../../../../Entity/EntityEnum';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
-import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoAdd, IoCopy, IoRefresh, IoDocumentText } from 'react-icons/io5';
-import ReactMarkdown from 'react-markdown';
-import Editor from '../../../../../Input/Editor';
+import { IoSend, IoSettings, IoChatbubbleEllipses, IoTrash, IoRefresh } from 'react-icons/io5';
 import EntityViewRenderer from './EntityViewRenderer';
+import MessageItem from './MessageItem';
 
 interface ChatInterfaceProps {
     data?: ChatInterfaceData;
@@ -52,6 +50,7 @@ export default function ChatInterface({
     const [modelProvider, setModelProvider] = useState<'openai' | 'google_genai' | 'anthropic'>('openai');
     const [modelName, setModelName] = useState('gpt-4o-mini');
     const [textareaHeight, setTextareaHeight] = useState('3rem');
+    const [modalEntity, setModalEntity] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -66,11 +65,15 @@ export default function ChatInterface({
     // Get messages from the API model's message_history attribute or from view data
     const messages: Message[] = currentApiModel?.data?.message_history || data?.message_history || [];
 
+    const filteredMessages = messages.filter(message => {
+        if (displayMode === 'all') return true;
+        return message.type === displayMode;
+    });
+
     const scrollToBottom = useCallback((smooth = false) => {
         if (messagesEndRef.current && data?.auto_scroll !== false) {
-            messagesEndRef.current.scrollIntoView({
-                behavior: smooth ? 'smooth' : 'auto',
-                block: 'end'
+            messagesEndRef.current.scrollIntoView({ 
+                behavior: smooth ? 'smooth' : 'auto' 
             });
         }
     }, [data?.auto_scroll]);
@@ -245,128 +248,6 @@ export default function ChatInterface({
         }
     };
 
-
-    const renderMessageContent = (content: string) => {
-        // First extract entity IDs from ```entities``` tags
-        let entityIds: string[] = [];
-        const entityTagRegex = /```entities\n([\s\S]*?)```/g;
-        let contentWithoutEntityTags = content;
-        let entityMatch;
-        
-        while ((entityMatch = entityTagRegex.exec(content)) !== null) {
-            try {
-                const ids = JSON.parse(entityMatch[1]);
-                if (Array.isArray(ids)) {
-                    entityIds = entityIds.concat(ids);
-                }
-                // Remove the entity tag from content
-                contentWithoutEntityTags = contentWithoutEntityTags.replace(entityMatch[0], '');
-            } catch (e) {
-                console.error('Failed to parse entity IDs:', e);
-            }
-        }
-        
-        // Remove duplicates
-        entityIds = [...new Set(entityIds)];
-        
-        // Parse remaining content for code blocks
-        const codeBlockRegex = /```([\w]*)\n?([\s\S]*?)```/g;
-        const parts = [];
-        let lastIndex = 0;
-        let match;
-
-        while ((match = codeBlockRegex.exec(contentWithoutEntityTags)) !== null) {
-            if (match.index > lastIndex) {
-                parts.push({
-                    type: 'markdown',
-                    content: contentWithoutEntityTags.slice(lastIndex, match.index)
-                });
-            }
-
-            const language = match[1].trim() || 'text';
-            const code = match[2].trim();
-            parts.push({
-                type: 'code',
-                language,
-                content: code
-            });
-
-            lastIndex = match.index + match[0].length;
-        }
-
-        if (lastIndex < contentWithoutEntityTags.length) {
-            parts.push({
-                type: 'markdown',
-                content: contentWithoutEntityTags.slice(lastIndex)
-            });
-        }
-
-        return (
-            <>
-                {/* Render message content first */}
-                {parts.map((part, index) => {
-                    if (part.type === 'markdown') {
-                        return (
-                            <div key={index} className="prose prose-invert max-w-none">
-                                <ReactMarkdown>{part.content}</ReactMarkdown>
-                            </div>
-                        );
-                    } else {
-                        const editorType = part.language === 'StrategyRequest' ? 'json' : part.language;
-                        const editorTitle = part.language === 'StrategyRequest'
-                            ? 'Strategy Request'
-                            : `${part.language.toUpperCase()} Code Block`;
-
-                        const editorVisualization = {
-                            data: part.content,
-                            config: {
-                                type: editorType,
-                                title: editorTitle,
-                                readOnly: true
-                            }
-                        };
-
-                        const numberOfLines = part.content.split('\n').length;
-                        const lineHeight = 20;
-                        const headerHeight = 56;
-                        const minHeight = 100;
-                        const height = Math.max(minHeight, (numberOfLines * lineHeight) + headerHeight);
-
-                        return (
-                            <div
-                                key={index}
-                                className="my-4 border border-gray-700 rounded-lg overflow-hidden"
-                                style={{ height }}
-                            >
-                                <Editor visualization={editorVisualization} />
-                            </div>
-                        );
-                    }
-                })}
-                
-                {/* Render entity views if any */}
-                {entityIds.length > 0 && (
-                    <div className="mt-4 space-y-3">
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">Affected Entities:</div>
-                        {entityIds.map((entityId, index) => (
-                            <EntityViewRenderer
-                                key={`${entityId}-${index}`}
-                                entityId={entityId}
-                                sendStrategyRequest={sendStrategyRequest}
-                                updateEntity={updateEntity}
-                            />
-                        ))}
-                    </div>
-                )}
-            </>
-        );
-    };
-
-    const filteredMessages = messages.filter(message => {
-        if (displayMode === 'all') return true;
-        return message.type === displayMode;
-    });
-
     if (!data) {
         return (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -487,7 +368,6 @@ export default function ChatInterface({
             <div
                 className="nowheel flex-grow min-h-0 overflow-y-auto p-4"
                 ref={chatContainerRef}
-                style={{ fontSize: `${fontSize}px` }}
             >
                 {filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -502,74 +382,23 @@ export default function ChatInterface({
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                         {filteredMessages.map((message, index) => (
-                            <div
+                            <MessageItem
                                 key={index}
-                                className="w-full group"
-                            >
-                                <div
-                                    className={`relative w-full max-w-none p-6 ${
-                                        message.type === 'ai'
-                                            ? 'bg-gray-800/30 border-l-2 border-gray-600/30'
-                                            : message.type === 'system' || message.type === 'tool'
-                                                ? 'bg-blue-900/20 border-l-2 border-blue-500/40'
-                                                : 'bg-gray-700/20 border-l-2 border-gray-500/30'
-                                    }`}
-                                >
-                                    {/* Copy Button */}
-                                    <button
-                                        onClick={() => handleCopy(message.content, index)}
-                                        className="absolute top-3 right-3 p-2 rounded-md hover:bg-gray-600/30 transition-colors opacity-0 group-hover:opacity-100"
-                                        title="Copy to clipboard"
-                                    >
-                                        {copiedMessageIndex === index ? (
-                                            <span className="text-green-400 text-sm">✓</span>
-                                        ) : (
-                                            /* @ts-ignore */
-                                            <IoCopy className="text-gray-400 text-sm" />
-                                        )}
-                                    </button>
-
-                                    {/* Create Document Button */}
-                                    <button
-                                        onClick={() => handleCreateDocument(message.content, index, message.type)}
-                                        className="absolute top-3 right-12 p-2 rounded-md hover:bg-gray-600/30 transition-colors opacity-0 group-hover:opacity-100"
-                                        title="Create document from message"
-                                    >
-                                        {createdDocumentIndex === index ? (
-                                            <span className="text-green-400 text-sm">✓</span>
-                                        ) : (
-                                            /* @ts-ignore */
-                                            <IoDocumentText className="text-gray-400 text-sm" />
-                                        )}
-                                    </button>
-
-                                    {/* Message Type Badge */}
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <span className={`text-sm font-semibold ${
-                                            message.type === 'ai' 
-                                                ? 'text-blue-400' 
-                                                : message.type === 'system'
-                                                    ? 'text-purple-400'
-                                                    : 'text-green-400'
-                                        }`}>
-                                            {message.type === 'ai' ? 'Assistant' : 
-                                             message.type === 'tool' ? 'Tool' : 'You'}
-                                        </span>
-                                        {message.timestamp && (
-                                            <span className="text-xs text-gray-500">
-                                                {new Date(message.timestamp).toLocaleTimeString()}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Message Content */}
-                                    <div className="pr-12 text-gray-100 leading-relaxed">
-                                        {renderMessageContent(message.content)}
-                                    </div>
-                                </div>
-                            </div>
+                                message={message}
+                                index={index}
+                                fontSize={fontSize}
+                                sendStrategyRequest={sendStrategyRequest}
+                                updateEntity={updateEntity}
+                                currentApiModel={currentApiModel}
+                                parentEntityId={parentEntityId}
+                                onCopy={handleCopy}
+                                onCreateDocument={handleCreateDocument}
+                                copiedMessageIndex={copiedMessageIndex}
+                                createdDocumentIndex={createdDocumentIndex}
+                                setModalEntity={setModalEntity}
+                            />
                         ))}
                         <div ref={messagesEndRef} />
                     </div>
@@ -690,6 +519,30 @@ export default function ChatInterface({
                             >
                                 Configure
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Entity Modal */}
+            {modalEntity && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setModalEntity(null)}>
+                    <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl max-h-[90vh] w-full mx-4 overflow-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-white">Entity View</h3>
+                            <button
+                                onClick={() => setModalEntity(null)}
+                                className="text-gray-400 hover:text-white transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <EntityViewRenderer
+                                entityId={modalEntity}
+                                sendStrategyRequest={sendStrategyRequest}
+                                updateEntity={updateEntity}
+                            />
                         </div>
                     </div>
                 </div>

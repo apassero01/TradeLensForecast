@@ -141,7 +141,7 @@ class CallApiModelStrategy(Strategy):
 
         contexts = []
 
-        with open("shared_utils/entities/api_model/strategy/instructions.txt", "r") as f:
+        with open("shared_utils/entities/api_model/strategy/instructions.md", "r") as f:
             instructions = f.read()
             contexts.append(
                 f"{'='*50}\n"
@@ -301,10 +301,7 @@ class CallApiModelStrategy(Strategy):
                     # Extract entity IDs from the tool call
                     entities_arg = tool_call.get('args', {}).get('entities', [])
                     
-                    tool_message_content = ''
-                    for ser_entity in serialized_entities:
-                        entity_message = self.format_entity_response(ser_entity)
-                        tool_message_content += f"{entity_message}\n\n"
+                    tool_message_content = f"Serialized Entities: {json.dumps(serialized_entities)}"
                     
                     # Add entity IDs tag if we have them
                     if entities_arg:
@@ -529,20 +526,6 @@ class CallApiModelStrategy(Strategy):
             'context_prefix': 'Here is the relevant context:',  # Optional prefix for context\
             'serialize_entities_and_strategies': False # Optional flag to serialize entities and strategies
         }
-
-    def format_entity_response(self, entities_dict):
-        entity_graph_json = json.dumps(entities_dict, indent=2)
-
-        response = f"""
-    
-        {'=' * 50}
-        Entity Graph
-        {'-' * 50}
-        {entity_graph_json}
-        {'=' * 50}
-        """
-        return response
-
 
 class ClearChatHistoryStrategy(Strategy):
     entity_type = EntityEnum.API_MODEL
