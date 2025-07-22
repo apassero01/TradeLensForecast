@@ -22,6 +22,7 @@ class StrategyDirectory:
                 "shared_utils.strategy.BaseStrategy.ExecuteRequestChildren",
                 "shared_utils.strategy.BaseStrategy.HTTPGetRequestStrategy",
                 "shared_utils.strategy.BaseStrategy.ExtractEntityDataStrategy",
+                "shared_utils.strategy.QueryEntitiesStrategy.QueryEntitiesStrategy",
             ],
             EntityEnum.TRAINING_SESSION.value: [
                 "training_session.strategy.TrainingSessionStrategy.GetSequenceSetsStrategy",

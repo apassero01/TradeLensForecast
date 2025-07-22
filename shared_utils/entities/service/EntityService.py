@@ -8,6 +8,8 @@ from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.EntityModel import EntityModel
 import logging
+from django.db import connection
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -452,6 +454,120 @@ class EntityService:
             entities.extend(child_entities)
 
         return entities
+
+    def find_entities(self, filters: list) -> list:
+        """
+        Find entities based on a list of filter conditions.
+        
+        Args:
+            filters: List of filter dictionaries with keys: attribute, operator, value
+            
+        Returns:
+            List of entity IDs matching all filter conditions
+        """
+        if not filters:
+            return []
+            
+        try:
+            query, params = self._build_sql_query(filters)
+            
+            # Execute query
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                results = [str(row[0]) for row in cursor.fetchall()]
+                
+            logger.info(f"Query found {len(results)} matching entities")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error executing find_entities query: {str(e)}")
+            raise
+
+    def _build_sql_query(self, filters: list) -> tuple:
+        """
+        Build SQL query from filter configuration.
+        
+        Args:
+            filters: List of filter dictionaries
+            
+        Returns:
+            Tuple of (query_string, params_list)
+        """
+        base_query = "SELECT entity_id FROM shared_utils_entitymodel WHERE "
+        where_clauses = []
+        params = []
+        
+        for filter_obj in filters:
+            attr = filter_obj['attribute']
+            op = filter_obj['operator']
+            val = filter_obj['value']
+            
+            # Handle special case for entity_type which is a direct column
+            if attr == 'entity_type':
+                if op == 'equals':
+                    where_clauses.append('entity_type = %s')
+                    params.append(val)
+                elif op == 'not_equals':
+                    where_clauses.append('entity_type != %s')
+                    params.append(val)
+                elif op == 'in':
+                    placeholders = ', '.join(['%s'] * len(val))
+                    where_clauses.append(f'entity_type IN ({placeholders})')
+                    params.extend(val)
+            # Handle attributes stored in JSONB
+            else:
+                if op == 'equals':
+                    where_clauses.append("attributes->>%s = %s")
+                    params.extend([attr, str(val)])
+                elif op == 'not_equals':
+                    where_clauses.append("attributes->>%s != %s")
+                    params.extend([attr, str(val)])
+                elif op == 'contains':
+                    where_clauses.append("attributes->>%s LIKE %s")
+                    params.extend([attr, f'%{val}%'])
+                elif op == 'starts_with':
+                    where_clauses.append("attributes->>%s LIKE %s")
+                    params.extend([attr, f'{val}%'])
+                elif op == 'ends_with':
+                    where_clauses.append("attributes->>%s LIKE %s")
+                    params.extend([attr, f'%{val}'])
+                elif op == 'greater_than':
+                    # Try to cast as numeric first, fall back to date
+                    where_clauses.append(
+                        "CASE "
+                        "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric > %s "
+                        "ELSE (attributes->>%s)::date > %s::date "
+                        "END"
+                    )
+                    params.extend([attr, attr, val, attr, val])
+                elif op == 'less_than':
+                    where_clauses.append(
+                        "CASE "
+                        "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric < %s "
+                        "ELSE (attributes->>%s)::date < %s::date "
+                        "END"
+                    )
+                    params.extend([attr, attr, val, attr, val])
+                elif op == 'between':
+                    if isinstance(val, list) and len(val) == 2:
+                        where_clauses.append(
+                            "CASE "
+                            "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric BETWEEN %s AND %s "
+                            "ELSE (attributes->>%s)::date BETWEEN %s::date AND %s::date "
+                            "END"
+                        )
+                        params.extend([attr, attr, val[0], val[1], attr, val[0], val[1]])
+                elif op == 'in':
+                    if isinstance(val, list):
+                        placeholders = ', '.join(['%s'] * len(val))
+                        where_clauses.append(f"attributes->>%s IN ({placeholders})")
+                        params.append(attr)
+                        params.extend([str(v) for v in val])
+                        
+        # Join all where clauses with AND
+        query = base_query + " AND ".join(where_clauses)
+        
+        return query, params
 
 
 
