@@ -62,6 +62,8 @@ const MessageItem = memo(({
         // Remove duplicates
         entityIds = [...new Set(entityIds)];
         
+        entityIds = entityIds.filter((id) => id !== parentEntityId);
+        
         // For tool messages, if we have entity IDs, just show the icons
         if (messageType === 'tool' && entityIds.length > 0) {
             return (
