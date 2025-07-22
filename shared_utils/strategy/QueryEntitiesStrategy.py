@@ -14,7 +14,39 @@ class QueryEntitiesStrategy(Strategy):
     """
     
     entity_type = EntityEnum.ENTITY
-    strategy_description = 'Queries entities based on filters and attaches results to target entity'
+    strategy_description = '''Queries entities based on filters and attaches results to target entity.
+    
+    Usage:
+    - filters: List of filter objects with keys: attribute, operator, value
+    - result_attribute: Name of attribute to store the query results on target entity
+    
+    Supported operators:
+    - equals: Exact match (e.g., entity_type = "document")
+    - not_equals: Not equal to value
+    - contains: Text contains substring (case-sensitive)
+    - starts_with: Text starts with prefix
+    - ends_with: Text ends with suffix
+    - greater_than: Numeric/date comparison (auto-detects type)
+    - less_than: Numeric/date comparison (auto-detects type)
+    - between: Value within range [min, max] (e.g., [10, 50] or ["2025-01-01", "2025-12-31"])
+    - in: Value is in list of options (e.g., ["document", "recipe"])
+    
+    Example:
+    {
+        "strategy_name": "QueryEntitiesStrategy",
+        "target_entity_id": "some_entity_id",
+        "param_config": {
+            "result_attribute": "matching_recipes",
+            "filters": [
+                {"attribute": "entity_type", "operator": "equals", "value": "recipe"},
+                {"attribute": "creation_date", "operator": "greater_than", "value": "2025-06-21"},
+                {"attribute": "name", "operator": "contains", "value": "chicken"}
+            ]
+        }
+    }
+    
+    Results are stored as a list of entity IDs on the target entity under the specified attribute.
+    '''
     
     def verify_executable(self, entity, strategy_request):
         """Verify the strategy can be executed with required parameters"""
