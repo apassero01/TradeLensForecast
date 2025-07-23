@@ -45,7 +45,6 @@ class QueryEntitiesStrategy(Strategy):
         }
     }
     
-    Results are stored as a list of entity IDs on the target entity under the specified attribute.
     '''
     
     def verify_executable(self, entity, strategy_request):
@@ -56,10 +55,7 @@ class QueryEntitiesStrategy(Strategy):
         if 'filters' not in config:
             logger.error("Missing required parameter: filters")
             return False
-            
-        if 'result_attribute' not in config:
-            logger.error("Missing required parameter: result_attribute")
-            return False
+        
             
         # Validate filter structure
         filters = config.get('filters', [])
@@ -89,17 +85,10 @@ class QueryEntitiesStrategy(Strategy):
         """
         config = self.strategy_request.param_config
         filters = config.get('filters', [])
-        result_attribute = config.get('result_attribute')
         
         try:
             # Use EntityService to find matching entities
             matching_entity_ids = self.entity_service.find_entities(filters)
-            
-            # Attach results to target entity
-            entity.set_attribute(result_attribute, matching_entity_ids)
-            
-            # Save the entity with new attribute
-            self.entity_service.save_entity(entity)
             
             # Store results in return value
             self.strategy_request.ret_val = {
@@ -135,17 +124,15 @@ class QueryEntitiesStrategy(Strategy):
                     'value': '2025-01-01'
                 }
             ],
-            'result_attribute': 'query_results'
         }
     
     @classmethod
-    def request_constructor(cls, target_entity_id, filters: list, result_attribute: str):
+    def request_constructor(cls, target_entity_id, filters: list):
         """Convenience method to create a strategy request for this strategy"""
         strategy_request = StrategyRequestEntity()
         strategy_request.strategy_name = cls.__name__
         strategy_request.param_config = {
             'filters': filters,
-            'result_attribute': result_attribute
         }
         strategy_request.target_entity_id = target_entity_id
         strategy_request._nested_requests = []
