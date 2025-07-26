@@ -39,6 +39,7 @@ export function useWebSocketConsumer() {
 
   return {
     sendStrategyRequest,
-    isConnected: ws?.readyState === WebSocket.OPEN
+    isConnected: ws?.readyState === WebSocket.OPEN,
+    ws
   };
 } 
