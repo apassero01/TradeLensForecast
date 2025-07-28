@@ -21,6 +21,7 @@ import AdvancedDocumentEditor from './DocumentEditor/AdvancedDocumentEditor';
 import DocumentListItem from './DocumentEditor/DocumentListItem';
 import CalendarEventDetails from './CalendarEntity/CalendarEventDetails';
 import CalendarMonthlyView from './CalendarEntity/CalendarMonthlyView';
+import { EntityCentricChatView } from './EntityCentricChatView';
 
 const viewComponents = {
   histogram: Histogram,
@@ -44,6 +45,7 @@ const viewComponents = {
   advanced_document_editor: AdvancedDocumentEditor,
   calendar_event_details: CalendarEventDetails,
   calendar_monthly_view: CalendarMonthlyView,
+  entity_centric_chat_view: EntityCentricChatView,
 };
 
 export default viewComponents;

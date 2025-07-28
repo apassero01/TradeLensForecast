@@ -275,6 +275,12 @@ class CallApiModelStrategy(Strategy):
         self.add_to_message_history(entity, HumanMessage(content=user_input))
         while CUR_ITERS < MAX_ITERS:
             CUR_ITERS += 1
+
+            context += "\n HERE ARE THE VISIBLE ENTITIES YOU CURRENTLY HAVE ACCESS TO: \n"
+            for entity_id in entity.get_attribute('visible_entities'):
+                cur_entity = self.entity_service.get_entity(entity_id)
+                context += cur_entity.serialize() + "\n"
+
             system_message = SystemMessage(content=context)
             model_input = [system_message] + entity.get_attribute('message_history')
             response = chat.invoke(model_input)
@@ -310,6 +316,24 @@ class CallApiModelStrategy(Strategy):
                     tool_message = ToolMessage(
                         content=tool_message_content,
                         tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                        name=tool_call["name"]
+                    )
+                    self.add_to_message_history(entity, tool_message)
+                    break
+                elif tool_call['name'].lower() == 'update_visible_entities':
+                    tool = tool_dict.get(tool_call['name'].lower())
+                    tool_msg = tool.invoke(tool_call)
+                    entity_ids, method = tool_msg.artifact
+                    if method == 'a':
+                        entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') + entity_ids)))
+                    elif method == 'r':
+                        entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') - entity_ids)))
+                    else:
+                        raise ValueError(f"Invalid method: {method}")
+                    self.entity_service.save_entity(entity)
+                    tool_message = ToolMessage(
+                        content=f"Updated visible entities: {entity.get_attribute('visible_entities')}",
+                        tool_call_id=tool_call["id"],
                         name=tool_call["name"]
                     )
                     self.add_to_message_history(entity, tool_message)
@@ -459,6 +483,16 @@ class CallApiModelStrategy(Strategy):
             if entity:
                 serialized_entities.append(entity.serialize())
         return "Serialized Entities", serialized_entities
+    
+    @staticmethod
+    @tool(response_format="content_and_artifact")
+    def update_visible_entities(entity_ids: List[str], method: str = 'a') -> str:
+        '''
+        Update the visible entities for the API model.
+        @param entity_ids: List of entity ids to update
+        @param method: The method to use to update the visible entities
+        '''
+        return entity_ids, method
 
     # @staticmethod
     # @tool(response_format="content_and_artifact")

@@ -17,6 +17,7 @@ class ApiModelEntity(Entity):
         })
         self.set_attribute('last_response', None)
         self.set_attribute('message_history', [])
+        self.set_attribute('visible_entities', [])
 
     def serialize(self) -> dict:
         parent_dict = super().serialize()
