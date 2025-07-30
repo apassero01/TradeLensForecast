@@ -134,9 +134,9 @@ class EntityServiceFindEntitiesTestCase(TestCase):
         ]
         self.entity_service.find_entities(filters)
         
-        # Verify SQL query uses LIKE with wildcards
+        # Verify SQL query uses LOWER LIKE for case-insensitive search
         query, params = mock_cursor.execute.call_args[0]
-        self.assertIn('attributes->>%s LIKE %s', query)
+        self.assertIn('LOWER(attributes->>%s) LIKE LOWER(%s)', query)
         self.assertEqual(params, ['description', '%delicious%'])
         
     @patch('shared_utils.entities.service.EntityService.connection')
@@ -180,10 +180,10 @@ class EntityServiceFindEntitiesTestCase(TestCase):
         ]
         self.entity_service.find_entities(filters)
         
-        # Verify SQL query uses BETWEEN
+        # Verify SQL query uses BETWEEN with improved date handling
         query, params = mock_cursor.execute.call_args[0]
         self.assertIn('BETWEEN', query)
-        self.assertIn('::date', query)
+        self.assertIn('to_date', query)  # New date handling format
         
     @patch('shared_utils.entities.service.EntityService.connection')
     def test_find_entities_in_operator_for_entity_type(self, mock_connection):
@@ -273,18 +273,18 @@ class EntityServiceFindEntitiesTestCase(TestCase):
         
     def test_build_sql_query_special_operators(self):
         """Test _build_sql_query handles all special operators"""
-        # Test starts_with
+        # Test starts_with (now case-insensitive)
         query, params = self.entity_service._build_sql_query([
             {'attribute': 'name', 'operator': 'starts_with', 'value': 'Test'}
         ])
-        self.assertIn('attributes->>%s LIKE %s', query)
+        self.assertIn('LOWER(attributes->>%s) LIKE LOWER(%s)', query)
         self.assertEqual(params[1], 'Test%')
         
-        # Test ends_with
+        # Test ends_with (now case-insensitive)
         query, params = self.entity_service._build_sql_query([
             {'attribute': 'name', 'operator': 'ends_with', 'value': '.txt'}
         ])
-        self.assertIn('attributes->>%s LIKE %s', query)
+        self.assertIn('LOWER(attributes->>%s) LIKE LOWER(%s)', query)
         self.assertEqual(params[1], '%.txt')
         
         # Test not_equals
@@ -292,3 +292,330 @@ class EntityServiceFindEntitiesTestCase(TestCase):
             {'attribute': 'status', 'operator': 'not_equals', 'value': 'draft'}
         ])
         self.assertIn('attributes->>%s != %s', query)
+
+    def test_normalize_date_string_yyyymmdd(self):
+        """Test _normalize_date_string with YYYYMMDD format"""
+        result = self.entity_service._normalize_date_string('20250630')
+        self.assertEqual(result, '2025-06-30')
+        
+    def test_normalize_date_string_iso_format(self):
+        """Test _normalize_date_string with ISO format"""
+        result = self.entity_service._normalize_date_string('2025-06-30T14:30:00.000Z')
+        self.assertEqual(result, '2025-06-30')
+        
+    def test_normalize_date_string_with_space(self):
+        """Test _normalize_date_string with space and time"""
+        result = self.entity_service._normalize_date_string('2025-06-30 14:30:00')
+        self.assertEqual(result, '2025-06-30')
+        
+    def test_normalize_date_string_already_normalized(self):
+        """Test _normalize_date_string with already normalized date"""
+        result = self.entity_service._normalize_date_string('2025-06-30')
+        self.assertEqual(result, '2025-06-30')
+        
+    def test_normalize_date_string_empty(self):
+        """Test _normalize_date_string with empty string"""
+        result = self.entity_service._normalize_date_string('')
+        self.assertEqual(result, '')
+        
+    def test_normalize_date_string_none(self):
+        """Test _normalize_date_string with None"""
+        result = self.entity_service._normalize_date_string(None)
+        self.assertEqual(result, None)
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_case_insensitive_contains(self, mock_connection):
+        """Test find_entities with case-insensitive contains"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'name',
+                'operator': 'contains',
+                'value': 'task'  # Should match "Task:" case-insensitively
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses LOWER for case-insensitive search
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('LOWER(attributes->>%s) LIKE LOWER(%s)', query)
+        self.assertEqual(params, ['name', '%task%'])
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_case_insensitive_starts_with(self, mock_connection):
+        """Test find_entities with case-insensitive starts_with"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'title',
+                'operator': 'starts_with',
+                'value': 'TASK'
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses LOWER for case-insensitive search
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('LOWER(attributes->>%s) LIKE LOWER(%s)', query)
+        self.assertEqual(params, ['title', 'TASK%'])
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_case_insensitive_ends_with(self, mock_connection):
+        """Test find_entities with case-insensitive ends_with"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'filename',
+                'operator': 'ends_with',
+                'value': '.TXT'
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses LOWER for case-insensitive search
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('LOWER(attributes->>%s) LIKE LOWER(%s)', query)
+        self.assertEqual(params, ['filename', '%.TXT'])
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_child_ids_equals(self, mock_connection):
+        """Test find_entities with child_ids equals operator"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        child_id = str(uuid.uuid4())
+        filters = [
+            {
+                'attribute': 'child_ids',
+                'operator': 'equals',
+                'value': child_id
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses JSONB ? operator for child_ids
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('child_ids ? %s', query)
+        self.assertEqual(params, [child_id])
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_child_ids_not_equals(self, mock_connection):
+        """Test find_entities with child_ids not_equals operator"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        child_id = str(uuid.uuid4())
+        filters = [
+            {
+                'attribute': 'child_ids',
+                'operator': 'not_equals',
+                'value': child_id
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses NOT (child_ids ? %s)
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('NOT (child_ids ? %s)', query)
+        self.assertEqual(params, [child_id])
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_child_ids_in_operator(self, mock_connection):
+        """Test find_entities with child_ids in operator"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        child_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+        filters = [
+            {
+                'attribute': 'child_ids',
+                'operator': 'in',
+                'value': child_ids
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses OR condition for multiple child_ids
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('child_ids ? %s OR child_ids ? %s', query)
+        self.assertEqual(params, child_ids)
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_entity_type_case_insensitive_contains(self, mock_connection):
+        """Test find_entities with entity_type case-insensitive contains"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'entity_type',
+                'operator': 'contains',
+                'value': 'DOC'  # Should match "document" case-insensitively
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query uses LOWER for case-insensitive search on entity_type
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('LOWER(entity_type) LIKE LOWER(%s)', query)
+        self.assertEqual(params, ['%DOC%'])
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_date_yyyymmdd_format(self, mock_connection):
+        """Test find_entities with YYYYMMDD date format"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'creation_date',
+                'operator': 'greater_than',
+                'value': '20250630'  # YYYYMMDD format
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query handles YYYYMMDD format conversion
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('SUBSTRING(attributes->>%s, 1, 4)', query)
+        self.assertIn('SUBSTRING(attributes->>%s, 5, 2)', query)
+        self.assertIn('SUBSTRING(attributes->>%s, 7, 2)', query)
+        self.assertIn('to_date(%s, \'YYYY-MM-DD\')', query)
+        # Check that the normalized date is in params
+        self.assertIn('2025-06-30', params)
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_date_iso_format(self, mock_connection):
+        """Test find_entities with ISO date format including time"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'creation_date',
+                'operator': 'less_than',
+                'value': '2025-06-30T14:30:00.000Z'  # ISO format with time
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query handles ISO format by splitting on T and space
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('SPLIT_PART(SPLIT_PART(attributes->>%s, \'T\', 1), \' \', 1)', query)
+        self.assertIn('to_date(%s, \'YYYY-MM-DD\')', query)
+        # Check that the normalized date is in params
+        self.assertIn('2025-06-30', params)
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_date_between_mixed_formats(self, mock_connection):
+        """Test find_entities with date between using mixed formats"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'event_date',
+                'operator': 'between',
+                'value': ['20250101', '2025-12-31T23:59:59Z']  # Mixed formats
+            }
+        ]
+        self.entity_service.find_entities(filters)
+        
+        # Verify SQL query handles both date formats
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('BETWEEN to_date(%s, \'YYYY-MM-DD\') AND to_date(%s, \'YYYY-MM-DD\')', query)
+        # Check that both normalized dates are in params
+        self.assertIn('2025-01-01', params)  # Normalized from 20250101
+        self.assertIn('2025-12-31', params)  # Normalized from 2025-12-31T23:59:59Z
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_boolean_attribute_true(self, mock_connection):
+        """Test find_entities with boolean attribute equals True"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        
+        # Mock query results
+        test_id = uuid.uuid4()
+        mock_cursor.fetchall.return_value = [(test_id,)]
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'random_attribute',
+                'operator': 'equals',
+                'value': True
+            }
+        ]
+        result = self.entity_service.find_entities(filters)
+        
+        # Verify results
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], str(test_id))
+        
+        # Verify SQL query
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('attributes->>%s = %s', query)
+        self.assertEqual(params, ['random_attribute', 'True'])  # Boolean converted to string
+
+    @patch('shared_utils.entities.service.EntityService.connection')
+    def test_find_entities_boolean_attribute_false(self, mock_connection):
+        """Test find_entities with boolean attribute equals False"""
+        # Set up mock cursor
+        mock_cursor = MagicMock()
+        mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        
+        # Execute query
+        filters = [
+            {
+                'attribute': 'is_active',
+                'operator': 'equals',
+                'value': False
+            }
+        ]
+        result = self.entity_service.find_entities(filters)
+        
+        # Verify results
+        self.assertEqual(len(result), 0)
+        
+        # Verify SQL query
+        query, params = mock_cursor.execute.call_args[0]
+        self.assertIn('attributes->>%s = %s', query)
+        self.assertEqual(params, ['is_active', 'False'])  # Boolean converted to string
