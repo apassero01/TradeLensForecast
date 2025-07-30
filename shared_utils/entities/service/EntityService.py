@@ -576,10 +576,18 @@ class EntityService:
             else:
                 if op == 'equals':
                     where_clauses.append("attributes->>%s = %s")
-                    params.extend([attr, str(val)])
+                    # Handle boolean values properly - JSON booleans are lowercase when extracted as text
+                    if isinstance(val, bool):
+                        params.extend([attr, str(val).lower()])
+                    else:
+                        params.extend([attr, str(val)])
                 elif op == 'not_equals':
                     where_clauses.append("attributes->>%s != %s")
-                    params.extend([attr, str(val)])
+                    # Handle boolean values properly - JSON booleans are lowercase when extracted as text
+                    if isinstance(val, bool):
+                        params.extend([attr, str(val).lower()])
+                    else:
+                        params.extend([attr, str(val)])
                 elif op == 'contains':
                     # Case-insensitive contains for text searches
                     where_clauses.append("LOWER(attributes->>%s) LIKE LOWER(%s)")

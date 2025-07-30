@@ -592,7 +592,7 @@ class EntityServiceFindEntitiesTestCase(TestCase):
         # Verify SQL query
         query, params = mock_cursor.execute.call_args[0]
         self.assertIn('attributes->>%s = %s', query)
-        self.assertEqual(params, ['random_attribute', 'True'])  # Boolean converted to string
+        self.assertEqual(params, ['random_attribute', 'true'])  # Boolean converted to lowercase string
 
     @patch('shared_utils.entities.service.EntityService.connection')
     def test_find_entities_boolean_attribute_false(self, mock_connection):
@@ -618,4 +618,4 @@ class EntityServiceFindEntitiesTestCase(TestCase):
         # Verify SQL query
         query, params = mock_cursor.execute.call_args[0]
         self.assertIn('attributes->>%s = %s', query)
-        self.assertEqual(params, ['is_active', 'False'])  # Boolean converted to string
+        self.assertEqual(params, ['is_active', 'false'])  # Boolean converted to lowercase string
