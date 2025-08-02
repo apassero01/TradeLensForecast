@@ -4,6 +4,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 
 from shared_utils.entities.service.EntityService import EntityService
+from shared_utils.strategy.QueryEntitiesStrategy import QueryEntitiesStrategy
 from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, HTTPGetRequestStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
@@ -141,7 +142,7 @@ class CallApiModelStrategy(Strategy):
 
         contexts = []
 
-        with open("shared_utils/entities/api_model/strategy/instructions.md", "r") as f:
+        with open("shared_utils/entities/api_model/strategy/agent_instructions.md", "r") as f:
             instructions = f.read()
             contexts.append(
                 f"{'='*50}\n"
@@ -151,11 +152,36 @@ class CallApiModelStrategy(Strategy):
                 f"{'='*50}\n"
             )
 
+        instruction_doc_request = QueryEntitiesStrategy.request_constructor(entity.entity_id, [
+            {
+                'attribute': 'instructions_'+entity.entity_id,
+                'operator': 'equals',
+                'value': True
+            }
+        ])
+        instruction_doc_request = self.executor_service.execute_request(instruction_doc_request)
+        matched_ids = instruction_doc_request.ret_val['matching_entity_ids']
+        contexts.append("HERE ARE ADDITIONAL INSTRUCTIONS THAT YOU HAVE PROVIDED TO YOURSELF BY SPECIFYING ATTRIBUTE 'instructions_entity_id' ON THE DOCUMENT TO TRUE WHERE entity_id is your id. You probably added this to come back to later. IF YOU WANT TO CREATE A NEW INSTRUCTION DOCUMENT FOR YOURSELF, YOU MUST SET THE ATTRIBUTE 'instructions_YOUR_ID' ON THE DOCUMENT TO TRUE")
+        for matched_id in matched_ids:
+            instruction_doc = self.entity_service.get_entity(matched_id)
+            contexts.append(
+                f"ENTITY ID: {matched_id}\n"
+                f"ENTITY NAME: {instruction_doc.get_attribute('name')}\n"
+                f"ENTITY TEXT: {instruction_doc.get_attribute('text')}\n"
+                f"CHILDREN: {instruction_doc.get_children()}\n"
+                f"\n\n"
+            )
+
+        self_serialized = entity.serialize()
+        # remove the message history from the serialized entity
+        del self_serialized['message_history']
+        del self_serialized['strategy_requests']
+        
         contexts.append(
             f"{'='*50}\n"
             f"Entity Context THIS IS YOU, THE AGENT\n"
             f"{'-'*50}\n"
-            f"{entity.entity_name} with id {entity.entity_id}\n"
+            f"{json.dumps(self_serialized, indent=2)}\n"
             f"{'='*50}\n"
         )
 
@@ -183,18 +209,18 @@ class CallApiModelStrategy(Strategy):
         #         )
 
         if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
-            entity_graph = self.serialize_entity_and_children(entity.entity_id)
-            contexts.append(
-                f"{'=' * 50}\n"
-                f"Entity Graph\n"
-                f"{'-' * 50}\n"
-                f"{json.dumps(entity_graph, indent=2)}\n"
-                f"{'=' * 50}\n"
-            )
+            # entity_graph = self.serialize_entity_and_children(entity.entity_id)
+            # contexts.append(
+            #     f"{'=' * 50}\n"
+            #     f"Entity Graph\n"
+            #     f"{'-' * 50}\n"
+            #     f"{json.dumps(entity_graph, indent=2)}\n"
+            #     f"{'=' * 50}\n"
+            # )
             strategy_directory = self.get_strategy_directory(entity)
             contexts.append(
                 f"{'='*50}\n"
-                f"Strategy Directory\n"
+                f"Strategy Directory: FIND THE STRATEGY YOU NEED TO EXECUTE FROM THIS DIRECTORY \n"
                 f"{'-'*50}\n"
                 f"{strategy_directory}\n"
                 f"{'='*50}\n"
@@ -263,8 +289,8 @@ class CallApiModelStrategy(Strategy):
             model_provider=entity.get_attribute('model_type'), 
             api_key=entity.get_attribute('api_key')
         )
-        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user, self.serialize_entities])
-        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user, "serialize_entities": self.serialize_entities}
+        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user, self.update_visible_entities])
+        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user, "update_visible_entities": self.update_visible_entities}
         tool_defs = [t.to_json() for t in tool_dict.values()]
 
 
@@ -276,12 +302,15 @@ class CallApiModelStrategy(Strategy):
         while CUR_ITERS < MAX_ITERS:
             CUR_ITERS += 1
 
-            context += "\n HERE ARE THE VISIBLE ENTITIES YOU CURRENTLY HAVE ACCESS TO: \n"
+            variable_context = context + "\n HERE ARE THE VISIBLE ENTITIES YOU CURRENTLY HAVE ACCESS TO: \n"
             for entity_id in entity.get_attribute('visible_entities'):
-                cur_entity = self.entity_service.get_entity(entity_id)
-                context += cur_entity.serialize() + "\n"
+                try:
+                    cur_entity = self.entity_service.get_entity(entity_id)
+                    variable_context += json.dumps(cur_entity.serialize()) + "\n"
+                except Exception as e:
+                    entity.get_attribute('visible_entities').remove(entity_id)
 
-            system_message = SystemMessage(content=context)
+            system_message = SystemMessage(content=variable_context)
             model_input = [system_message] + entity.get_attribute('message_history')
             response = chat.invoke(model_input)
             self.add_to_message_history(entity, response)
@@ -289,61 +318,61 @@ class CallApiModelStrategy(Strategy):
 
             self.entity_service.save_entity(entity)
             for tool_call in response.tool_calls:
-                if tool_call['name'].lower() == 'yield_to_user':
-                    CUR_ITERS = MAX_ITERS
-                    tool_message = ToolMessage(
-                        content="Control Yielded Back to the user",
-                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
-                        name=tool_call["name"]
-                    )
-                    self.add_to_message_history(entity, tool_message)
-                    break
-                    # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
-                elif tool_call['name'].lower() == 'serialize_entities':
-                    tool = tool_dict.get(tool_call['name'].lower())
-                    tool_msg = tool.invoke(tool_call)
-                    serialized_entities = tool_msg.artifact
-                    
-                    # Extract entity IDs from the tool call
-                    entities_arg = tool_call.get('args', {}).get('entities', [])
-                    
-                    tool_message_content = f"Serialized Entities: {json.dumps(serialized_entities)}"
-                    
-                    # Add entity IDs tag if we have them
-                    if entities_arg:
-                        tool_message_content += f"\n```entities\n{json.dumps(entities_arg)}\n```"
-                    
-                    tool_message = ToolMessage(
-                        content=tool_message_content,
-                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
-                        name=tool_call["name"]
-                    )
-                    self.add_to_message_history(entity, tool_message)
-                    break
-                elif tool_call['name'].lower() == 'update_visible_entities':
-                    tool = tool_dict.get(tool_call['name'].lower())
-                    tool_msg = tool.invoke(tool_call)
-                    entity_ids, method = tool_msg.artifact
-                    if method == 'a':
-                        entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') + entity_ids)))
-                    elif method == 'r':
-                        entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') - entity_ids)))
-                    else:
-                        raise ValueError(f"Invalid method: {method}")
-                    self.entity_service.save_entity(entity)
-                    tool_message = ToolMessage(
-                        content=f"Updated visible entities: {entity.get_attribute('visible_entities')}",
-                        tool_call_id=tool_call["id"],
-                        name=tool_call["name"]
-                    )
-                    self.add_to_message_history(entity, tool_message)
-                    break
-                    
-                try:
-                    selected_tool = tool_dict.get(tool_call['name'].lower())
-                    tool_msg = selected_tool.invoke(tool_call)
-                    
-                    if tool_call['name'].lower() == 'create_strategy_request':
+                try: 
+                    if tool_call['name'].lower() == 'yield_to_user':
+                        CUR_ITERS = MAX_ITERS
+                        tool_message = ToolMessage(
+                            content="Control Yielded Back to the user",
+                            tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                            name=tool_call["name"]
+                        )
+                        self.add_to_message_history(entity, tool_message)
+                        break
+                        # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
+                    elif tool_call['name'].lower() == 'serialize_entities':
+                        tool = tool_dict.get(tool_call['name'].lower())
+                        tool_msg = tool.invoke(tool_call)
+                        serialized_entities = tool_msg.artifact
+                        
+                        # Extract entity IDs from the tool call
+                        entities_arg = tool_call.get('args', {}).get('entities', [])
+                        
+                        tool_message_content = f"Serialized Entities: {json.dumps(serialized_entities)}"
+                        
+                        # Add entity IDs tag if we have them
+                        if entities_arg:
+                            tool_message_content += f"\n```entities\n{json.dumps(entities_arg)}\n```"
+                        
+                        tool_message = ToolMessage(
+                            content=tool_message_content,
+                            tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                            name=tool_call["name"]
+                        )
+                        self.add_to_message_history(entity, tool_message)
+                        break
+                    elif tool_call['name'].lower() == 'update_visible_entities':
+                        tool = tool_dict.get(tool_call['name'].lower())
+                        tool_msg = tool.invoke(tool_call)
+                        entity_ids, method = tool_msg.artifact
+                        if method == 'a':
+                            entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') + entity_ids)))
+                        elif method == 'r':
+                            new_list = [x for x in entity.get_attribute('visible_entities') if x not in entity_ids]
+                            entity.set_attribute('visible_entities', new_list)
+                        else:
+                            raise ValueError(f"Invalid method: {method}")
+                        self.entity_service.save_entity(entity)
+                        tool_message = ToolMessage(
+                            content=f"Updated visible entities: {entity.get_attribute('visible_entities')}",
+                            tool_call_id=tool_call["id"],
+                            name=tool_call["name"]
+                        )
+                        self.add_to_message_history(entity, tool_message)
+                        break
+
+                    elif tool_call['name'].lower() == 'create_strategy_request':
+                        selected_tool = tool_dict.get(tool_call['name'].lower())
+                        tool_msg = selected_tool.invoke(tool_call)
                         child_request = tool_msg.artifact
                         if child_request:
                             request = self.execute_model_request(child_request, entity)
@@ -351,7 +380,8 @@ class CallApiModelStrategy(Strategy):
                             ret_val = request.ret_val
                             if 'entity' in ret_val:
                                 del ret_val['entity']
-                            target_entity = self.entity_service.get_entity(request.target_entity_id)
+                            if 'child_entity' in ret_val:
+                                del ret_val['child_entity']
                             
                             # Collect affected entity IDs
                             affected_entity_ids = []
@@ -375,6 +405,7 @@ class CallApiModelStrategy(Strategy):
                                 f"This step is complete: Are there any further actions needed? "
                                 f"If yes, complete further actions, else let the user return additional information. "
                                 f"Be sure to call the yield_to_user() tool.\n\n"
+                                f"\n{json.dumps(ret_val, indent=2)}\n\n"
                                 f"```entities\n{json.dumps(affected_entity_ids)}\n```"
                             )
                             
@@ -492,7 +523,7 @@ class CallApiModelStrategy(Strategy):
         @param entity_ids: List of entity ids to update
         @param method: The method to use to update the visible entities
         '''
-        return entity_ids, method
+        return "updated entitiees", (entity_ids, method)
 
     # @staticmethod
     # @tool(response_format="content_and_artifact")
@@ -568,6 +599,7 @@ class ClearChatHistoryStrategy(Strategy):
     def apply(self, entity) -> StrategyRequestEntity:
         entity.set_attribute('message_history', [])
         entity.set_attribute('response', [])
+        entity.set_attribute('visible_entities', [])
         self.entity_service.save_entity(entity)
         return self.strategy_request
 

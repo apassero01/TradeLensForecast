@@ -397,8 +397,11 @@ class RemoveEntityStrategy(Strategy):
             remove_child_request.target_entity_id = parent
             remove_child_request.strategy_name = RemoveChildStrategy.__name__
             remove_child_request.param_config['child_id'] = entity.entity_id
-            remove_child_request = self.executor_service.execute_request(remove_child_request)
-            self.strategy_request.add_nested_request(remove_child_request)
+            try:
+                self.executor_service.execute_request(remove_child_request)
+            except ValueError as e:
+                self.logger.warning(f"Failed to remove child {entity.entity_id} from parent {parent}: {e}")
+                continue
 
         for child_id in entity.children_ids:
             try:

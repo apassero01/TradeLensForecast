@@ -149,6 +149,9 @@ class Entity():
             'hidden': self.get_attribute('hidden') if self.has_attribute('hidden') else False,
         }
 
+    def __str__(self):
+        return f"Entity({self.entity_name.value}, ID: {self.entity_id}, Attributes: {self.get_attributes()}, Children: {self.get_children()}, Parents: {self.get_parents()})"
+
     def to_db(self, model=None):
         """Convert entity to database model"""
         return EntityAdapter.entity_to_model(self, model)

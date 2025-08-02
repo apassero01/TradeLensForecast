@@ -18,7 +18,6 @@ class QueryEntitiesStrategy(Strategy):
     
     Usage:
     - filters: List of filter objects with keys: attribute, operator, value
-    - result_attribute: Name of attribute to store the query results on target entity
     
     Supported operators:
     - equals: Exact match (e.g., entity_type = "document")
@@ -36,7 +35,6 @@ class QueryEntitiesStrategy(Strategy):
         "strategy_name": "QueryEntitiesStrategy",
         "target_entity_id": "some_entity_id",
         "param_config": {
-            "result_attribute": "matching_recipes",
             "filters": [
                 {"attribute": "entity_type", "operator": "equals", "value": "recipe"},
                 {"attribute": "creation_date", "operator": "greater_than", "value": "2025-06-21"},
@@ -44,6 +42,8 @@ class QueryEntitiesStrategy(Strategy):
             ]
         }
     }
+    
+    Notes: Currently only supports AND logic between filters so do not try OR. 
     
     '''
     
