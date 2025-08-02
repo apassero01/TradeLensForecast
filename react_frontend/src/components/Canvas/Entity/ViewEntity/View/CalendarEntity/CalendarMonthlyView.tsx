@@ -221,7 +221,7 @@ export default function CalendarMonthlyView({
     return (
         <div
             ref={calendarContainerRef}
-            className="flex flex-col h-full w-full bg-gray-800 text-white nowheel p-4 overflow-y-auto relative"
+            className="flex flex-col h-full w-full bg-gray-800 text-white nowheel p-4 overflow-y-auto"
         >
             <div className="flex-shrink-0 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -231,6 +231,10 @@ export default function CalendarMonthlyView({
                     </h1>
                     <button onClick={() => changeMonth('next')} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Next</button>
                 </div>
+            </div>
+            
+            {/* Calendar grid container with relative positioning for overlay */}
+            <div className="relative flex-1">
                 <div className = "grid grid-cols-7 gap-2">
                     {DAYS_OF_WEEK.map((day) => (
                         <div key={day.key} className="text-center text-sm font-medium text-gray-400">
@@ -315,18 +319,17 @@ export default function CalendarMonthlyView({
 
 
                 </div>
-            </div>
-            
-            {popupPosition && selectedEventId && (
+                
+                {popupPosition && selectedEventId && (
                 <>
-                    {/* Transparent overlay to intercept clicks - only covers calendar grid */}
+                    {/* Transparent overlay to intercept clicks - positioned relative to calendar grid */}
                     <div
-                        className="absolute inset-0 z-10" //absolute bad, go back and fix
+                        className="absolute inset-0 z-10"
                         style={{
-                            top: '120px', // Below the month navigation buttons
-                            left: '16px',
-                            right: '16px',
-                            bottom: '16px',
+                            top: '0',
+                            left: '0',
+                            right: '0',
+                            bottom: '0',
                         }}
                         onClick={() => {
                             setSelectedEventId(null);
@@ -340,8 +343,8 @@ export default function CalendarMonthlyView({
                         style={{
                             position: 'absolute',
                             top: popupPosition.top,
-                            left: selectedEventDayOfWeek === 5
-                                ? popupPosition.left - 600 // Saturday: pop out to the left
+                            left: selectedEventDayOfWeek === 6
+                                ? popupPosition.left - 6000 // Saturday: pop out to the left
                                 : popupPosition.left + 10, // Other days: pop out to the right
                             zIndex: 20,
                         }}
@@ -352,6 +355,7 @@ export default function CalendarMonthlyView({
                     </div>
                 </>
             )}
+            </div>
         </div>
     );
 }
