@@ -18,6 +18,8 @@
     "ace-builds": "^1.39.0",
     "apexcharts": "^4.5.0",
     "axios": "^1.8.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "heic2any": "^0.0.4",
     "monaco-editor": "^0.52.2",
     "react": "^18.2.0",

@@ -31,7 +31,7 @@ class ApiModelEntity(Entity):
             if type(message.content) is list:
                 content = ''
                 for single_message in message.content:
-                    content += single_message + '\n'
+                    content += str(single_message) + '\n'
             else :
                 content = message.content
 

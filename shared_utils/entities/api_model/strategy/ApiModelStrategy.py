@@ -1,7 +1,9 @@
 import datetime
+import pytz
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 
+from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy.BaseStrategy import Strategy, CreateEntityStrategy, HTTPGetRequestStrategy
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
@@ -114,13 +116,32 @@ class CallApiModelStrategy(Strategy):
         required_attrs = ['model_type', 'model_name', 'api_key', 'serialize_entities_and_strategies']
         return all(entity.has_attribute(attr) for attr in required_attrs)
 
+    def extract_entity_ids_from_obj(self, obj):
+        """Extract entity IDs (UUIDs) from various object types"""
+        import re
+        uuid_pattern = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        
+        if isinstance(obj, str):
+            return re.findall(uuid_pattern, obj)
+        elif isinstance(obj, dict):
+            ids = []
+            for v in obj.values():
+                ids.extend(self.extract_entity_ids_from_obj(v))
+            return ids
+        elif isinstance(obj, list):
+            ids = []
+            for item in obj:
+                ids.extend(self.extract_entity_ids_from_obj(item))
+            return ids
+        return []
+
     def form_context(self, entity) -> str:
         """Form context from document children"""
         doc_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.DOCUMENT)
 
         contexts = []
 
-        with open("shared_utils/entities/api_model/strategy/instructions.txt", "r") as f:
+        with open("shared_utils/entities/api_model/strategy/instructions.md", "r") as f:
             instructions = f.read()
             contexts.append(
                 f"{'='*50}\n"
@@ -138,28 +159,28 @@ class CallApiModelStrategy(Strategy):
             f"{'='*50}\n"
         )
 
-        contexts.append("These documents may contain import instructions or other relevant information:")
-        doc_ids = set(doc_ids)
-        for doc_id in doc_ids:
-            doc = self.entity_service.get_entity(doc_id)
-            if doc and doc.has_attribute('text'):
-                text_to_add = doc.get_text()
-                if len(text_to_add) > 500:
-                    text_to_add = text_to_add[:500] + '... [TRUNCATED]'
+        # contexts.append("These documents may contain import instructions or other relevant information:")
+        # doc_ids = set(doc_ids)
+        # for doc_id in doc_ids:
+        #     doc = self.entity_service.get_entity(doc_id)
+        #     if doc and doc.has_attribute('text'):
+        #         text_to_add = doc.get_text()
+        #         if len(text_to_add) > 500:
+        #             text_to_add = text_to_add[:500] + '... [TRUNCATED]'
 
-                doc_type = doc.get_document_type() or 'unknown'
-                if doc.has_attribute('path'):
-                    doc_type = f"{doc_type} ({doc.get_attribute('path')})"
-                if doc.has_attribute('name'):
-                    doc_type = f"{doc_type} - {doc.get_attribute('name')}"
-                contexts.append(
-                    f"{'='*50}\n"
-                    f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
-                    f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
-                    f"{'-'*50} DOCUMENT_BEGIN\n"
-                    f"{text_to_add}\n"
-                    f"{'='*50} DOCUMENT_END\n"
-                )
+        #         doc_type = doc.get_document_type() or 'unknown'
+        #         if doc.has_attribute('path'):
+        #             doc_type = f"{doc_type} ({doc.get_attribute('path')})"
+        #         if doc.has_attribute('name'):
+        #             doc_type = f"{doc_type} - {doc.get_attribute('name')}"
+        #         contexts.append(
+        #             f"{'='*50}\n"
+        #             f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
+        #             f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
+        #             f"{'-'*50} DOCUMENT_BEGIN\n"
+        #             f"{text_to_add}\n"
+        #             f"{'='*50} DOCUMENT_END\n"
+        #         )
 
         if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
             entity_graph = self.serialize_entity_and_children(entity.entity_id)
@@ -188,7 +209,9 @@ class CallApiModelStrategy(Strategy):
                 f"{'='*50}\n"
             )
 
-        contexts.append("HERE IS THE CURRENT DATE USE IT IF THE USER REQUESTS DATE RELEVANT INFORMATION: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        est_tz = pytz.timezone('US/Eastern')
+        current_time_est = datetime.datetime.now(est_tz)
+        contexts.append("HERE IS THE CURRENT DATE USE IT IF THE USER REQUESTS DATE RELEVANT INFORMATION: " + current_time_est.strftime("%A, %Y-%m-%d %H:%M:%S %Z"))
 
         return "\n".join(contexts)
 
@@ -240,8 +263,8 @@ class CallApiModelStrategy(Strategy):
             model_provider=entity.get_attribute('model_type'), 
             api_key=entity.get_attribute('api_key')
         )
-        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user])
-        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user}
+        chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user, self.serialize_entities])
+        tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user, "serialize_entities": self.serialize_entities}
         tool_defs = [t.to_json() for t in tool_dict.values()]
 
 
@@ -270,38 +293,74 @@ class CallApiModelStrategy(Strategy):
                     self.add_to_message_history(entity, tool_message)
                     break
                     # self.add_to_message_history(entity, SystemMessage(content="Control Yielded Back to the user"))
-
+                elif tool_call['name'].lower() == 'serialize_entities':
+                    tool = tool_dict.get(tool_call['name'].lower())
+                    tool_msg = tool.invoke(tool_call)
+                    serialized_entities = tool_msg.artifact
+                    
+                    # Extract entity IDs from the tool call
+                    entities_arg = tool_call.get('args', {}).get('entities', [])
+                    
+                    tool_message_content = f"Serialized Entities: {json.dumps(serialized_entities)}"
+                    
+                    # Add entity IDs tag if we have them
+                    if entities_arg:
+                        tool_message_content += f"\n```entities\n{json.dumps(entities_arg)}\n```"
+                    
+                    tool_message = ToolMessage(
+                        content=tool_message_content,
+                        tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
+                        name=tool_call["name"]
+                    )
+                    self.add_to_message_history(entity, tool_message)
+                    break
+                    
                 try:
                     selected_tool = tool_dict.get(tool_call['name'].lower())
                     tool_msg = selected_tool.invoke(tool_call)
-                    child_request = tool_msg.artifact
-                    if child_request:
-                        request = self.execute_model_request(child_request, entity)
-                        entity = self.entity_service.get_entity(entity.entity_id)
-                        ret_val = request.ret_val
-                        if 'entity' in ret_val:
-                            del ret_val['entity']
-                        target_entity = self.entity_service.get_entity(request.target_entity_id)
-                        # Compose your tool result as a string (or as JSON if required)
-                        tool_message_content = (
-                            f"Result of model executed strategy {request.strategy_name} "
-                            f"with config {request.param_config} on target entity {request.target_entity_id}. "
-                            f"This step is complete: Are there any further actions needed? "
-                            f"If yes, complete further actions, else let the user return additional information. "
-                            f"Be sure to call the yield_to_user() tool."
-                        )
-
-                        tool_message = ToolMessage(
-                            content=tool_message_content,
-                            tool_call_id=tool_call["id"],  # use the actual ID from the model's tool call
-                            name=tool_call["name"]
-                        )
-
-                        # if target_entity.entity_id != entity.entity_id:
-                        #     updated_entity_message = SystemMessage(content=self.format_entity_response(target_entity.serialize()))
-                        #     request_message.content += f"\n\n{updated_entity_message.content}"
-
-                        self.add_to_message_history(entity, tool_message)
+                    
+                    if tool_call['name'].lower() == 'create_strategy_request':
+                        child_request = tool_msg.artifact
+                        if child_request:
+                            request = self.execute_model_request(child_request, entity)
+                            entity = self.entity_service.get_entity(entity.entity_id)
+                            ret_val = request.ret_val
+                            if 'entity' in ret_val:
+                                del ret_val['entity']
+                            target_entity = self.entity_service.get_entity(request.target_entity_id)
+                            
+                            # Collect affected entity IDs
+                            affected_entity_ids = []
+                            affected_entity_ids.append(request.target_entity_id)
+                            
+                            # Extract entity IDs from param_config
+                            if request.param_config:
+                                affected_entity_ids.extend(self.extract_entity_ids_from_obj(request.param_config))
+                            
+                            # Add target_entity_ids if present
+                            if hasattr(request, 'target_entity_ids') and request.target_entity_ids:
+                                affected_entity_ids.extend(request.target_entity_ids)
+                            
+                            # Remove duplicates
+                            affected_entity_ids = list(set(affected_entity_ids))
+                            
+                            # Compose your tool result as a string (or as JSON if required)
+                            tool_message_content = (
+                                f"Result of model executed strategy {request.strategy_name} "
+                                f"with config {request.param_config} on target entity {request.target_entity_id}. "
+                                f"This step is complete: Are there any further actions needed? "
+                                f"If yes, complete further actions, else let the user return additional information. "
+                                f"Be sure to call the yield_to_user() tool.\n\n"
+                                f"```entities\n{json.dumps(affected_entity_ids)}\n```"
+                            )
+                            
+                            tool_message = ToolMessage(
+                                content=tool_message_content,
+                                tool_call_id=tool_call["id"],
+                                name=tool_call["name"]
+                            )
+                            
+                            self.add_to_message_history(entity, tool_message)
                 except Exception as e:
                     error_message = f"Error executing tool {tool_call['name']}: {str(e)}"
                     logger.error(error_message)
@@ -343,7 +402,11 @@ class CallApiModelStrategy(Strategy):
             'response_attribute': 'strategy_registry'
         }
         strategy_request = self.executor_service.execute_request(strategy_request)
-        return strategy_request.ret_val['strategy_registry']
+        registry = strategy_request.ret_val['strategy_registry']
+        registry_flattened = [d for group in registry.values() for d in group]
+        for strategy in registry_flattened:
+            del strategy['source']
+        return registry_flattened
 
     def get_available_entities(self, entity: 'Entity'):
         strategy_request = StrategyRequestEntity()
@@ -381,18 +444,34 @@ class CallApiModelStrategy(Strategy):
 
         return return_dict
 
-    @tool()
-    def serialize_entities(self,entities: List[str]) -> List[dict]:
+    @staticmethod
+    @tool(response_format="content_and_artifact")
+    def serialize_entities(entities: List[str]) -> List[dict]:
         '''
-        Serialize a list of entities. If the model needs to know about entities with
-        specific ids, this method will return more information about the entities.
+        Serialize a list of entity ids into a list of dictionaries.
+        @param entities: List of entity ids to serialize
+        @return: List of serialized entities
         '''
+        entity_service = EntityService()
         serialized_entities = []
         for entity_id in entities:
-            entity = self.entity_service.get_entity(entity_id)
+            entity = entity_service.get_entity(entity_id)
             if entity:
                 serialized_entities.append(entity.serialize())
-        return serialized_entities
+        return "Serialized Entities", serialized_entities
+
+    # @staticmethod
+    # @tool(response_format="content_and_artifact")
+    # def form_plan(self, ):
+    #     '''
+    #     T@tool(
+    #         name="form_plan",
+    #         description="Call these with a list of entity ids to retrieve context for the entities you will need to work with as well as the plans for the next steps"
+    #         "You will then create a plan for the next steps based on the context and the entities you have been given."
+    #         ""
+    #     )
+    #     '''
+    #     return 'Please provide a plan for the next steps.'
 
     @staticmethod
     @tool
@@ -447,20 +526,6 @@ class CallApiModelStrategy(Strategy):
             'context_prefix': 'Here is the relevant context:',  # Optional prefix for context\
             'serialize_entities_and_strategies': False # Optional flag to serialize entities and strategies
         }
-
-    def format_entity_response(self, entities_dict):
-        entity_graph_json = json.dumps(entities_dict, indent=2)
-
-        response = f"""
-    
-        {'=' * 50}
-        Entity Graph
-        {'-' * 50}
-        {entity_graph_json}
-        {'=' * 50}
-        """
-        return response
-
 
 class ClearChatHistoryStrategy(Strategy):
     entity_type = EntityEnum.API_MODEL

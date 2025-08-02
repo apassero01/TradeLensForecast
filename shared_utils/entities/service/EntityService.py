@@ -8,6 +8,8 @@ from shared_utils.cache.CacheService import CacheService
 from shared_utils.entities.EnityEnum import EntityEnum
 from shared_utils.entities.EntityModel import EntityModel
 import logging
+from django.db import connection
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +21,25 @@ class EntityService:
     def get_entity(self, entity_id):
         """Get an entity by its ID from cache or database"""
         logger.info(f"Getting entity {entity_id}")
-        entity = self.load_from_cache(entity_id)
+        cached_entity = self.load_from_cache(entity_id)
         logger.info(f"Entity {entity_id} loaded from cache")
-        if entity is None:
-            logger.info(f"Entity {entity_id} not found in cache, loading from database")
-            entity = self.load_from_db(entity_id)
 
-        if entity is None:
+        db_entity = None
+        if cached_entity is None:
+            logger.info(f"Entity {entity_id} not found in cache, loading from database")
+            db_entity = self.load_from_db(entity_id)
+
+        if cached_entity is None and db_entity is None:
             logger.info(f"Entity {entity_id} not found in database")
             raise ValueError(f"Entity with ID {entity_id} not found")
 
-        return entity
+        if cached_entity:
+            return cached_entity
+        if db_entity:
+            self.cache_service.set(entity_id, db_entity)
+            return db_entity
+
+        return None
 
     def delete_entity(self, entity_id):
         self.clear_entity(entity_id)
@@ -48,16 +58,12 @@ class EntityService:
             self.clear_entity(entity.entity_id)
             return
         # Broadcast update
-        # if not socket_exists:
-        # No socket exists, broadcast to global to establish connection
-        # print(f"No socket exists for entity {entity.entity_id}, broadcasting to global")
         self._broadcast_to_global_socket({
             entity.entity_id: entity.serialize()
         })
-        # else:
-            # Socket exists, send update through entity-specific socket
-        print(f"Socket exists for entity {entity.entity_id}, broadcasting to entity socket")
-        self._broadcast_to_entity_socket(entity)
+
+        # Save to database
+        self.save_to_db(entity)
             
         print(f"Entity {entity.entity_id} saved and broadcast")
 
@@ -295,6 +301,45 @@ class EntityService:
         except EntityModel.DoesNotExist:
             logger.error(f"Entity with ID {entity_id} not found in database")
             return None
+        
+    def save_to_db(self, entity):
+        """Save an entity to database"""
+        try:
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, use thread executor for sync database operations
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._save_to_db_sync, entity)
+                        future.result()
+                        return
+            except RuntimeError:
+                pass
+            
+            # We're in a sync context, still use the sync method directly
+            self._save_to_db_sync(entity)
+            
+        except Exception as e:
+            # If we get async/sync mixing errors, fall back to thread executor
+            if "async event loop" in str(e) or "AsyncToSync" in str(e):
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._save_to_db_sync, entity)
+            else:
+                logger.error(f"Error saving entity {entity.entity_id} to database: {e}")
+                raise
+
+    def _save_to_db_sync(self, entity):
+        """Synchronous version of save_to_db for use in thread executor"""
+        try:
+            model = entity.to_db()
+            model.save()
+            logger.info(f"Entity {entity.entity_id} saved to database")
+        except Exception as e:
+            logger.error(f"Error saving entity {entity.entity_id} to database: {e}")
+            raise
 
     def clear_entities(self, entity_ids):
         """Remove multiple entities from cache"""
@@ -409,6 +454,120 @@ class EntityService:
             entities.extend(child_entities)
 
         return entities
+
+    def find_entities(self, filters: list) -> list:
+        """
+        Find entities based on a list of filter conditions.
+        
+        Args:
+            filters: List of filter dictionaries with keys: attribute, operator, value
+            
+        Returns:
+            List of entity IDs matching all filter conditions
+        """
+        if not filters:
+            return []
+            
+        try:
+            query, params = self._build_sql_query(filters)
+            
+            # Execute query
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                results = [str(row[0]) for row in cursor.fetchall()]
+                
+            logger.info(f"Query found {len(results)} matching entities")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error executing find_entities query: {str(e)}")
+            raise
+
+    def _build_sql_query(self, filters: list) -> tuple:
+        """
+        Build SQL query from filter configuration.
+        
+        Args:
+            filters: List of filter dictionaries
+            
+        Returns:
+            Tuple of (query_string, params_list)
+        """
+        base_query = "SELECT entity_id FROM shared_utils_entitymodel WHERE "
+        where_clauses = []
+        params = []
+        
+        for filter_obj in filters:
+            attr = filter_obj['attribute']
+            op = filter_obj['operator']
+            val = filter_obj['value']
+            
+            # Handle special case for entity_type which is a direct column
+            if attr == 'entity_type':
+                if op == 'equals':
+                    where_clauses.append('entity_type = %s')
+                    params.append(val)
+                elif op == 'not_equals':
+                    where_clauses.append('entity_type != %s')
+                    params.append(val)
+                elif op == 'in':
+                    placeholders = ', '.join(['%s'] * len(val))
+                    where_clauses.append(f'entity_type IN ({placeholders})')
+                    params.extend(val)
+            # Handle attributes stored in JSONB
+            else:
+                if op == 'equals':
+                    where_clauses.append("attributes->>%s = %s")
+                    params.extend([attr, str(val)])
+                elif op == 'not_equals':
+                    where_clauses.append("attributes->>%s != %s")
+                    params.extend([attr, str(val)])
+                elif op == 'contains':
+                    where_clauses.append("attributes->>%s LIKE %s")
+                    params.extend([attr, f'%{val}%'])
+                elif op == 'starts_with':
+                    where_clauses.append("attributes->>%s LIKE %s")
+                    params.extend([attr, f'{val}%'])
+                elif op == 'ends_with':
+                    where_clauses.append("attributes->>%s LIKE %s")
+                    params.extend([attr, f'%{val}'])
+                elif op == 'greater_than':
+                    # Try to cast as numeric first, fall back to date
+                    where_clauses.append(
+                        "CASE "
+                        "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric > %s "
+                        "ELSE (attributes->>%s)::date > %s::date "
+                        "END"
+                    )
+                    params.extend([attr, attr, val, attr, val])
+                elif op == 'less_than':
+                    where_clauses.append(
+                        "CASE "
+                        "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric < %s "
+                        "ELSE (attributes->>%s)::date < %s::date "
+                        "END"
+                    )
+                    params.extend([attr, attr, val, attr, val])
+                elif op == 'between':
+                    if isinstance(val, list) and len(val) == 2:
+                        where_clauses.append(
+                            "CASE "
+                            "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric BETWEEN %s AND %s "
+                            "ELSE (attributes->>%s)::date BETWEEN %s::date AND %s::date "
+                            "END"
+                        )
+                        params.extend([attr, attr, val[0], val[1], attr, val[0], val[1]])
+                elif op == 'in':
+                    if isinstance(val, list):
+                        placeholders = ', '.join(['%s'] * len(val))
+                        where_clauses.append(f"attributes->>%s IN ({placeholders})")
+                        params.append(attr)
+                        params.extend([str(v) for v in val])
+                        
+        # Join all where clauses with AND
+        query = base_query + " AND ".join(where_clauses)
+        
+        return query, params
 
 
 

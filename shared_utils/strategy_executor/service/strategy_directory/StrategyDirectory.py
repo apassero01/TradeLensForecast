@@ -22,6 +22,7 @@ class StrategyDirectory:
                 "shared_utils.strategy.BaseStrategy.ExecuteRequestChildren",
                 "shared_utils.strategy.BaseStrategy.HTTPGetRequestStrategy",
                 "shared_utils.strategy.BaseStrategy.ExtractEntityDataStrategy",
+                "shared_utils.strategy.QueryEntitiesStrategy.QueryEntitiesStrategy",
             ],
             EntityEnum.TRAINING_SESSION.value: [
                 "training_session.strategy.TrainingSessionStrategy.GetSequenceSetsStrategy",
@@ -48,7 +49,7 @@ class StrategyDirectory:
             EntityEnum.DOCUMENT.value: [
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.ScrapeFilePathStrategy",
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.GetFilePathWithDepth",
-                "shared_utils.entities.document_entities.strategy.SearchDocumentsStrategy.SearchDocumentsStrategy",
+                # "shared_utils.entities.document_entities.strategy.SearchDocumentsStrategy.SearchDocumentsStrategy",
                 "shared_utils.entities.document_entities.strategy.FileTreeStrategies.WriteToFilePath",
             ],  
             EntityEnum.API_MODEL.value: [
