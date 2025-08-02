@@ -190,7 +190,6 @@ export default function CalendarMonthlyView({
 
     useEffect(() => {
         if (pendingEventDate) {
-            // Find the most recent event for the pending date
             const events = eventsByDate[pendingEventDate];
             if (events) {
                 const newestEvent = events[events.length - 1];
@@ -200,6 +199,21 @@ export default function CalendarMonthlyView({
             }
         }
     }, [pendingEventDate, eventsByDate]);
+
+    // Reset modal state when selected event is deleted
+    useEffect(() => {
+        if (selectedEventId) {
+            const eventStillExists = eventChildren.some(eventNode => 
+                eventNode.data?.entity_id === selectedEventId
+            );
+            
+            if (!eventStillExists) {
+                setSelectedEventId(null);
+                setPopupPosition(null);
+                setSelectedEventDayOfWeek(null);
+            }
+        }
+    }, [selectedEventId, eventChildren]);
 
     if (!data) {
         return (
@@ -243,10 +257,16 @@ export default function CalendarMonthlyView({
                                 day.date.getMonth() === currentDate.getMonth() && 
                                 day.date.getFullYear() === currentDate.getFullYear() && 
                                 "bg-gray-500",
-                                "hover:bg-gray-600 hover:border-gray-400"
+                                // Only apply hover effects when no event details modal is open
+                                !(popupPosition && selectedEventId) && "hover:bg-gray-600 hover:border-gray-400"
                             )}
 
                             onClick={e => {
+                                // Ignore day clicks when an event details view is open
+                                if (popupPosition && selectedEventId) {
+                                    return;
+                                }
+                                
                                 const dateString = day.date.toISOString().split('T')[0];
                                 const request = StrategyRequests.createEntity(
                                     parentEntityId,
