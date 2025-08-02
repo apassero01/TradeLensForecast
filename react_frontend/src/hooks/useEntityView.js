@@ -10,13 +10,29 @@ import useRenderStoredView from "./useRenderStoredView";
  * @param {function to send strategy request} sendStrategyRequest 
  * @param {function to update entity} updateEntity 
  * @param {props to pass to the view} props 
- * @param {type of view component child of entity that we want to return} viewComponentType 
+ * @param {type of view component child of entity that we want to return OR specific view entity ID} viewComponentTypeOrId 
  * @returns {view component child of entity that we want to return} view 
  * This hook is used assuming that we have Entity A that contains a child entity that is a view component of some type. 
  * This hook will return the view component child of entity A that is of the type specified by viewComponentType.
+ * If viewComponentTypeOrId is a valid entity ID, it will return that specific view.
  */
-export default function useEntityView(entityId, sendStrategyRequest, updateEntity, props, viewComponentType) {
+export default function useEntityView(entityId, sendStrategyRequest, updateEntity, props, viewComponentTypeOrId) {
     const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: entityId, type: EntityTypes.VIEW })) || [];
-    const view = viewComponentType ? viewChildren.find((child) => child.data.view_component_type === viewComponentType) : viewChildren[0];
-    return useRenderStoredView(view?.entity_id, sendStrategyRequest, updateEntity, props);
+    
+    let view;
+    if (viewComponentTypeOrId) {
+        // Check if it's a specific view ID (UUID format)
+        const isViewId = viewChildren.some(child => child.data.entity_id === viewComponentTypeOrId);
+        if (isViewId) {
+            view = viewChildren.find(child => child.data.entity_id === viewComponentTypeOrId);
+        } else {
+            // It's a view component type
+            view = viewChildren.find((child) => child.data.view_component_type === viewComponentTypeOrId);
+        }
+    } else {
+        // Default to first view
+        view = viewChildren[0];
+    }
+    
+    return useRenderStoredView(view?.data?.entity_id, sendStrategyRequest, updateEntity, props);
 }

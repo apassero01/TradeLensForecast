@@ -135,12 +135,45 @@ class CallApiModelStrategy(Strategy):
                 ids.extend(self.extract_entity_ids_from_obj(item))
             return ids
         return []
+    
+    def _add_instructions_recursively(self, entity_id: str, processed_ids: set, contexts: list):
+        """
+        Recursively traverses entities, adding document text to contexts.
+        Uses a set of processed_ids to avoid redundant work and cycles.
+        """
+        if entity_id in processed_ids:
+            return  # Avoid processing the same entity twice
+        
+        processed_ids.add(entity_id)
+        
+        try:
+            instruction_doc = self.entity_service.get_entity(entity_id)
+            if not instruction_doc:
+                return
+
+            # If the entity is a document, add its content to the context
+            if instruction_doc.entity_name == EntityEnum.DOCUMENT and instruction_doc.has_attribute('text'):
+                contexts.append(
+                    f"ENTITY ID: {entity_id}\n"
+                    f"ENTITY NAME: {instruction_doc.get_attribute('name')}\n"
+                    f"ENTITY TEXT: {instruction_doc.get_attribute('text')}\n"
+                    f"CHILDREN: {instruction_doc.get_children()}\n"
+                    f"\n\n"
+                )
+
+            # Recurse for all children
+            for child_id in instruction_doc.get_children():
+                self._add_instructions_recursively(child_id, processed_ids, contexts)
+
+        except Exception as e:
+            logger.error(f"Error processing instruction entity {entity_id}: {e}")
+
 
     def form_context(self, entity) -> str:
         """Form context from document children"""
-        doc_ids = self.entity_service.get_children_ids_by_type(entity, EntityEnum.DOCUMENT)
 
         contexts = []
+        processed_instruction_ids = set()
 
         with open("shared_utils/entities/api_model/strategy/agent_instructions.md", "r") as f:
             instructions = f.read()
@@ -163,14 +196,9 @@ class CallApiModelStrategy(Strategy):
         matched_ids = instruction_doc_request.ret_val['matching_entity_ids']
         contexts.append("HERE ARE ADDITIONAL INSTRUCTIONS THAT YOU HAVE PROVIDED TO YOURSELF BY SPECIFYING ATTRIBUTE 'instructions_entity_id' ON THE DOCUMENT TO TRUE WHERE entity_id is your id. You probably added this to come back to later. IF YOU WANT TO CREATE A NEW INSTRUCTION DOCUMENT FOR YOURSELF, YOU MUST SET THE ATTRIBUTE 'instructions_YOUR_ID' ON THE DOCUMENT TO TRUE")
         for matched_id in matched_ids:
-            instruction_doc = self.entity_service.get_entity(matched_id)
-            contexts.append(
-                f"ENTITY ID: {matched_id}\n"
-                f"ENTITY NAME: {instruction_doc.get_attribute('name')}\n"
-                f"ENTITY TEXT: {instruction_doc.get_attribute('text')}\n"
-                f"CHILDREN: {instruction_doc.get_children()}\n"
-                f"\n\n"
-            )
+            # The recursive function will automatically skip any IDs already processed from the package
+            self._add_instructions_recursively(matched_id, processed_instruction_ids, contexts)
+
 
         self_serialized = entity.serialize()
         # remove the message history from the serialized entity
@@ -185,61 +213,33 @@ class CallApiModelStrategy(Strategy):
             f"{'='*50}\n"
         )
 
-        # contexts.append("These documents may contain import instructions or other relevant information:")
-        # doc_ids = set(doc_ids)
-        # for doc_id in doc_ids:
-        #     doc = self.entity_service.get_entity(doc_id)
-        #     if doc and doc.has_attribute('text'):
-        #         text_to_add = doc.get_text()
-        #         if len(text_to_add) > 500:
-        #             text_to_add = text_to_add[:500] + '... [TRUNCATED]'
 
-        #         doc_type = doc.get_document_type() or 'unknown'
-        #         if doc.has_attribute('path'):
-        #             doc_type = f"{doc_type} ({doc.get_attribute('path')})"
-        #         if doc.has_attribute('name'):
-        #             doc_type = f"{doc_type} - {doc.get_attribute('name')}"
-        #         contexts.append(
-        #             f"{'='*50}\n"
-        #             f"Document Type and Name and Path : {doc_type.upper()} DocumentID: {doc_id}\n"
-        #             f"Document path (if available): {doc.get_attribute('path') if doc.has_attribute('path') else 'N/A'}\n"
-        #             f"{'-'*50} DOCUMENT_BEGIN\n"
-        #             f"{text_to_add}\n"
-        #             f"{'='*50} DOCUMENT_END\n"
-        #         )
+        strategy_directory = self.get_strategy_directory(entity)
+        contexts.append(
+            f"{'='*50}\n"
+            f"Strategy Directory: FIND THE STRATEGY YOU NEED TO EXECUTE FROM THIS DIRECTORY \n"
+            f"{'-'*50}\n"
+            f"{strategy_directory}\n"
+            f"{'='*50}\n"
+        )
 
-        if self.strategy_request.param_config.get('serialize_entities_and_strategies', False):
-            # entity_graph = self.serialize_entity_and_children(entity.entity_id)
-            # contexts.append(
-            #     f"{'=' * 50}\n"
-            #     f"Entity Graph\n"
-            #     f"{'-' * 50}\n"
-            #     f"{json.dumps(entity_graph, indent=2)}\n"
-            #     f"{'=' * 50}\n"
-            # )
-            strategy_directory = self.get_strategy_directory(entity)
-            contexts.append(
-                f"{'='*50}\n"
-                f"Strategy Directory: FIND THE STRATEGY YOU NEED TO EXECUTE FROM THIS DIRECTORY \n"
-                f"{'-'*50}\n"
-                f"{strategy_directory}\n"
-                f"{'='*50}\n"
-            )
-
-            available_entities = self.get_available_entities(entity)
-            contexts.append(
-                f"{'='*50}\n"
-                f"Available Entities\n"
-                f"{'-'*50}\n"
-                f"{available_entities}\n"
-                f"{'='*50}\n"
-            )
+        available_entities = self.get_available_entities(entity)
+        contexts.append(
+            f"{'='*50}\n"
+            f"Available Entities\n"
+            f"{'-'*50}\n"
+            f"{available_entities}\n"
+            f"{'='*50}\n"
+        )
 
         est_tz = pytz.timezone('US/Eastern')
         current_time_est = datetime.datetime.now(est_tz)
         contexts.append("HERE IS THE CURRENT DATE USE IT IF THE USER REQUESTS DATE RELEVANT INFORMATION: " + current_time_est.strftime("%A, %Y-%m-%d %H:%M:%S %Z"))
 
+        entity.set_attribute('ids_in_context', list(processed_instruction_ids))
+
         return "\n".join(contexts)
+    
 
     def format_response_text(self, text: str, max_line_length: int = 80) -> str:
         """Format response text with proper line breaks"""
@@ -274,16 +274,7 @@ class CallApiModelStrategy(Strategy):
 
         user_input = config.get('user_input', '')
 
-        system_prompt = config.get('system_prompt', '')
-        context_prefix = config.get('context_prefix', 'Here is the relevant context:')
 
-
-        # # Initialize LangChain chat model
-        # chat = ChatOpenAI(
-        #     model_name=entity.get_attribute('model_name'),
-        #     openai_api_key=entity.get_attribute('api_key'),
-        #     max_tokens=entity.get_attribute('config').get('max_tokens', 1000)
-        # )
         chat = init_chat_model(
             model=entity.get_attribute('model_name'), 
             model_provider=entity.get_attribute('model_type'), 
@@ -291,19 +282,20 @@ class CallApiModelStrategy(Strategy):
         )
         chat = chat.bind_tools([self.create_strategy_request, self.yield_to_user, self.update_visible_entities])
         tool_dict = {"create_strategy_request": self.create_strategy_request, "yield_to_user": self.yield_to_user, "update_visible_entities": self.update_visible_entities}
-        tool_defs = [t.to_json() for t in tool_dict.values()]
-
 
         MAX_ITERS = 15
         CUR_ITERS = 0
-        # Use invoke() instead of __call__
 
         self.add_to_message_history(entity, HumanMessage(content=user_input))
         while CUR_ITERS < MAX_ITERS:
             CUR_ITERS += 1
 
             variable_context = context + "\n HERE ARE THE VISIBLE ENTITIES YOU CURRENTLY HAVE ACCESS TO: \n"
-            for entity_id in entity.get_attribute('visible_entities'):
+            # Create a copy of visible_entities to iterate over to avoid RuntimeError
+            visible_entities_copy = list(entity.get_attribute('visible_entities'))
+            for entity_id in visible_entities_copy:
+                if entity_id in entity.get_attribute('ids_in_context'):
+                    continue
                 try:
                     cur_entity = self.entity_service.get_entity(entity_id)
                     variable_context += json.dumps(cur_entity.serialize()) + "\n"
@@ -355,7 +347,7 @@ class CallApiModelStrategy(Strategy):
                         tool_msg = tool.invoke(tool_call)
                         entity_ids, method = tool_msg.artifact
                         if method == 'a':
-                            entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') + entity_ids)))
+                            entity.set_attribute('visible_entities', list(set(entity.get_attribute('visible_entities') + entity_ids + list(entity.get_attribute('ids_in_context')))))
                         elif method == 'r':
                             new_list = [x for x in entity.get_attribute('visible_entities') if x not in entity_ids]
                             entity.set_attribute('visible_entities', new_list)
@@ -397,6 +389,13 @@ class CallApiModelStrategy(Strategy):
                             
                             # Remove duplicates
                             affected_entity_ids = list(set(affected_entity_ids))
+
+                            current_visible_entities = entity.get_attribute('visible_entities')
+                            new_visible_entities = current_visible_entities + affected_entity_ids
+                            new_visible_entities = list(set(new_visible_entities))
+                            entity.set_attribute('visible_entities', new_visible_entities)
+                            self.entity_service.save_entity(entity) 
+
                             
                             # Compose your tool result as a string (or as JSON if required)
                             tool_message_content = (
@@ -524,19 +523,6 @@ class CallApiModelStrategy(Strategy):
         @param method: The method to use to update the visible entities
         '''
         return "updated entitiees", (entity_ids, method)
-
-    # @staticmethod
-    # @tool(response_format="content_and_artifact")
-    # def form_plan(self, ):
-    #     '''
-    #     T@tool(
-    #         name="form_plan",
-    #         description="Call these with a list of entity ids to retrieve context for the entities you will need to work with as well as the plans for the next steps"
-    #         "You will then create a plan for the next steps based on the context and the entities you have been given."
-    #         ""
-    #     )
-    #     '''
-    #     return 'Please provide a plan for the next steps.'
 
     @staticmethod
     @tool

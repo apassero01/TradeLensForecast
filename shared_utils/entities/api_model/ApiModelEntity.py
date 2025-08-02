@@ -24,7 +24,7 @@ class ApiModelEntity(Entity):
         self.set_attribute('message_history', [])
         self.set_attribute('visible_entities', [])
 
-    def on_create(self):
+    def on_create(self, param_config: Optional[Dict[str, Any]] = None):
         strategy_request_list = []
         child_vis_create  = StrategyRequestEntity()
         self.add_child(child_vis_create)
@@ -35,7 +35,7 @@ class ApiModelEntity(Entity):
             'entity_class': ViewEntity.get_class_path(),
             'entity_uuid': child_uuid,
             'initial_attributes': {
-                'view_component_type': 'chat_interface',
+                'view_component_type': 'chatinterface',
             }
         }
         child_vis_create.target_entity_id = self.entity_id

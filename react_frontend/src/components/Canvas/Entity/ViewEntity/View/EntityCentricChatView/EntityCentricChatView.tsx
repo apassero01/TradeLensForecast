@@ -317,26 +317,8 @@ export default function EntityCentricChatView({
             {/* Fullscreen Entity View */}
             {fullscreenEntity && (
                 <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
-                    {/* Fullscreen Header */}
-                    <div className="flex-shrink-0 p-4 border-b border-gray-700 flex items-center justify-between bg-gray-800">
-                        <h2 className="text-lg font-semibold">Entity View</h2>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-400">
-                                {filteredEntityIds.indexOf(fullscreenEntity) + 1} / {filteredEntityIds.length}
-                            </span>
-                            <button
-                                onClick={() => setFullscreenEntity(null)}
-                                className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors"
-                                title="Close fullscreen (Esc)"
-                            >
-                                {/* @ts-ignore */}
-                                <IoContract className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                    
-                    {/* Fullscreen Content */}
-                    <div className="flex-grow overflow-auto p-4">
+                    {/* Fullscreen Content - No Header */}
+                    <div className="flex-grow overflow-auto">
                         <EntityViewRenderer
                             entityId={fullscreenEntity}
                             sendStrategyRequest={sendStrategyRequest}

@@ -1,15 +1,15 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useWebSocketConsumer } from '../../hooks/useWebSocketConsumer';
 import { FaCopy, FaCheck, FaExternalLinkAlt } from 'react-icons/fa';
 import ConfirmationModal from '../Modal/ConfirmationModal';
-import { useRecoilValue } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { childrenByTypeSelector, nodeSelectorFamily } from '../../state/entitiesSelectors';
 import { EntityTypes } from '../Canvas/Entity/EntityEnum';
 import VisibilityToggleIcon from '../common/VisibilityToggleIcon';
 import { StrategyRequests } from '../../utils/StrategyRequestBuilder';
 import { useReactFlow } from '@xyflow/react';
 import useUpdateFlowNodes from '../../hooks/useUpdateFlowNodes';
+import { sessionAtom } from '../../state/sessionAtoms';
 export default function ContextMenu({
   id,
   entityId,
@@ -19,7 +19,7 @@ export default function ContextMenu({
   bottom,
   onClick,
 }) {
-  const navigate = useNavigate();
+  const setSession = useSetRecoilState(sessionAtom);
   const { sendStrategyRequest } = useWebSocketConsumer();
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -122,9 +122,13 @@ export default function ContextMenu({
     // Close the context menu
     onClick();
     
-    // Navigate to entity view in the same tab
-    navigate(`/entity/${entityId}`);
-  }, [entityId, onClick, navigate]);
+    // Switch to entity view mode
+    setSession(prev => ({
+      ...prev,
+      viewMode: 'entity',
+      currentEntityId: entityId
+    }));
+  }, [entityId, onClick, setSession]);
 
   return (
     <>
