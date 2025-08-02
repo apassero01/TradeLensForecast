@@ -8,6 +8,7 @@ import useEntityView from '../../../../../../hooks/useEntityView';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
 
 
+
 interface CalendarMonthlyViewProps {
     data?: CalendarMonthlyViewData;
     sendStrategyRequest: (strategyRequest: any) => void;
@@ -38,14 +39,10 @@ export default function CalendarMonthlyView({
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
     const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth()); // 0 = Ja
-    const [showDayModal, setShowDayModal] = useState(false);
-    const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
-    const [showEventSidebar, setShowEventSidebar] = useState(false);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const selectedEventDetailView = useEntityView(selectedEventId, sendStrategyRequest, updateEntity, {}, 'calendar_event_details');
     const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
     const calendarContainerRef = useRef<HTMLDivElement>(null);
-    const popupRef = useRef<HTMLDivElement>(null);
     const [pendingEventDate, setPendingEventDate] = useState<string | null>(null);
     const [selectedEventDayOfWeek, setSelectedEventDayOfWeek] = useState<number | null>(null);
 
@@ -119,7 +116,6 @@ export default function CalendarMonthlyView({
                 onClick={e => {
                     e.stopPropagation();
                     setSelectedEventId(event.entity_id);
-                    setShowEventSidebar(true);
                     const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
                     const container = calendarContainerRef.current;
                     if (dayCell && container) {
@@ -147,7 +143,6 @@ export default function CalendarMonthlyView({
     const changeMonth = (direction: 'previous' | 'next') => {
         if (direction === 'previous') {
             if (currentMonth === 0) {
-                // January -> December of previous year
                 setCurrentMonth(11);
                 setCurrentYear(currentYear - 1);
             } else {
@@ -155,38 +150,22 @@ export default function CalendarMonthlyView({
             }
         } else {
             if (currentMonth === 11) {
-                // December -> January of next year
                 setCurrentMonth(0);
                 setCurrentYear(currentYear + 1);
             } else {
                 setCurrentMonth(currentMonth + 1);
             }
         }
+
+        //In case modal is still open
+        setSelectedEventId(null);
+        setPopupPosition(null);
+        setSelectedEventDayOfWeek(null);
     };
 
-    // Use it in your component
     const calendarDays = createCalendarDays(firstDayOfMonth, lastDayOfMonth);
-
-    // Calculate the starting day offset (0 = Sunday, 1 = Monday, etc.)
     const startingDayOffset = firstDayOfMonth.getDay();
     const endingDayOffset = lastDayOfMonth.getDay();
-
-    // Close popup when clicking outside
-    useEffect(() => {
-        if (!popupPosition || !selectedEventId) return;
-
-        function handleClickOutside(event: MouseEvent) {
-            if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-                setSelectedEventId(null);
-                setPopupPosition(null);
-                setSelectedEventDayOfWeek(null);
-            }
-        }
-        document.addEventListener('pointerdown', handleClickOutside);
-        return () => {
-            document.removeEventListener('pointerdown', handleClickOutside);
-        };
-    }, [popupPosition, selectedEventId]);
 
     useEffect(() => {
         if (pendingEventDate) {
@@ -194,7 +173,6 @@ export default function CalendarMonthlyView({
             if (events) {
                 const newestEvent = events[events.length - 1];
                 setSelectedEventId(newestEvent.entity_id);
-                setShowEventSidebar(true);
                 setPendingEventDate(null);
             }
         }
@@ -262,11 +240,10 @@ export default function CalendarMonthlyView({
                             )}
 
                             onClick={e => {
-                                // Ignore day clicks when an event details view is open
-                                if (popupPosition && selectedEventId) {
+                                if (selectedEventId || popupPosition) {
                                     return;
                                 }
-                                
+
                                 const dateString = day.date.toISOString().split('T')[0];
                                 const request = StrategyRequests.createEntity(
                                     parentEntityId,
@@ -313,19 +290,39 @@ export default function CalendarMonthlyView({
             </div>
             
             {popupPosition && selectedEventId && (
-                <div
-                    ref={popupRef}
-                    style={{
-                        position: 'absolute',
-                        top: popupPosition.top,
-                        left: selectedEventDayOfWeek === 5
-                            ? popupPosition.left - 600 // Saturday: pop out to the right
-                            : popupPosition.left + 10, // Other days: pop out to the left (adjust -310 as needed for your modal width)
-                    }}
-                    className={clsx('border border-gray-400')}
-                >
-                    {selectedEventDetailView}
-                </div>
+                <>
+                    {/* Transparent overlay to intercept clicks - only covers calendar grid */}
+                    <div
+                        className="absolute inset-0 z-10"
+                        style={{
+                            top: '120px', // Below the month navigation buttons
+                            left: '16px',
+                            right: '16px',
+                            bottom: '16px',
+                        }}
+                        onClick={() => {
+                            setSelectedEventId(null);
+                            setPopupPosition(null);
+                            setSelectedEventDayOfWeek(null);
+                        }}
+                    />
+                    
+                    {/* Modal content */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: popupPosition.top,
+                            left: selectedEventDayOfWeek === 5
+                                ? popupPosition.left - 600 // Saturday: pop out to the left
+                                : popupPosition.left + 10, // Other days: pop out to the right
+                            zIndex: 20,
+                        }}
+                        className={clsx('border border-gray-400 bg-gray-800')}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {selectedEventDetailView}
+                    </div>
+                </>
             )}
         </div>
     );
