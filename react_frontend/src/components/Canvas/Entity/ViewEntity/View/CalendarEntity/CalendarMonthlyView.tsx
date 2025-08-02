@@ -272,10 +272,6 @@ export default function CalendarMonthlyView({
                             }}
 
                             onClick={e => {
-                                if (selectedEventId || popupPosition) {
-                                    return;
-                                }
-
                                 const dateString = day.date.toISOString().split('T')[0];
                                 const request = StrategyRequests.createEntity(
                                     parentEntityId,
@@ -291,6 +287,7 @@ export default function CalendarMonthlyView({
                                 );
                                 sendStrategyRequest(request);
                                 setPendingEventDate(dateString);
+                                setSelectedEventDayOfWeek(new Date(dateString).getDay());
                                 const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
                                 const container = calendarContainerRef.current;
                                 if (dayCell && container) {
@@ -343,8 +340,8 @@ export default function CalendarMonthlyView({
                         style={{
                             position: 'absolute',
                             top: popupPosition.top,
-                            left: selectedEventDayOfWeek === 6
-                                ? popupPosition.left - 6000 // Saturday: pop out to the left
+                            left: selectedEventDayOfWeek === 5
+                                ? popupPosition.left - 500 // Saturday: pop out to the left
                                 : popupPosition.left + 10, // Other days: pop out to the right
                             zIndex: 20,
                         }}
