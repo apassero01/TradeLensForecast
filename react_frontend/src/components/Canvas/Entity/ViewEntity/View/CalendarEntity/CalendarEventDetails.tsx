@@ -33,7 +33,9 @@ export default function CalendarEventDetails({
     description: data?.description || '',
     location: data?.location || ''
   });
+
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -73,6 +75,13 @@ export default function CalendarEventDetails({
       .withStrategyName('SetAttributesStrategy')
       .withTargetEntity(parentEntityId)
       .withParams({ attribute_map: updated_attributes })
+      .build());
+  };
+
+  const handleDeleteEvent = () => {
+    sendStrategyRequest(StrategyRequests.builder()
+      .withStrategyName('RemoveEntityStrategy')
+      .withTargetEntity(parentEntityId)
       .build());
   };
 
@@ -234,7 +243,41 @@ export default function CalendarEventDetails({
               </span>
             )}
           </div>
+
+          
         </div>
+      </div>
+
+      {/* Delete Button Section */}
+      <div className="flex-shrink-0 mt-auto pt-6 border-t border-gray-700">
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-full px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+          >
+            <span>Delete Event</span>
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-center text-gray-300 text-sm">
+              Are you sure you want to delete "{formData.title || 'this event'}"?
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 w-40 px-4 py-3 bg-gray-800 border border-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteEvent}
+                className="flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

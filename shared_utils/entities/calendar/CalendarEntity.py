@@ -25,7 +25,7 @@ class CalendarEntity(Entity):
             'parent_attributes': {
                 "title": "title",
             },
-            'view_component_type': 'calendarmonthlyview',
+            'view_component_type': 'calendar_monthly_view',
         }
         monthly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
@@ -41,7 +41,7 @@ class CalendarEntity(Entity):
             'parent_attributes': {
                 "title": "title",
             },
-            'view_component_type': 'calendarweeklyview',
+            'view_component_type': 'calendar_weekly_view',
         }
         weekly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
@@ -49,7 +49,7 @@ class CalendarEntity(Entity):
             entity_uuid=weekly_child_id,
             initial_attributes=weekly_view_attributes
         )
-        requests.append(weekly_view_request)
+        #requests.append(weekly_view_request)
 
         # Create yearly events view
         yearly_child_id = str(uuid4())
@@ -57,7 +57,7 @@ class CalendarEntity(Entity):
             'parent_attributes': {
                 "title": "title",
             },
-            'view_component_type': 'calendaryearlyview',
+            'view_component_type': 'calendar_yearly_view',
         }
         yearly_view_request = CreateEntityStrategy.request_constructor(
             self.entity_id,
@@ -65,7 +65,7 @@ class CalendarEntity(Entity):
             entity_uuid=yearly_child_id,
             initial_attributes=yearly_view_attributes
         )
-        requests.append(yearly_view_request)
+        #requests.append(yearly_view_request)
 
         return requests
 

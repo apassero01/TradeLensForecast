@@ -8,6 +8,7 @@ import useEntityView from '../../../../../../hooks/useEntityView';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
 
 
+
 interface CalendarMonthlyViewProps {
     data?: CalendarMonthlyViewData;
     sendStrategyRequest: (strategyRequest: any) => void;
@@ -38,14 +39,10 @@ export default function CalendarMonthlyView({
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
     const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth()); // 0 = Ja
-    const [showDayModal, setShowDayModal] = useState(false);
-    const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
-    const [showEventSidebar, setShowEventSidebar] = useState(false);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const selectedEventDetailView = useEntityView(selectedEventId, sendStrategyRequest, updateEntity, {}, 'calendar_event_details');
     const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
     const calendarContainerRef = useRef<HTMLDivElement>(null);
-    const popupRef = useRef<HTMLDivElement>(null);
     const [pendingEventDate, setPendingEventDate] = useState<string | null>(null);
     const [selectedEventDayOfWeek, setSelectedEventDayOfWeek] = useState<number | null>(null);
 
@@ -115,11 +112,27 @@ export default function CalendarMonthlyView({
         return day.events.map(event => (
             <div
                 key={event.entity_id}
-                className="text-xs bg-blue-500 rounded p-1 mb-1 truncate cursor-pointer"
+                className="text-xs bg-blue-600 rounded p-1 mb-1 truncate cursor-pointer hover:bg-blue-500"
+
+                //Manual hover for day cell
+                onMouseEnter={(e) => {
+                    // Prevent day cell hover when hovering over event
+                    const dayCell = e.currentTarget.closest('.calendar-day-cell') as HTMLElement;
+                    if (dayCell) {
+                        dayCell.classList.remove('bg-gray-700', 'border-gray-400');
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    // Re-apply day cell hover when leaving event
+                    const dayCell = e.currentTarget.closest('.calendar-day-cell') as HTMLElement;
+                    if (dayCell) {
+                        dayCell.classList.add('bg-gray-700', 'border-gray-400');
+                    }
+                }}
+
                 onClick={e => {
                     e.stopPropagation();
                     setSelectedEventId(event.entity_id);
-                    setShowEventSidebar(true);
                     const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
                     const container = calendarContainerRef.current;
                     if (dayCell && container) {
@@ -147,7 +160,6 @@ export default function CalendarMonthlyView({
     const changeMonth = (direction: 'previous' | 'next') => {
         if (direction === 'previous') {
             if (currentMonth === 0) {
-                // January -> December of previous year
                 setCurrentMonth(11);
                 setCurrentYear(currentYear - 1);
             } else {
@@ -155,51 +167,48 @@ export default function CalendarMonthlyView({
             }
         } else {
             if (currentMonth === 11) {
-                // December -> January of next year
                 setCurrentMonth(0);
                 setCurrentYear(currentYear + 1);
             } else {
                 setCurrentMonth(currentMonth + 1);
             }
         }
+
+        //In case modal is still open
+        setSelectedEventId(null);
+        setPopupPosition(null);
+        setSelectedEventDayOfWeek(null);
     };
 
-    // Use it in your component
     const calendarDays = createCalendarDays(firstDayOfMonth, lastDayOfMonth);
-
-    // Calculate the starting day offset (0 = Sunday, 1 = Monday, etc.)
     const startingDayOffset = firstDayOfMonth.getDay();
     const endingDayOffset = lastDayOfMonth.getDay();
 
-    // Close popup when clicking outside
     useEffect(() => {
-        if (!popupPosition || !selectedEventId) return;
+        if (pendingEventDate) {
+            const events = eventsByDate[pendingEventDate];
+            if (events) {
+                const newestEvent = events[events.length - 1];
+                setSelectedEventId(newestEvent.entity_id);
+                setPendingEventDate(null);
+            }
+        }
+    }, [pendingEventDate, eventsByDate]);
 
-        function handleClickOutside(event: MouseEvent) {
-            if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+    // Reset modal state when selected event is deleted
+    useEffect(() => {
+        if (selectedEventId) {
+            const eventStillExists = eventChildren.some(eventNode => 
+                eventNode.data?.entity_id === selectedEventId
+            );
+            
+            if (!eventStillExists) {
                 setSelectedEventId(null);
                 setPopupPosition(null);
                 setSelectedEventDayOfWeek(null);
             }
         }
-        document.addEventListener('pointerdown', handleClickOutside);
-        return () => {
-            document.removeEventListener('pointerdown', handleClickOutside);
-        };
-    }, [popupPosition, selectedEventId]);
-
-    useEffect(() => {
-        if (pendingEventDate) {
-            // Find the most recent event for the pending date
-            const events = eventsByDate[pendingEventDate];
-            if (events) {
-                const newestEvent = events[events.length - 1];
-                setSelectedEventId(newestEvent.entity_id);
-                setShowEventSidebar(true);
-                setPendingEventDate(null);
-            }
-        }
-    }, [pendingEventDate, eventsByDate]);
+    }, [selectedEventId, eventChildren]);
 
     if (!data) {
         return (
@@ -212,7 +221,7 @@ export default function CalendarMonthlyView({
     return (
         <div
             ref={calendarContainerRef}
-            className="flex flex-col h-full w-full bg-gray-800 text-white nowheel p-4 overflow-y-auto relative"
+            className="flex flex-col h-full w-full bg-gray-800 text-white nowheel p-4 overflow-y-auto"
         >
             <div className="flex-shrink-0 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -222,6 +231,10 @@ export default function CalendarMonthlyView({
                     </h1>
                     <button onClick={() => changeMonth('next')} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Next</button>
                 </div>
+            </div>
+            
+            {/* Calendar grid container with relative positioning for overlay */}
+            <div className="relative flex-1">
                 <div className = "grid grid-cols-7 gap-2">
                     {DAYS_OF_WEEK.map((day) => (
                         <div key={day.key} className="text-center text-sm font-medium text-gray-400">
@@ -243,8 +256,20 @@ export default function CalendarMonthlyView({
                                 day.date.getMonth() === currentDate.getMonth() && 
                                 day.date.getFullYear() === currentDate.getFullYear() && 
                                 "bg-gray-500",
-                                "hover:bg-gray-600 hover:border-gray-400"
                             )}
+
+                            //manual hover effects
+                            onMouseEnter={(e) => {
+                                // Only apply hover effect if not hovering over an event
+                                const target = e.target as HTMLElement;
+                                if (!target.closest('.bg-blue-500')) {
+                                    e.currentTarget.classList.add('bg-gray-700', 'border-gray-400');
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                // Remove hover effect when leaving the day cell
+                                e.currentTarget.classList.remove('bg-gray-700', 'border-gray-400');
+                            }}
 
                             onClick={e => {
                                 const dateString = day.date.toISOString().split('T')[0];
@@ -262,6 +287,7 @@ export default function CalendarMonthlyView({
                                 );
                                 sendStrategyRequest(request);
                                 setPendingEventDate(dateString);
+                                setSelectedEventDayOfWeek(new Date(dateString).getDay());
                                 const dayCell = (e.target as HTMLElement).closest('.calendar-day-cell') as HTMLElement;
                                 const container = calendarContainerRef.current;
                                 if (dayCell && container) {
@@ -290,23 +316,43 @@ export default function CalendarMonthlyView({
 
 
                 </div>
-            </div>
-            
-            {popupPosition && selectedEventId && (
-                <div
-                    ref={popupRef}
-                    style={{
-                        position: 'absolute',
-                        top: popupPosition.top,
-                        left: selectedEventDayOfWeek === 5
-                            ? popupPosition.left - 600 // Saturday: pop out to the right
-                            : popupPosition.left + 10, // Other days: pop out to the left (adjust -310 as needed for your modal width)
-                    }}
-                    className={clsx('border border-gray-400')}
-                >
-                    {selectedEventDetailView}
-                </div>
+                
+                {popupPosition && selectedEventId && (
+                <>
+                    {/* Transparent overlay to intercept clicks - positioned relative to calendar grid */}
+                    <div
+                        className="absolute inset-0 z-10"
+                        style={{
+                            top: '0',
+                            left: '0',
+                            right: '0',
+                            bottom: '0',
+                        }}
+                        onClick={() => {
+                            setSelectedEventId(null);
+                            setPopupPosition(null);
+                            setSelectedEventDayOfWeek(null);
+                        }}
+                    />
+                    
+                    {/* Modal content */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: popupPosition.top,
+                            left: selectedEventDayOfWeek === 5
+                                ? popupPosition.left - 500 // Saturday: pop out to the left
+                                : popupPosition.left + 10, // Other days: pop out to the right
+                            zIndex: 20,
+                        }}
+                        className={clsx('border border-gray-400 bg-gray-800')}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {selectedEventDetailView}
+                    </div>
+                </>
             )}
+            </div>
         </div>
     );
 }
