@@ -112,7 +112,24 @@ export default function CalendarMonthlyView({
         return day.events.map(event => (
             <div
                 key={event.entity_id}
-                className="text-xs bg-blue-500 rounded p-1 mb-1 truncate cursor-pointer"
+                className="text-xs bg-blue-600 rounded p-1 mb-1 truncate cursor-pointer hover:bg-blue-500"
+
+                //Manual hover for day cell
+                onMouseEnter={(e) => {
+                    // Prevent day cell hover when hovering over event
+                    const dayCell = e.currentTarget.closest('.calendar-day-cell') as HTMLElement;
+                    if (dayCell) {
+                        dayCell.classList.remove('bg-gray-700', 'border-gray-400');
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    // Re-apply day cell hover when leaving event
+                    const dayCell = e.currentTarget.closest('.calendar-day-cell') as HTMLElement;
+                    if (dayCell) {
+                        dayCell.classList.add('bg-gray-700', 'border-gray-400');
+                    }
+                }}
+
                 onClick={e => {
                     e.stopPropagation();
                     setSelectedEventId(event.entity_id);
@@ -235,9 +252,20 @@ export default function CalendarMonthlyView({
                                 day.date.getMonth() === currentDate.getMonth() && 
                                 day.date.getFullYear() === currentDate.getFullYear() && 
                                 "bg-gray-500",
-                                // Only apply hover effects when no event details modal is open
-                                !(popupPosition && selectedEventId) && "hover:bg-gray-600 hover:border-gray-400"
                             )}
+
+                            //manual hover effects
+                            onMouseEnter={(e) => {
+                                // Only apply hover effect if not hovering over an event
+                                const target = e.target as HTMLElement;
+                                if (!target.closest('.bg-blue-500')) {
+                                    e.currentTarget.classList.add('bg-gray-700', 'border-gray-400');
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                // Remove hover effect when leaving the day cell
+                                e.currentTarget.classList.remove('bg-gray-700', 'border-gray-400');
+                            }}
 
                             onClick={e => {
                                 if (selectedEventId || popupPosition) {
@@ -293,7 +321,7 @@ export default function CalendarMonthlyView({
                 <>
                     {/* Transparent overlay to intercept clicks - only covers calendar grid */}
                     <div
-                        className="absolute inset-0 z-10"
+                        className="absolute inset-0 z-10" //absolute bad, go back and fix
                         style={{
                             top: '120px', // Below the month navigation buttons
                             left: '16px',
