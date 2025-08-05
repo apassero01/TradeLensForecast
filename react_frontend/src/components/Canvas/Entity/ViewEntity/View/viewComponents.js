@@ -24,28 +24,46 @@ import CalendarMonthlyView from './CalendarEntity/CalendarMonthlyView';
 import { EntityCentricChatView } from './EntityCentricChatView';
 
 const viewComponents = {
-  histogram: Histogram,
-  linegraph: Line,
-  stockchart: MultiStockChart,
-  multiline: MultiLine,
-  editor: Editor,
-  chatinterface: ChatInterface,
-  photo: PhotoDisplay,
-  recipeinstructions: RecipeInstructions,
-  recipelistitem: RecipeListItem,
-  recipelist: RecipeList,
-  newline: NewLine,
-  document_list_item: DocumentListItem,
-  mealplan: MealPlanView,
-  mealplannerdashboard: MealPlannerDashboard,
-  entityrenderer: EntityRenderer,
-  ide_app_dashboard: IdeAppDashboard,
-  file_tree: FileTree,
-  document_search: DocumentSearch,
-  advanced_document_editor: AdvancedDocumentEditor,
-  calendar_event_details: CalendarEventDetails,
-  calendar_monthly_view: CalendarMonthlyView,
-  entity_centric_chat_view: EntityCentricChatView,
+  histogram: { component: Histogram, displayName: 'Histogram' },
+  linegraph: { component: Line, displayName: 'Line Graph' },
+  stockchart: { component: MultiStockChart, displayName: 'Stock Chart' },
+  multiline: { component: MultiLine, displayName: 'Multi Line' },
+  editor: { component: Editor, displayName: 'Editor' },
+  chatinterface: { component: ChatInterface, displayName: 'Chat Interface' },
+  photo: { component: PhotoDisplay, displayName: 'Photo Display' },
+  recipeinstructions: { component: RecipeInstructions, displayName: 'Recipe Instructions' },
+  recipelistitem: { component: RecipeListItem, displayName: 'Recipe List Item' },
+  recipelist: { component: RecipeList, displayName: 'Recipe List' },
+  newline: { component: NewLine, displayName: 'New Line' },
+  document_list_item: { component: DocumentListItem, displayName: 'Document List Item' },
+  mealplan: { component: MealPlanView, displayName: 'Meal Plan' },
+  mealplannerdashboard: { component: MealPlannerDashboard, displayName: 'Meal Planner Dashboard' },
+  entityrenderer: { component: EntityRenderer, displayName: 'Entity Renderer' },
+  ide_app_dashboard: { component: IdeAppDashboard, displayName: 'IDE App Dashboard' },
+  file_tree: { component: FileTree, displayName: 'File Tree' },
+  document_search: { component: DocumentSearch, displayName: 'Document Search' },
+  advanced_document_editor: { component: AdvancedDocumentEditor, displayName: 'Advanced Document Editor' },
+  calendar_event_details: { component: CalendarEventDetails, displayName: 'Calendar Event Details' },
+  calendar_monthly_view: { component: CalendarMonthlyView, displayName: 'Calendar Monthly View' },
+  entity_centric_chat_view: { component: EntityCentricChatView, displayName: 'Entity Centric Chat View' },
+};
+
+// Helper function to get component names for backwards compatibility
+export const getViewComponentNames = () => {
+  const names = {};
+  Object.keys(viewComponents).forEach(key => {
+    names[key] = viewComponents[key].displayName;
+  });
+  return names;
+};
+
+// Helper function to get just the components for backwards compatibility
+export const getViewComponents = () => {
+  const components = {};
+  Object.keys(viewComponents).forEach(key => {
+    components[key] = viewComponents[key].component;
+  });
+  return components;
 };
 
 export default viewComponents;

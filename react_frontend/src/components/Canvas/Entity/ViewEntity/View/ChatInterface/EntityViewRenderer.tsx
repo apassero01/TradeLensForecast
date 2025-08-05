@@ -4,7 +4,7 @@ import { childrenByTypeSelector } from '../../../../../../state/entitiesSelector
 import { EntityTypes } from '../../../EntityEnum';
 import useRenderStoredView from '../../../../../../hooks/useRenderStoredView';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
-import viewComponents from '../viewComponents';
+import viewComponents, { getViewComponentNames } from '../viewComponents';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useRecoilState } from 'recoil';
 import { sessionAtom } from '../../../../../../state/sessionAtoms';
@@ -29,7 +29,7 @@ export default function EntityViewRenderer({
     initialViewId,
     isStandalone = false // New prop
 }: EntityViewRendererProps) {
-    const [, setSession] = useRecoilState(sessionAtom);
+    const [session, setSession] = useRecoilState(sessionAtom);
     
     const handleBackToCanvas = () => {
         setSession(prev => ({
@@ -54,31 +54,8 @@ export default function EntityViewRenderer({
     // Get the selected view content
     const selectedView = useRenderStoredView(selectedViewId, sendStrategyRequest, updateEntity, {});
     
-    // View component names mapping
-    const viewComponentNames: Record<string, string> = {
-        histogram: 'Histogram',
-        linegraph: 'Line Graph',
-        stockchart: 'Stock Chart',
-        multiline: 'Multi Line',
-        editor: 'Editor',
-        chatinterface: 'Chat Interface',
-        photo: 'Photo Display',
-        recipeinstructions: 'Recipe Instructions',
-        recipelistitem: 'Recipe List Item',
-        recipelist: 'Recipe List',
-        newline: 'New Line',
-        document_list_item: 'Document List Item',
-        mealplan: 'Meal Plan',
-        mealplannerdashboard: 'Meal Planner Dashboard',
-        entityrenderer: 'Entity Renderer',
-        ide_app_dashboard: 'IDE App Dashboard',
-        file_tree: 'File Tree',
-        document_search: 'Document Search',
-        advanced_document_editor: 'Advanced Document Editor',
-        calendar_event_details: 'Calendar Event Details',
-        calendar_monthly_view: 'Calendar Monthly View',
-        entity_centric_chat_view: 'Entity Centric Chat View',
-    };
+    // Get view component names from the centralized source
+    const viewComponentNames = getViewComponentNames();
 
     // Handle creating a new view
     const handleCreateView = () => {
