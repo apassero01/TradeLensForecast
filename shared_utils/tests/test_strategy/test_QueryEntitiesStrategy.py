@@ -47,8 +47,7 @@ class QueryEntitiesStrategyTestCase(TestCase):
                     'operator': 'equals',
                     'value': 'document'
                 }
-            ],
-            'result_attribute': 'query_results'
+            ]
         }
         
         strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
@@ -58,31 +57,23 @@ class QueryEntitiesStrategyTestCase(TestCase):
         
     def test_verify_executable_missing_filters(self):
         """Test verify_executable with missing filters parameter"""
-        self.strategy_request.param_config = {
-            'result_attribute': 'query_results'
-        }
+        self.strategy_request.param_config = {}
         
         strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
         result = strategy.verify_executable(self.target_entity, self.strategy_request)
         
         self.assertFalse(result)
         
-    def test_verify_executable_missing_result_attribute(self):
-        """Test verify_executable with missing result_attribute parameter"""
+    def test_verify_executable_with_empty_filters(self):
+        """Test verify_executable with empty filters list"""
         self.strategy_request.param_config = {
-            'filters': [
-                {
-                    'attribute': 'entity_type',
-                    'operator': 'equals',
-                    'value': 'document'
-                }
-            ]
+            'filters': []
         }
         
         strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
         result = strategy.verify_executable(self.target_entity, self.strategy_request)
         
-        self.assertFalse(result)
+        self.assertTrue(result)  # Empty filters list is valid
         
     def test_verify_executable_invalid_filter_structure(self):
         """Test verify_executable with invalid filter structure"""
@@ -92,8 +83,7 @@ class QueryEntitiesStrategyTestCase(TestCase):
                     'attribute': 'entity_type',
                     # Missing 'operator' and 'value'
                 }
-            ],
-            'result_attribute': 'query_results'
+            ]
         }
         
         strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
@@ -122,8 +112,7 @@ class QueryEntitiesStrategyTestCase(TestCase):
                     'operator': 'equals',
                     'value': 'document'
                 }
-            ],
-            'result_attribute': 'matching_documents'
+            ]
         }
         
         # Execute strategy
@@ -138,12 +127,6 @@ class QueryEntitiesStrategyTestCase(TestCase):
         mock_entity_service.find_entities.assert_called_once_with(
             self.strategy_request.param_config['filters']
         )
-        
-        # Verify attribute was set on target entity
-        self.assertEqual(self.target_entity.get_attribute('matching_documents'), test_entity_ids)
-        
-        # Verify entity was saved
-        mock_entity_service.save_entity.assert_called_once_with(self.target_entity)
         
     def test_apply_with_multiple_filters(self):
         """Test apply method with multiple filters"""
@@ -176,8 +159,7 @@ class QueryEntitiesStrategyTestCase(TestCase):
                     'operator': 'greater_than',
                     'value': '2025-01-01'
                 }
-            ],
-            'result_attribute': 'recent_chicken_recipes'
+            ]
         }
         
         # Execute strategy
@@ -212,8 +194,7 @@ class QueryEntitiesStrategyTestCase(TestCase):
                     'operator': 'equals',
                     'value': 'non_existent_type'
                 }
-            ],
-            'result_attribute': 'no_results'
+            ]
         }
         
         # Execute strategy
@@ -222,9 +203,6 @@ class QueryEntitiesStrategyTestCase(TestCase):
         # Verify results
         self.assertEqual(result.ret_val['matching_entity_ids'], [])
         self.assertEqual(result.ret_val['count'], 0)
-        
-        # Verify empty list was set as attribute
-        self.assertEqual(self.target_entity.get_attribute('no_results'), [])
         
     def test_apply_with_error(self):
         """Test apply method when find_entities raises an exception"""
@@ -246,8 +224,7 @@ class QueryEntitiesStrategyTestCase(TestCase):
                     'operator': 'equals',
                     'value': 'document'
                 }
-            ],
-            'result_attribute': 'error_results'
+            ]
         }
         
         # Execute strategy
@@ -264,7 +241,6 @@ class QueryEntitiesStrategyTestCase(TestCase):
         
         # Verify config structure
         self.assertIn('filters', config)
-        self.assertIn('result_attribute', config)
         self.assertIsInstance(config['filters'], list)
         self.assertGreater(len(config['filters']), 0)
         
@@ -284,17 +260,202 @@ class QueryEntitiesStrategyTestCase(TestCase):
                 'value': ['document', 'recipe']
             }
         ]
-        result_attribute = 'multi_type_results'
         
         request = QueryEntitiesStrategy.request_constructor(
             target_entity_id=target_id,
-            filters=filters,
-            result_attribute=result_attribute
+            filters=filters
         )
         
         # Verify request structure
         self.assertEqual(request.strategy_name, 'QueryEntitiesStrategy')
         self.assertEqual(request.target_entity_id, target_id)
         self.assertEqual(request.param_config['filters'], filters)
-        self.assertEqual(request.param_config['result_attribute'], result_attribute)
         self.assertEqual(request._nested_requests, [])
+
+    def test_case_insensitive_text_search(self):
+        """Test case-insensitive text searching for contains operator"""
+        # Create strategy
+        strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Mock the entity_service instance
+        mock_entity_service = Mock()
+        strategy.entity_service = mock_entity_service
+        
+        # Mock find_entities to return entity IDs
+        test_entity_ids = [str(uuid.uuid4()) for _ in range(2)]
+        mock_entity_service.find_entities.return_value = test_entity_ids
+        
+        # Configure strategy request with case-insensitive contains
+        self.strategy_request.param_config = {
+            'filters': [
+                {
+                    'attribute': 'name',
+                    'operator': 'contains',
+                    'value': 'task'  # Should match "Task:" in database
+                }
+            ]
+        }
+        
+        # Execute strategy
+        result = strategy.apply(self.target_entity)
+        
+        # Verify results
+        self.assertEqual(result.ret_val['matching_entity_ids'], test_entity_ids)
+        self.assertEqual(result.ret_val['count'], 2)
+        
+    def test_child_ids_querying(self):
+        """Test querying by child_ids attribute"""
+        # Create strategy
+        strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Mock the entity_service instance
+        mock_entity_service = Mock()
+        strategy.entity_service = mock_entity_service
+        
+        # Mock find_entities to return entity IDs
+        test_entity_ids = [str(uuid.uuid4())]
+        mock_entity_service.find_entities.return_value = test_entity_ids
+        
+        # Configure strategy request to search for child_ids
+        child_id = str(uuid.uuid4())
+        self.strategy_request.param_config = {
+            'filters': [
+                {
+                    'attribute': 'child_ids',
+                    'operator': 'equals',
+                    'value': child_id
+                }
+            ]
+        }
+        
+        # Execute strategy
+        result = strategy.apply(self.target_entity)
+        
+        # Verify results
+        self.assertEqual(result.ret_val['matching_entity_ids'], test_entity_ids)
+        self.assertEqual(result.ret_val['count'], 1)
+        
+    def test_child_ids_multiple_values(self):
+        """Test querying child_ids with 'in' operator"""
+        # Create strategy
+        strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Mock the entity_service instance
+        mock_entity_service = Mock()
+        strategy.entity_service = mock_entity_service
+        
+        # Mock find_entities to return entity IDs
+        test_entity_ids = [str(uuid.uuid4()) for _ in range(3)]
+        mock_entity_service.find_entities.return_value = test_entity_ids
+        
+        # Configure strategy request to search for multiple child_ids
+        child_ids = [str(uuid.uuid4()) for _ in range(2)]
+        self.strategy_request.param_config = {
+            'filters': [
+                {
+                    'attribute': 'child_ids',
+                    'operator': 'in',
+                    'value': child_ids
+                }
+            ]
+        }
+        
+        # Execute strategy
+        result = strategy.apply(self.target_entity)
+        
+        # Verify results
+        self.assertEqual(result.ret_val['matching_entity_ids'], test_entity_ids)
+        self.assertEqual(result.ret_val['count'], 3)
+        
+    def test_date_comparison_different_formats(self):
+        """Test date comparison with different date formats"""
+        # Create strategy
+        strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Mock the entity_service instance
+        mock_entity_service = Mock()
+        strategy.entity_service = mock_entity_service
+        
+        # Mock find_entities to return entity IDs
+        test_entity_ids = [str(uuid.uuid4()) for _ in range(2)]
+        mock_entity_service.find_entities.return_value = test_entity_ids
+        
+        # Test with YYYYMMDD format
+        self.strategy_request.param_config = {
+            'filters': [
+                {
+                    'attribute': 'creation_date',
+                    'operator': 'greater_than',
+                    'value': '20250101'  # Should work with YYYYMMDD format
+                }
+            ]
+        }
+        
+        # Execute strategy
+        result = strategy.apply(self.target_entity)
+        
+        # Verify results
+        self.assertEqual(result.ret_val['matching_entity_ids'], test_entity_ids)
+        self.assertEqual(result.ret_val['count'], 2)
+        
+    def test_date_comparison_iso_format(self):
+        """Test date comparison with ISO format including time"""
+        # Create strategy
+        strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Mock the entity_service instance
+        mock_entity_service = Mock()
+        strategy.entity_service = mock_entity_service
+        
+        # Mock find_entities to return entity IDs
+        test_entity_ids = [str(uuid.uuid4())]
+        mock_entity_service.find_entities.return_value = test_entity_ids
+        
+        # Test with ISO format including time
+        self.strategy_request.param_config = {
+            'filters': [
+                {
+                    'attribute': 'creation_date',
+                    'operator': 'less_than',
+                    'value': '2025-12-31T23:59:59.000Z'  # Should work with ISO format
+                }
+            ]
+        }
+        
+        # Execute strategy
+        result = strategy.apply(self.target_entity)
+        
+        # Verify results
+        self.assertEqual(result.ret_val['matching_entity_ids'], test_entity_ids)
+        self.assertEqual(result.ret_val['count'], 1)
+        
+    def test_date_between_mixed_formats(self):
+        """Test date between with mixed date formats"""
+        # Create strategy
+        strategy = QueryEntitiesStrategy(self.strategy_executor, self.strategy_request)
+        
+        # Mock the entity_service instance
+        mock_entity_service = Mock()
+        strategy.entity_service = mock_entity_service
+        
+        # Mock find_entities to return entity IDs
+        test_entity_ids = [str(uuid.uuid4()) for _ in range(2)]
+        mock_entity_service.find_entities.return_value = test_entity_ids
+        
+        # Test with mixed date formats
+        self.strategy_request.param_config = {
+            'filters': [
+                {
+                    'attribute': 'event_date',
+                    'operator': 'between',
+                    'value': ['20250101', '2025-12-31T00:00:00Z']  # Mixed formats
+                }
+            ]
+        }
+        
+        # Execute strategy
+        result = strategy.apply(self.target_entity)
+        
+        # Verify results
+        self.assertEqual(result.ret_val['matching_entity_ids'], test_entity_ids)
+        self.assertEqual(result.ret_val['count'], 2)

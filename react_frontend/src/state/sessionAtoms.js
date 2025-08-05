@@ -10,5 +10,7 @@ export const sessionAtom = atom({
         savedSessions: [],
         error: null,
         isLoading: false,
+        viewMode: 'canvas', // 'canvas' or 'entity'
+        currentEntityId: null,
     }
 })

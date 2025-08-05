@@ -1,14 +1,15 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useWebSocketConsumer } from '../../hooks/useWebSocketConsumer';
-import { FaCopy, FaCheck } from 'react-icons/fa';
+import { FaCopy, FaCheck, FaExternalLinkAlt } from 'react-icons/fa';
 import ConfirmationModal from '../Modal/ConfirmationModal';
-import { useRecoilValue } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { childrenByTypeSelector, nodeSelectorFamily } from '../../state/entitiesSelectors';
 import { EntityTypes } from '../Canvas/Entity/EntityEnum';
 import VisibilityToggleIcon from '../common/VisibilityToggleIcon';
 import { StrategyRequests } from '../../utils/StrategyRequestBuilder';
 import { useReactFlow } from '@xyflow/react';
 import useUpdateFlowNodes from '../../hooks/useUpdateFlowNodes';
+import { sessionAtom } from '../../state/sessionAtoms';
 export default function ContextMenu({
   id,
   entityId,
@@ -18,6 +19,7 @@ export default function ContextMenu({
   bottom,
   onClick,
 }) {
+  const setSession = useSetRecoilState(sessionAtom);
   const { sendStrategyRequest } = useWebSocketConsumer();
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -116,6 +118,18 @@ export default function ContextMenu({
     });
   }, [entity, sendStrategyRequest]);
 
+  const openInNewTab = useCallback(() => {
+    // Close the context menu
+    onClick();
+    
+    // Switch to entity view mode
+    setSession(prev => ({
+      ...prev,
+      viewMode: 'entity',
+      currentEntityId: entityId
+    }));
+  }, [entityId, onClick, setSession]);
+
   return (
     <>
       {/* Overlay to capture clicks outside the menu */}
@@ -204,6 +218,28 @@ export default function ContextMenu({
           onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           New View
+        </button>
+
+        <button
+          onClick={openInNewTab}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            width: '100%',
+            padding: '8px 10px',
+            textAlign: 'left',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            borderTop: '1px solid #374151',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <FaExternalLinkAlt size={12} />
+          <span>Open in New Tab</span>
         </button>
 
         {/* Views submenu button - only show if there are views */}

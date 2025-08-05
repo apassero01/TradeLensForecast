@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
@@ -63,12 +63,16 @@ export default function ChatInterface({
     const currentApiModel = parentEntity?.entity_name === "api_model" ? parentEntity : null;
 
     // Get messages from the API model's message_history attribute or from view data
-    const messages: Message[] = currentApiModel?.data?.message_history || data?.message_history || [];
+    const messages: Message[] = useMemo(() => {
+        return currentApiModel?.data?.message_history || data?.message_history || [];
+    }, [currentApiModel?.data?.message_history, data?.message_history]);
 
-    const filteredMessages = messages.filter(message => {
-        if (displayMode === 'all') return true;
-        return message.type === displayMode;
-    });
+    const filteredMessages = useMemo(() => {
+        return messages.filter(message => {
+            if (displayMode === 'all') return true;
+            return message.type === displayMode;
+        });
+    }, [messages, displayMode]);
 
     const scrollToBottom = useCallback((smooth = false) => {
         if (messagesEndRef.current && data?.auto_scroll !== false) {
@@ -115,9 +119,13 @@ export default function ChatInterface({
         setTextareaHeight(`${newHeight}px`);
     }, []);
 
-    // Auto-resize when input changes
+    // Auto-resize when input changes - debounced for performance
     useEffect(() => {
-        autoResizeTextarea();
+        const timeoutId = setTimeout(() => {
+            autoResizeTextarea();
+        }, 10); // Small delay to batch DOM operations
+        
+        return () => clearTimeout(timeoutId);
     }, [currentInput, autoResizeTextarea]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -201,7 +209,7 @@ export default function ChatInterface({
         }
     };
 
-    const handleCopy = async (content: string, index: number) => {
+    const handleCopy = useCallback(async (content: string, index: number) => {
         try {
             await navigator.clipboard.writeText(content);
             setCopiedMessageIndex(index);
@@ -209,9 +217,9 @@ export default function ChatInterface({
         } catch (err) {
             console.error('Failed to copy text:', err);
         }
-    };
+    }, []);
 
-    const handleCreateDocument = async (content: string, index: number, messageType: string) => {
+    const handleCreateDocument = useCallback(async (content: string, index: number, messageType: string) => {
         try {
             // Generate a timestamp-based filename
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
@@ -246,7 +254,28 @@ export default function ChatInterface({
         } catch (err) {
             console.error('Failed to create document:', err);
         }
-    };
+    }, [currentApiModel?.entity_id, parentEntityId, sendStrategyRequest]);
+
+    // Memoize rendered messages to prevent re-rendering on input changes
+    const renderedMessages = useMemo(() => {
+        return filteredMessages.map((message, index) => (
+            <MessageItem
+                key={`${index}-${message.timestamp || index}`}
+                message={message}
+                index={index}
+                fontSize={fontSize}
+                sendStrategyRequest={sendStrategyRequest}
+                updateEntity={updateEntity}
+                currentApiModel={currentApiModel}
+                parentEntityId={parentEntityId}
+                onCopy={handleCopy}
+                onCreateDocument={handleCreateDocument}
+                copiedMessageIndex={copiedMessageIndex}
+                createdDocumentIndex={createdDocumentIndex}
+                setModalEntity={setModalEntity}
+            />
+        ));
+    }, [filteredMessages, fontSize, sendStrategyRequest, updateEntity, currentApiModel, parentEntityId, handleCopy, handleCreateDocument, copiedMessageIndex, createdDocumentIndex, setModalEntity]);
 
     if (!data) {
         return (
@@ -383,23 +412,7 @@ export default function ChatInterface({
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {filteredMessages.map((message, index) => (
-                            <MessageItem
-                                key={index}
-                                message={message}
-                                index={index}
-                                fontSize={fontSize}
-                                sendStrategyRequest={sendStrategyRequest}
-                                updateEntity={updateEntity}
-                                currentApiModel={currentApiModel}
-                                parentEntityId={parentEntityId}
-                                onCopy={handleCopy}
-                                onCreateDocument={handleCreateDocument}
-                                copiedMessageIndex={copiedMessageIndex}
-                                createdDocumentIndex={createdDocumentIndex}
-                                setModalEntity={setModalEntity}
-                            />
-                        ))}
+                        {renderedMessages}
                         <div ref={messagesEndRef} />
                     </div>
                 )}

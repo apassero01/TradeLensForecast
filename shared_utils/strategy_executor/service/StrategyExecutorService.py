@@ -1,3 +1,4 @@
+from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.service.EntityService import EntityService
 from shared_utils.strategy_executor.service.strategy_directory.StrategyDirectory import StrategyDirectory
@@ -14,7 +15,7 @@ class StrategyExecutorService:
         self.strategies = {}
         self.register_strategies(StrategyDirectory().get_strategy_classes())
 
-    def execute(self, entity, strategy_request):
+    def execute(self, entity: Entity, strategy_request):
         """Execute a strategy on an entity after resolving its path"""
 
         logger.info(f"Executing strategy {strategy_request.strategy_name} on entity {entity.entity_id}")
@@ -33,8 +34,11 @@ class StrategyExecutorService:
             entity = self.entity_service.get_entity(entity.entity_id)
 
         if strat_request.add_to_history:
-            entity.update_strategy_requests(strat_request)
             self.entity_service.save_entity(strat_request)
+        else:
+            if strat_request.entity_id in entity.get_children(): 
+                entity.remove_child(strat_request)
+            self.entity_service.delete_entity(strat_request.entity_id)
 
         self.entity_service.save_entity(entity)
 

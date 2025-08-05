@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../state/entitiesSelectors'; // Adjust path as needed
-import visualizationComponents from '../components/Canvas/Entity/ViewEntity/View/viewComponents'; // Adjust path
+import viewComponents from '../components/Canvas/Entity/ViewEntity/View/viewComponents'; // Adjust path
 import ErrorBoundary from '../components/common/ErrorBoundary'; // Adjust path
 
 /**
@@ -64,7 +64,8 @@ function useRenderStoredView(viewEntityId, sendStrategyRequest, updateEntity, pr
     }
 
     // 5. Find the corresponding component constructor
-    const ViewComponent = visualizationComponents[view_type];
+    
+    const ViewComponent = viewComponents[view_type]?.component;
 
     // Handle case where the view type is unknown
     if (!ViewComponent) {

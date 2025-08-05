@@ -1,5 +1,6 @@
 import importlib
 import asyncio
+import re
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync, sync_to_async
@@ -483,6 +484,42 @@ class EntityService:
             logger.error(f"Error executing find_entities query: {str(e)}")
             raise
 
+    def _normalize_date_string(self, date_str: str) -> str:
+        """
+        Normalize date string to YYYY-MM-DD format for consistent comparison.
+        Handles various input formats including YYYYMMDD, ISO with time, etc.
+        
+        Args:
+            date_str: Date string in various formats
+            
+        Returns:
+            Normalized date string in YYYY-MM-DD format
+        """
+        if not date_str:
+            return date_str
+            
+        # Remove any whitespace
+        date_str = str(date_str).strip()
+        
+        # Handle YYYYMMDD format (8 digits)
+        if re.match(r'^\d{8}$', date_str):
+            return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+            
+        # Handle ISO format with time (extract date part)
+        if 'T' in date_str:
+            date_str = date_str.split('T')[0]
+            
+        # Handle formats with space and time
+        if ' ' in date_str:
+            date_str = date_str.split(' ')[0]
+            
+        # Already in YYYY-MM-DD format or similar
+        if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+            return date_str[:10]  # Take only YYYY-MM-DD part
+            
+        # Return as-is if we can't normalize it
+        return date_str
+
     def _build_sql_query(self, filters: list) -> tuple:
         """
         Build SQL query from filter configuration.
@@ -502,61 +539,119 @@ class EntityService:
             op = filter_obj['operator']
             val = filter_obj['value']
             
-            # Handle special case for entity_type which is a direct column
-            if attr == 'entity_type':
+            # Handle special cases for direct columns (entity_type, child_ids)
+            if attr in ['entity_type', 'child_ids']:
                 if op == 'equals':
-                    where_clauses.append('entity_type = %s')
-                    params.append(val)
+                    if attr == 'child_ids':
+                        # For child_ids, check if the value exists in the JSONB array
+                        where_clauses.append('child_ids ? %s')
+                        params.append(str(val))
+                    else:
+                        where_clauses.append(f'{attr} = %s')
+                        params.append(val)
                 elif op == 'not_equals':
-                    where_clauses.append('entity_type != %s')
-                    params.append(val)
+                    if attr == 'child_ids':
+                        where_clauses.append('NOT (child_ids ? %s)')
+                        params.append(str(val))
+                    else:
+                        where_clauses.append(f'{attr} != %s')
+                        params.append(val)
+                elif op == 'contains' and attr == 'entity_type':
+                    # Case-insensitive contains for entity_type
+                    where_clauses.append('LOWER(entity_type) LIKE LOWER(%s)')
+                    params.append(f'%{val}%')
                 elif op == 'in':
-                    placeholders = ', '.join(['%s'] * len(val))
-                    where_clauses.append(f'entity_type IN ({placeholders})')
-                    params.extend(val)
+                    if attr == 'child_ids':
+                        # For child_ids with 'in' operator, check if any of the values exist
+                        conditions = []
+                        for v in val:
+                            conditions.append('child_ids ? %s')
+                            params.append(str(v))
+                        where_clauses.append(f"({' OR '.join(conditions)})")
+                    else:
+                        placeholders = ', '.join(['%s'] * len(val))
+                        where_clauses.append(f'{attr} IN ({placeholders})')
+                        params.extend(val)
             # Handle attributes stored in JSONB
             else:
                 if op == 'equals':
                     where_clauses.append("attributes->>%s = %s")
-                    params.extend([attr, str(val)])
+                    # Handle boolean values properly - JSON booleans are lowercase when extracted as text
+                    if isinstance(val, bool):
+                        params.extend([attr, str(val).lower()])
+                    else:
+                        params.extend([attr, str(val)])
                 elif op == 'not_equals':
                     where_clauses.append("attributes->>%s != %s")
-                    params.extend([attr, str(val)])
+                    # Handle boolean values properly - JSON booleans are lowercase when extracted as text
+                    if isinstance(val, bool):
+                        params.extend([attr, str(val).lower()])
+                    else:
+                        params.extend([attr, str(val)])
                 elif op == 'contains':
-                    where_clauses.append("attributes->>%s LIKE %s")
+                    # Case-insensitive contains for text searches
+                    where_clauses.append("LOWER(attributes->>%s) LIKE LOWER(%s)")
                     params.extend([attr, f'%{val}%'])
                 elif op == 'starts_with':
-                    where_clauses.append("attributes->>%s LIKE %s")
+                    # Case-insensitive starts_with
+                    where_clauses.append("LOWER(attributes->>%s) LIKE LOWER(%s)")
                     params.extend([attr, f'{val}%'])
                 elif op == 'ends_with':
-                    where_clauses.append("attributes->>%s LIKE %s")
+                    # Case-insensitive ends_with
+                    where_clauses.append("LOWER(attributes->>%s) LIKE LOWER(%s)")
                     params.extend([attr, f'%{val}'])
                 elif op == 'greater_than':
-                    # Try to cast as numeric first, fall back to date
+                    # Normalize date strings for comparison
+                    normalized_val = self._normalize_date_string(val)
                     where_clauses.append(
                         "CASE "
                         "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric > %s "
-                        "ELSE (attributes->>%s)::date > %s::date "
+                        "ELSE to_date(CASE "
+                        "  WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
+                        "    SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2) "
+                        "  WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
+                        "    SUBSTRING(attributes->>%s, 1, 10) "
+                        "  ELSE "
+                        "    SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1) "
+                        "  END, 'YYYY-MM-DD') > to_date(%s, 'YYYY-MM-DD') "
                         "END"
                     )
-                    params.extend([attr, attr, val, attr, val])
+                    params.extend([attr, attr, val, attr, attr, attr, attr, attr, attr, attr, normalized_val])
                 elif op == 'less_than':
+                    # Normalize date strings for comparison
+                    normalized_val = self._normalize_date_string(val)
                     where_clauses.append(
                         "CASE "
                         "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric < %s "
-                        "ELSE (attributes->>%s)::date < %s::date "
+                        "ELSE to_date(CASE "
+                        "  WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
+                        "    SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2) "
+                        "  WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
+                        "    SUBSTRING(attributes->>%s, 1, 10) "
+                        "  ELSE "
+                        "    SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1) "
+                        "  END, 'YYYY-MM-DD') < to_date(%s, 'YYYY-MM-DD') "
                         "END"
                     )
-                    params.extend([attr, attr, val, attr, val])
+                    params.extend([attr, attr, val, attr, attr, attr, attr, attr, attr, attr, normalized_val])
                 elif op == 'between':
                     if isinstance(val, list) and len(val) == 2:
+                        normalized_val0 = self._normalize_date_string(val[0])
+                        normalized_val1 = self._normalize_date_string(val[1])
                         where_clauses.append(
                             "CASE "
                             "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric BETWEEN %s AND %s "
-                            "ELSE (attributes->>%s)::date BETWEEN %s::date AND %s::date "
+                            "ELSE to_date(CASE "
+                            "  WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
+                            "    SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2) "
+                            "  WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
+                            "    SUBSTRING(attributes->>%s, 1, 10) "
+                            "  ELSE "
+                            "    SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1) "
+                            "  END, 'YYYY-MM-DD') BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD') "
                             "END"
                         )
-                        params.extend([attr, attr, val[0], val[1], attr, val[0], val[1]])
+                        params.extend([attr, attr, val[0], val[1], attr, attr, attr, attr, attr, attr, attr, normalized_val0, normalized_val1])
                 elif op == 'in':
                     if isinstance(val, list):
                         placeholders = ', '.join(['%s'] * len(val))
