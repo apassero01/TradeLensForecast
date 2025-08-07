@@ -603,55 +603,95 @@ class EntityService:
                 elif op == 'greater_than':
                     # Normalize date strings for comparison
                     normalized_val = self._normalize_date_string(val)
-                    where_clauses.append(
-                        "CASE "
-                        "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric > %s "
-                        "ELSE to_date(CASE "
-                        "  WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
-                        "    SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2) "
-                        "  WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
-                        "    SUBSTRING(attributes->>%s, 1, 10) "
-                        "  ELSE "
-                        "    SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1) "
-                        "  END, 'YYYY-MM-DD') > to_date(%s, 'YYYY-MM-DD') "
-                        "END"
-                    )
-                    params.extend([attr, attr, val, attr, attr, attr, attr, attr, attr, attr, normalized_val])
+                    # Check if the comparison value is numeric
+                    is_numeric_val = isinstance(val, (int, float)) or (isinstance(val, str) and re.match(r'^[0-9]+\.?[0-9]*$', str(val)))
+                    
+                    if is_numeric_val:
+                        # Pure numeric comparison
+                        where_clauses.append("(attributes->>%s)::numeric > %s")
+                        params.extend([attr, val])
+                    else:
+                        # Date comparison only - with graceful error handling
+                        where_clauses.append(
+                            "("
+                            "  CASE "
+                            "    WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
+                            "      CASE "
+                            "        WHEN (SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2)) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN "
+                            "          to_date(SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2), 'YYYY-MM-DD') > to_date(%s, 'YYYY-MM-DD') "
+                            "        ELSE FALSE "
+                            "      END "
+                            "    WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
+                            "      to_date(SUBSTRING(attributes->>%s, 1, 10), 'YYYY-MM-DD') > to_date(%s, 'YYYY-MM-DD') "
+                            "    WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' OR attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' THEN "
+                            "      to_date(SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1), 'YYYY-MM-DD') > to_date(%s, 'YYYY-MM-DD') "
+                            "    ELSE FALSE "
+                            "  END"
+                            ")"
+                        )
+                        params.extend([attr, attr, attr, attr, attr, attr, attr, normalized_val, attr, attr, normalized_val, attr, attr, attr, normalized_val])
                 elif op == 'less_than':
                     # Normalize date strings for comparison
                     normalized_val = self._normalize_date_string(val)
-                    where_clauses.append(
-                        "CASE "
-                        "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric < %s "
-                        "ELSE to_date(CASE "
-                        "  WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
-                        "    SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2) "
-                        "  WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
-                        "    SUBSTRING(attributes->>%s, 1, 10) "
-                        "  ELSE "
-                        "    SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1) "
-                        "  END, 'YYYY-MM-DD') < to_date(%s, 'YYYY-MM-DD') "
-                        "END"
-                    )
-                    params.extend([attr, attr, val, attr, attr, attr, attr, attr, attr, attr, normalized_val])
+                    # Check if the comparison value is numeric
+                    is_numeric_val = isinstance(val, (int, float)) or (isinstance(val, str) and re.match(r'^[0-9]+\.?[0-9]*$', str(val)))
+                    
+                    if is_numeric_val:
+                        # Pure numeric comparison
+                        where_clauses.append("(attributes->>%s)::numeric < %s")
+                        params.extend([attr, val])
+                    else:
+                        # Date comparison only - with graceful error handling
+                        where_clauses.append(
+                            "("
+                            "  CASE "
+                            "    WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
+                            "      CASE "
+                            "        WHEN (SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2)) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN "
+                            "          to_date(SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2), 'YYYY-MM-DD') < to_date(%s, 'YYYY-MM-DD') "
+                            "        ELSE FALSE "
+                            "      END "
+                            "    WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
+                            "      to_date(SUBSTRING(attributes->>%s, 1, 10), 'YYYY-MM-DD') < to_date(%s, 'YYYY-MM-DD') "
+                            "    WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' OR attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' THEN "
+                            "      to_date(SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1), 'YYYY-MM-DD') < to_date(%s, 'YYYY-MM-DD') "
+                            "    ELSE FALSE "
+                            "  END"
+                            ")"
+                        )
+                        params.extend([attr, attr, attr, attr, attr, attr, attr, normalized_val, attr, attr, normalized_val, attr, attr, attr, normalized_val])
                 elif op == 'between':
                     if isinstance(val, list) and len(val) == 2:
                         normalized_val0 = self._normalize_date_string(val[0])
                         normalized_val1 = self._normalize_date_string(val[1])
-                        where_clauses.append(
-                            "CASE "
-                            "WHEN attributes->>%s ~ '^[0-9]+\\.?[0-9]*$' THEN (attributes->>%s)::numeric BETWEEN %s AND %s "
-                            "ELSE to_date(CASE "
-                            "  WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
-                            "    SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2) "
-                            "  WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
-                            "    SUBSTRING(attributes->>%s, 1, 10) "
-                            "  ELSE "
-                            "    SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1) "
-                            "  END, 'YYYY-MM-DD') BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD') "
-                            "END"
-                        )
-                        params.extend([attr, attr, val[0], val[1], attr, attr, attr, attr, attr, attr, attr, normalized_val0, normalized_val1])
+                        # Check if the comparison values are numeric
+                        is_numeric_val0 = isinstance(val[0], (int, float)) or (isinstance(val[0], str) and re.match(r'^[0-9]+\.?[0-9]*$', str(val[0])))
+                        is_numeric_val1 = isinstance(val[1], (int, float)) or (isinstance(val[1], str) and re.match(r'^[0-9]+\.?[0-9]*$', str(val[1])))
+                        
+                        if is_numeric_val0 and is_numeric_val1:
+                            # Pure numeric comparison
+                            where_clauses.append("(attributes->>%s)::numeric BETWEEN %s AND %s")
+                            params.extend([attr, val[0], val[1]])
+                        else:
+                            # Date comparison only - with graceful error handling
+                            where_clauses.append(
+                                "("
+                                "  CASE "
+                                "    WHEN attributes->>%s ~ '^[0-9]{8}$' THEN "
+                                "      CASE "
+                                "        WHEN (SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2)) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN "
+                                "          to_date(SUBSTRING(attributes->>%s, 1, 4) || '-' || SUBSTRING(attributes->>%s, 5, 2) || '-' || SUBSTRING(attributes->>%s, 7, 2), 'YYYY-MM-DD') BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD') "
+                                "        ELSE FALSE "
+                                "      END "
+                                "    WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN "
+                                "      to_date(SUBSTRING(attributes->>%s, 1, 10), 'YYYY-MM-DD') BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD') "
+                                "    WHEN attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' OR attributes->>%s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' THEN "
+                                "      to_date(SPLIT_PART(SPLIT_PART(attributes->>%s, 'T', 1), ' ', 1), 'YYYY-MM-DD') BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD') "
+                                "    ELSE FALSE "
+                                "  END"
+                                ")"
+                            )
+                            params.extend([attr, attr, attr, attr, attr, attr, attr, normalized_val0, normalized_val1, attr, attr, normalized_val0, normalized_val1, attr, attr, attr, normalized_val0, normalized_val1])
                 elif op == 'in':
                     if isinstance(val, list):
                         placeholders = ', '.join(['%s'] * len(val))

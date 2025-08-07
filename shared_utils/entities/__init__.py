@@ -14,7 +14,6 @@ def discover_entities():
     from .api_model.ApiModelEntity import ApiModelEntity
     from model_stage.entities.ModelStageEntity import ModelStageEntity
     from .document_entities.DocumentEntity import DocumentEntity
-    from .input_entity.InputEntity import InputEntity
     from .view_entity.ViewEntity import ViewEntity
     from .meal_planner.RecipeEntity import RecipeEntity
     from .meal_planner.MealPlanEntity import MealPlanEntity
