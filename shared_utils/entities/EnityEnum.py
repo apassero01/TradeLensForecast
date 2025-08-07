@@ -13,7 +13,6 @@ class EntityEnum(Enum):
     VISUALIZATION = "visualization"
     DOCUMENT = "document"
     API_MODEL = "api_model"
-    INPUT = "input"
     VIEW = "view"
     RECIPE = "recipe"
     MEAL_PLAN = "meal_plan"
