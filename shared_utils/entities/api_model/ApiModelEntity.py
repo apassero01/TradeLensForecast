@@ -52,6 +52,7 @@ class ApiModelEntity(Entity):
         parent_dict['model_name'] = self.get_attribute('model_name')
         parent_dict['message_history'] = self.serialize_message_history()
         parent_dict['visible_entities'] = self.get_attribute('visible_entities')
+        parent_dict['name'] = self.get_attribute('name') if self.has_attribute('name') else None
         return parent_dict
 
     def serialize_message_history(self) -> list:

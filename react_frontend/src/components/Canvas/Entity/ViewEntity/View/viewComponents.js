@@ -22,6 +22,8 @@ import DocumentListItem from './DocumentEditor/DocumentListItem';
 import CalendarEventDetails from './CalendarEntity/CalendarEventDetails';
 import CalendarMonthlyView from './CalendarEntity/CalendarMonthlyView';
 import { EntityCentricChatView } from './EntityCentricChatView';
+import MainUIPhase1 from './MainUIPhase1/MainUIPhase1';
+import Phase1UIPrototype from './Phase1UIPrototype/Phase1UIPrototype';
 
 const viewComponents = {
   histogram: { component: Histogram, displayName: 'Histogram' },
@@ -46,6 +48,8 @@ const viewComponents = {
   calendar_event_details: { component: CalendarEventDetails, displayName: 'Calendar Event Details' },
   calendar_monthly_view: { component: CalendarMonthlyView, displayName: 'Calendar Monthly View' },
   entity_centric_chat_view: { component: EntityCentricChatView, displayName: 'Entity Centric Chat View' },
+  main_ui_phase1: { component: MainUIPhase1, displayName: 'Main UI (Phase 1)' },
+  phase1_ui_prototype: { component: Phase1UIPrototype, displayName: 'Phase 1 UI Prototype' },
 };
 
 // Helper function to get component names for backwards compatibility
