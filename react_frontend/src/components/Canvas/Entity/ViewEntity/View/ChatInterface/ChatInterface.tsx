@@ -47,8 +47,7 @@ export default function ChatInterface({
     const [createdDocumentIndex, setCreatedDocumentIndex] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfigModal, setShowConfigModal] = useState(false);
-    const [modelProvider, setModelProvider] = useState<'openai' | 'google_genai' | 'anthropic'>('openai');
-    const [modelName, setModelName] = useState('gpt-4o-mini');
+    const [selectedModel, setSelectedModel] = useState<'google' | 'anthropic' | 'openai'>('openai');
     const [textareaHeight, setTextareaHeight] = useState('3rem');
     const [modalEntity, setModalEntity] = useState<string | null>(null);
 
@@ -165,20 +164,34 @@ export default function ChatInterface({
     const configureApiModel = () => {
         if (!currentApiModel) return;
 
-        // Map provider to env_key
-        const envKeyMap = {
-            'openai': 'OPENAI_API_KEY',
-            'google_genai': 'GOOGLE_API_KEY',
-            'anthropic': 'ANTHROPIC_API_KEY'
+        // Define model configurations
+        const modelConfigs = {
+            'google': {
+                provider: 'google_genai',
+                modelName: 'gemini-2.5-pro',
+                envKey: 'GOOGLE_API_KEY'
+            },
+            'anthropic': {
+                provider: 'anthropic',
+                modelName: 'claude-sonnet-4-20250514',
+                envKey: 'ANTHROPIC_API_KEY'
+            },
+            'openai': {
+                provider: 'openai',
+                modelName: 'gpt-5-2025-08-07',
+                envKey: 'OPENAI_API_KEY'
+            }
         };
+
+        const config = modelConfigs[selectedModel];
 
         sendStrategyRequest(StrategyRequests.builder()
             .withStrategyName('ConfigureApiModelStrategy')
             .withTargetEntity(currentApiModel.entity_id)
             .withParams({
-                "env_key": envKeyMap[modelProvider],
-                "model_name": modelName.trim(),
-                "model_type": modelProvider,
+                "env_key": config.envKey,
+                "model_name": config.modelName,
+                "model_type": config.provider,
                 "model_config": {
                     "top_p": 1,
                     "stream": false,
@@ -477,43 +490,27 @@ export default function ChatInterface({
                         <h3 className="text-lg font-semibold mb-4 text-white">Configure API Model</h3>
                         
                         <div className="space-y-4">
-                            {/* Model Provider Selection */}
+                            {/* Model Selection */}
                             <div>
-                                <label className="block text-sm text-gray-300 mb-2">Model Provider</label>
+                                <label className="block text-sm text-gray-300 mb-2">Select Model</label>
                                 <select
-                                    value={modelProvider}
-                                    onChange={(e) => setModelProvider(e.target.value as any)}
+                                    value={selectedModel}
+                                    onChange={(e) => setSelectedModel(e.target.value as any)}
                                     className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
                                 >
-                                    <option value="openai">OpenAI</option>
-                                    <option value="google_genai">Google GenAI</option>
-                                    <option value="anthropic">Anthropic</option>
+                                    <option value="openai">OpenAI - gpt-5-2025-08-07</option>
+                                    <option value="google">Google - gemini-2.5-pro</option>
+                                    <option value="anthropic">Anthropic - claude-sonnet-4-20250514</option>
                                 </select>
-                            </div>
-
-                            {/* Model Name Input */}
-                            <div>
-                                <label className="block text-sm text-gray-300 mb-2">Model Name</label>
-                                <input
-                                    type="text"
-                                    value={modelName}
-                                    onChange={(e) => setModelName(e.target.value)}
-                                    placeholder={
-                                        modelProvider === 'openai' ? 'e.g., gpt-4o-mini, gpt-4' :
-                                        modelProvider === 'google_genai' ? 'e.g., gemini-1.5-pro' :
-                                        'e.g., claude-3-opus-20240229'
-                                    }
-                                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400"
-                                />
                             </div>
 
                             {/* Helper text */}
                             <div className="text-xs text-gray-400">
                                 Make sure you have the corresponding API key set in your environment:
                                 <br />
-                                {modelProvider === 'openai' && 'OPENAI_API_KEY'}
-                                {modelProvider === 'google_genai' && 'GOOGLE_API_KEY'}
-                                {modelProvider === 'anthropic' && 'ANTHROPIC_API_KEY'}
+                                {selectedModel === 'openai' && 'OPENAI_API_KEY'}
+                                {selectedModel === 'google' && 'GOOGLE_API_KEY'}
+                                {selectedModel === 'anthropic' && 'ANTHROPIC_API_KEY'}
                             </div>
                         </div>
 
@@ -527,8 +524,7 @@ export default function ChatInterface({
                             </button>
                             <button
                                 onClick={configureApiModel}
-                                disabled={!modelName.trim()}
-                                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white"
+                                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 transition-colors text-white"
                             >
                                 Configure
                             </button>
