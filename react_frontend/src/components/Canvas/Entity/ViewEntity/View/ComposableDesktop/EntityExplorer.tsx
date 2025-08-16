@@ -1,14 +1,17 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { nodeSelectorFamily, allEntitiesSelector } from '../../../../../../state/entitiesSelectors';
+import { nodeSelectorFamily, allEntitiesSelector, childrenByTypeSelector } from '../../../../../../state/entitiesSelectors';
+import { EntityTypes } from '../../../EntityEnum';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
+import { EntitySearchBox } from './EntitySearchBox';
 
+// Standard view component props interface
 interface EntityExplorerProps {
-  rootEntityId: string;
-  onEntityDoubleClick: (entityId: string) => void;
-  onEntityPin?: (entityId: string) => void;
+  data?: any;
   sendStrategyRequest: (request: any) => void;
-  viewEntityId?: string;
+  updateEntity: (entityId: string, data: any) => void;
+  viewEntityId: string;
+  parentEntityId: string;
 }
 
 // Helper function to get entity icon
@@ -46,6 +49,7 @@ interface EntityItemProps {
   entityId: string;
   onDoubleClick: (entityId: string) => void;
   onPin?: (entityId: string) => void;
+  onDelete?: (entityId: string) => void;
   expandedEntities: Set<string>;
   onToggleExpanded: (entityId: string) => void;
   depth?: number;
@@ -55,17 +59,29 @@ const EntityItem: React.FC<EntityItemProps> = ({
   entityId,
   onDoubleClick,
   onPin,
+  onDelete,
   expandedEntities,
   onToggleExpanded,
   depth = 0,
 }) => {
   const node: any = useRecoilValue(nodeSelectorFamily(entityId));
   const allEntities = useRecoilValue<any[]>(allEntitiesSelector);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+
+  // Close context menu when clicking elsewhere
+  useEffect(() => {
+    if (showContextMenu) {
+      const handleGlobalClick = () => setShowContextMenu(false);
+      document.addEventListener('click', handleGlobalClick);
+      return () => document.removeEventListener('click', handleGlobalClick);
+    }
+  }, [showContextMenu]);
 
   // Define all hooks before any early returns
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    // Single click doesn't do anything special in this implementation
+    // Close context menu if open
+    setShowContextMenu(false);
   }, []);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -84,6 +100,12 @@ const EntityItem: React.FC<EntityItemProps> = ({
   const handleRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setShowContextMenu(true);
+  }, []);
+
+  const handlePinClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (onPin) {
       onPin(entityId);
     }
@@ -99,16 +121,20 @@ const EntityItem: React.FC<EntityItemProps> = ({
   const hasChildren = node?.data?.child_ids && node?.data?.child_ids.length > 0;
   const isExpanded = expandedEntities.has(entityId);
   
-  // Get display name
-  const displayName = node?.data?.name || 
-                     node?.data?.entity_name || 
-                     node?.data?.display_name ||
-                     node?.data?.title ||
-                     node?.data?.attributes?.name ||
-                     node?.data?.attribute_map?.name ||
-                     node?.data?.meta_data?.name ||
-                     node?.data?.entity_type || 
-                     'Unnamed';
+  // Get display name - for view entities, use view_component_type if available
+  let displayName = node?.data?.name || 
+                   node?.data?.entity_name || 
+                   node?.data?.display_name ||
+                   node?.data?.title ||
+                   node?.data?.attributes?.name ||
+                   node?.data?.attribute_map?.name ||
+                   node?.data?.meta_data?.name ||
+                   'Unnamed';
+
+  // For view entities, prefer the view_component_type as the display name
+  if (type === 'view' && node?.data?.view_component_type) {
+    displayName = node.data.view_component_type;
+  }
 
   // Get children entities if expanded
   const children = hasChildren && isExpanded 
@@ -117,15 +143,45 @@ const EntityItem: React.FC<EntityItemProps> = ({
 
   const indentStyle = { paddingLeft: `${depth * 16 + 8}px` };
 
+  // Simple context menu component
+  const ContextMenu = () => {
+    if (!showContextMenu) return null;
+
+    return (
+      <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg py-1 z-10 min-w-32">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowContextMenu(false);
+            if (onPin) onPin(entityId);
+          }}
+          className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+        >
+          📌 Pin to dock
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowContextMenu(false);
+            if (onDelete) onDelete(entityId);
+          }}
+          className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2"
+        >
+          🗑️ Delete entity
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <div>
+    <div className="relative">
       <div
         className="flex items-center gap-1.5 py-1 px-2 rounded text-sm transition-all cursor-pointer select-none hover:bg-gray-800 text-gray-300"
         style={indentStyle}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleRightClick}
-        title={`${type} • ${displayName} • Double-click to open • Right-click to pin • ${entityId}`}
+        title={`${type} • ${displayName} • Double-click to open • Click pin to dock • Right-click for menu • ${entityId}`}
       >
         {/* Expand/Collapse Arrow */}
         {hasChildren && (
@@ -151,11 +207,23 @@ const EntityItem: React.FC<EntityItemProps> = ({
           {displayName}
         </div>
         
+        {/* Pin Icon */}
+        <button
+          onClick={handlePinClick}
+          className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-xs text-gray-500 hover:text-yellow-400 hover:bg-gray-700 rounded transition-all"
+          title="Pin to dock"
+        >
+          📌
+        </button>
+        
         {/* Entity Type Badge */}
         <div className="ml-auto text-[10px] text-gray-500 bg-gray-800 px-1 rounded">
           {type}
         </div>
       </div>
+      
+      {/* Context Menu */}
+      <ContextMenu />
       
       {/* Render children when expanded */}
       {isExpanded && children.length > 0 && (
@@ -166,6 +234,7 @@ const EntityItem: React.FC<EntityItemProps> = ({
               entityId={child.data.entity_id}
               onDoubleClick={onDoubleClick}
               onPin={onPin}
+              onDelete={onDelete}
               expandedEntities={expandedEntities}
               onToggleExpanded={onToggleExpanded}
               depth={depth + 1}
@@ -178,16 +247,42 @@ const EntityItem: React.FC<EntityItemProps> = ({
 };
 
 export const EntityExplorer: React.FC<EntityExplorerProps> = ({
-  rootEntityId,
-  onEntityDoubleClick,
-  onEntityPin,
+  data,
   sendStrategyRequest,
+  updateEntity,
   viewEntityId,
+  parentEntityId,
 }) => {
+  // Extract configuration from data or use defaults
+  const rootEntityId = data?.rootEntityId || parentEntityId;
+  const onEntityDoubleClick = data?.onEntityDoubleClick || ((entityId: string) => {
+    console.log('EntityExplorer: Entity double-clicked:', entityId);
+  });
+  const onEntityPin = data?.onEntityPin || ((entityId: string) => {
+    // Default pinning behavior - store in view entity
+    const request = StrategyRequests.setAttributes(viewEntityId, {
+      pinned_entities: [...(data?.pinned_entities || []), entityId]
+    });
+    sendStrategyRequest(request);
+  });
+  
+  const onEntityDelete = data?.onEntityDelete || ((entityId: string) => {
+    setDeleteModalEntity(entityId);
+  });
   const [expandedEntities, setExpandedEntities] = useState<Set<string>>(new Set([rootEntityId]));
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [deleteModalEntity, setDeleteModalEntity] = useState<string | null>(null);
   const rootNode: any = useRecoilValue(nodeSelectorFamily(rootEntityId));
   const viewEntity: any = useRecoilValue(nodeSelectorFamily(viewEntityId || rootEntityId));
+  
+  // Get entity data for delete modal (hook must be called at top level, before any early returns)
+  const deleteModalEntityNode: any = useRecoilValue(nodeSelectorFamily(deleteModalEntity || rootEntityId));
+
+  // Get child view entities and check for EntitySearchBox view
+  const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: viewEntityId, type: EntityTypes.VIEW })) as any[];
+  const entitySearchBoxView = useMemo(() => 
+    viewChildren.find((view) => view.data?.view_component_type === 'entitysearchbox'),
+    [viewChildren]
+  );
 
   const handleToggleExpanded = useCallback((entityId: string) => {
     setExpandedEntities(prev => {
@@ -201,64 +296,25 @@ export const EntityExplorer: React.FC<EntityExplorerProps> = ({
     });
   }, []);
 
-  // Search functionality
-  const searchTargetEntityId = viewEntityId || rootEntityId;
-
-  // Debounced search effect
+  // Create EntitySearchBox view if it doesn't exist
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      // Don't clear search results - just return and let them persist
-      return;
+    if (!entitySearchBoxView) {
+      const entitySearchBoxRequest = StrategyRequests.builder()
+        .withStrategyName('CreateEntityStrategy')
+        .withTargetEntity(viewEntityId)
+        .withParams({
+          entity_class: 'shared_utils.entities.view_entity.ViewEntity.ViewEntity',
+          initial_attributes: {
+            parent_attributes: {},
+            view_component_type: 'entitysearchbox',
+            hidden: false
+          }
+        })
+        .build();
+      
+      sendStrategyRequest(entitySearchBoxRequest);
     }
-
-    const timeoutId = setTimeout(() => {
-      if (viewEntityId) {
-        // Execute three parallel queries using StrategyRequestBuilder
-        // Send requests to the view entity itself, not the parent
-        const nameSearchRequest = StrategyRequests.queryEntities(
-          viewEntityId,
-          [{ attribute: "name", operator: "contains", value: searchQuery }],
-          "name_search_results",
-          true // add_to_history
-        );
-
-        const typeSearchRequest = StrategyRequests.queryEntities(
-          viewEntityId,
-          [{ attribute: "entity_type", operator: "contains", value: searchQuery }],
-          "type_search_results",
-          true // add_to_history
-        );
-
-        const textSearchRequest = StrategyRequests.queryEntities(
-          viewEntityId,
-          [{ attribute: "text", operator: "contains", value: searchQuery }],
-          "text_search_results",
-          true // add_to_history
-        );
-
-        // Send all three requests in parallel
-        sendStrategyRequest(nameSearchRequest);
-        sendStrategyRequest(typeSearchRequest);
-        sendStrategyRequest(textSearchRequest);
-      }
-    }, 300); // 300ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, searchTargetEntityId, viewEntityId, sendStrategyRequest]);
-
-  // Process search results with prioritization and deduplication
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim() || !viewEntityId) return [];
-
-    // Read directly from the view entity's data (not through parent_attributes)
-    const nameResults = viewEntity?.data?.name_search_results || [];
-    const typeResults = viewEntity?.data?.type_search_results || [];
-    const textResults = viewEntity?.data?.text_search_results || [];
-
-    // Combine with prioritization and deduplication
-    const combined = [...new Set([...nameResults, ...typeResults, ...textResults])];
-    return combined;
-  }, [searchQuery, viewEntity?.data, viewEntityId]);
+  }, [viewEntityId, entitySearchBoxView, sendStrategyRequest]);
 
   if (!rootNode || !rootNode.data) {
     return (
@@ -271,6 +327,67 @@ export const EntityExplorer: React.FC<EntityExplorerProps> = ({
       </div>
     );
   }
+
+  // Delete confirmation modal component
+  const DeleteConfirmationModal = () => {
+    if (!deleteModalEntity) return null;
+    
+    const entityName = deleteModalEntityNode?.data?.name || 
+                      deleteModalEntityNode?.data?.entity_name || 
+                      deleteModalEntityNode?.data?.display_name ||
+                      deleteModalEntityNode?.data?.title ||
+                      'this entity';
+
+    const handleConfirmDelete = () => {
+      // Send delete entity strategy request
+      const deleteRequest = StrategyRequests.builder()
+        .withStrategyName('RemoveEntityStrategy')
+        .withTargetEntity(deleteModalEntity)
+        .withParams({})
+        .build();
+      
+      sendStrategyRequest(deleteRequest);
+      setDeleteModalEntity(null);
+    };
+
+    const handleCancelDelete = () => {
+      setDeleteModalEntity(null);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="text-2xl">⚠️</div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Confirm Delete</h3>
+              <p className="text-sm text-gray-400">This action cannot be undone</p>
+            </div>
+          </div>
+          
+          <p className="text-gray-300 mb-6">
+            Are you sure you want to delete <span className="font-medium text-white">"{entityName}"</span>? 
+            This will permanently remove the entity and all its data.
+          </p>
+          
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={handleCancelDelete}
+              className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmDelete}
+              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded transition-all"
+            >
+              Delete Entity
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-full flex flex-col bg-gray-900 text-white">
@@ -285,63 +402,18 @@ export const EntityExplorer: React.FC<EntityExplorerProps> = ({
         </div>
       </div>
 
-      {/* Search Box */}
-      {viewEntityId && (
-        <div className="flex-shrink-0 p-3 border-b border-gray-800">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search entities by name, type, or text..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                title="Clear search"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Search Results */}
-      {searchQuery.trim() && searchResults.length > 0 && (
-        <div className="flex-shrink-0 border-b border-gray-800">
-          <div className="p-2 bg-gray-800">
-            <div className="text-xs text-gray-400 mb-2">
-              🔍 Search Results ({searchResults.length})
-            </div>
-            <div className="max-h-48 overflow-auto space-y-1">
-              {searchResults.map((entityId) => (
-                <EntityItem
-                  key={`search-${entityId}`}
-                  entityId={entityId}
-                  onDoubleClick={onEntityDoubleClick}
-                  onPin={onEntityPin}
-                  expandedEntities={new Set()}
-                  onToggleExpanded={() => {}}
-                  depth={0}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search Results - No Results Found */}
-      {searchQuery.trim() && searchResults.length === 0 && viewEntityId && (
-        <div className="flex-shrink-0 border-b border-gray-800">
-          <div className="p-3 bg-gray-800 text-center">
-            <div className="text-xs text-gray-500">
-              No entities found matching "{searchQuery}"
-            </div>
-          </div>
-        </div>
+      {/* Entity Search Box */}
+      {viewEntityId && entitySearchBoxView && (
+        <EntitySearchBox
+          data={{
+            onEntityDoubleClick: onEntityDoubleClick,
+            onEntityPin: onEntityPin
+          }}
+          sendStrategyRequest={sendStrategyRequest}
+          updateEntity={updateEntity}
+          viewEntityId={entitySearchBoxView.data.entity_id}
+          parentEntityId={viewEntityId}
+        />
       )}
 
       {/* Entity Tree */}
@@ -353,6 +425,7 @@ export const EntityExplorer: React.FC<EntityExplorerProps> = ({
           entityId={rootEntityId}
           onDoubleClick={onEntityDoubleClick}
           onPin={onEntityPin}
+          onDelete={onEntityDelete}
           expandedEntities={expandedEntities}
           onToggleExpanded={handleToggleExpanded}
           depth={0}
@@ -364,10 +437,13 @@ export const EntityExplorer: React.FC<EntityExplorerProps> = ({
         <div className="space-y-1">
           <div>💡 <strong>Double-click</strong> to open entities</div>
           <div>📂 <strong>Single-click arrows</strong> to expand/collapse</div>
-          <div>📌 <strong>Right-click</strong> to pin entities to dock</div>
+          <div>📌 <strong>Click pin icon</strong> to pin entities to dock</div>
           <div>🪟 Each entity opens in a separate window</div>
         </div>
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal />
     </div>
   );
 };

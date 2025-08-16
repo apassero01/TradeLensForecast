@@ -25,6 +25,8 @@ import { EntityCentricChatView } from './EntityCentricChatView';
 import MainUIPhase1 from './MainUIPhase1/MainUIPhase1';
 import Phase1UIPrototype from './Phase1UIPrototype/Phase1UIPrototype';
 import ComposableDesktopView from './ComposableDesktop';
+import { EntityExplorer } from './ComposableDesktop/EntityExplorer';
+import { EntitySearchBox } from './ComposableDesktop/EntitySearchBox';
 
 const viewComponents = {
   histogram: { component: Histogram, displayName: 'Histogram' },
@@ -52,6 +54,8 @@ const viewComponents = {
   main_ui_phase1: { component: MainUIPhase1, displayName: 'Main UI (Phase 1)' },
   phase1_ui_prototype: { component: Phase1UIPrototype, displayName: 'Phase 1 UI Prototype' },
   composable_desktop: { component: ComposableDesktopView, displayName: 'Composable Desktop' },
+  entityexplorer: { component: EntityExplorer, displayName: 'Entity Explorer' },
+  entitysearchbox: { component: EntitySearchBox, displayName: 'Entity Search Box' },
 };
 
 // Helper function to get component names for backwards compatibility

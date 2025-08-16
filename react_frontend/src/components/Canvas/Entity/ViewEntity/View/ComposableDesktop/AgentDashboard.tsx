@@ -3,10 +3,13 @@ import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily, allEntitiesSelector } from '../../../../../../state/entitiesSelectors';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
 import { EntityDragDropUtil, EntityDragData, useDragDrop } from '../../../../../../utils/dragDropInterface';
+import { EntityExplorer } from './EntityExplorer';
 
 interface AgentDashboardProps {
   sendStrategyRequest: (request: any) => void;
   onEntityDoubleClick: (entityId: string) => void;
+  updateEntity?: (entityId: string, data: any) => void;
+  viewEntityId?: string;
 }
 
 interface Message {
@@ -478,6 +481,8 @@ const ChatMessagesPanel: React.FC<{
 export const AgentDashboard: React.FC<AgentDashboardProps> = ({
   sendStrategyRequest,
   onEntityDoubleClick,
+  updateEntity,
+  viewEntityId,
 }) => {
   const [agents, setAgents] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -716,20 +721,22 @@ export const AgentDashboard: React.FC<AgentDashboardProps> = ({
             )}
           </div>
           
-          <div className="flex-1 overflow-auto p-2">
+          <div className="flex-1 overflow-auto">
             {!selectedAgentId ? (
               <div className="text-center py-8 text-gray-500">
                 <div className="text-lg mb-2">👈</div>
                 <div className="text-sm">Select an agent to explore its entities</div>
               </div>
             ) : selectedAgent ? (
-              <EntityItem
-                entityId={selectedAgentId}
-                onDoubleClick={onEntityDoubleClick}
-                onPin={handlePinEntityFromExplorer}
-                expandedEntities={expandedEntities}
-                onToggleExpanded={handleToggleExpanded}
-                depth={0}
+              <EntityExplorer
+                data={{
+                  onEntityDoubleClick: onEntityDoubleClick,
+                  onEntityPin: handlePinEntityFromExplorer
+                }}
+                sendStrategyRequest={sendStrategyRequest}
+                updateEntity={updateEntity || (() => {})}
+                viewEntityId={viewEntityId || selectedAgentId}
+                parentEntityId={selectedAgentId}
               />
             ) : (
               <div className="text-center py-8 text-gray-500">

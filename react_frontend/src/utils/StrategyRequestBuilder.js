@@ -190,6 +190,25 @@ export const StrategyRequests = {
       .withTargetEntity(entityId)
       .withAddToHistory(false)
       .build();
+  },
+
+  /**
+   * Query entities with filters
+   * @param {string|number} entityId - Target entity ID
+   * @param {Array} filters - Array of filter objects with attribute, operator, value
+   * @param {string} resultAttributeName - Name of attribute to store results in
+   * @param {boolean} addToHistory - Whether to add to history (default: false)
+   */
+  queryEntities(entityId, filters, resultAttributeName, addToHistory = false) {
+    return new StrategyRequestBuilder()
+      .withStrategyName('QueryEntitiesStrategy')
+      .withTargetEntity(entityId)
+      .withParams({
+        filters: filters,
+        result_attribute_name: resultAttributeName
+      })
+      .withAddToHistory(addToHistory)
+      .build();
   }
 };
 

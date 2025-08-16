@@ -296,3 +296,4 @@ Enable drag/drop logging:
 - Undo/redo for drag/drop operations
 - Cross-window drag/drop support
 
+

@@ -3,6 +3,7 @@ import { Rnd } from 'react-rnd';
 import { useRecoilValue } from 'recoil';
 import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
 import EntityViewRenderer from '../ChatInterface/EntityViewRenderer';
+import useRenderStoredView from '../../../../../../hooks/useRenderStoredView';
 import { Position, Size } from './WindowManager';
 
 interface WindowFrameProps {
@@ -70,6 +71,13 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   customIcon,
 }) => {
   const node: any = useRecoilValue(nodeSelectorFamily(entityId));
+  
+  // Try to render the entity as a view if it has view_component_type
+  const viewContent = useRenderStoredView(
+    node?.data?.entity_type === 'view' && node?.data?.view_component_type ? entityId : null,
+    sendStrategyRequest,
+    updateEntity
+  );
 
   const handleDragStop = useCallback((e: any, data: any) => {
     onPositionChange(windowId, { x: data.x, y: data.y });
@@ -156,7 +164,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
 
         {/* Window Content */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          {customContent || (
+          {customContent || viewContent || (
             <EntityViewRenderer
               entityId={entityId}
               sendStrategyRequest={sendStrategyRequest}

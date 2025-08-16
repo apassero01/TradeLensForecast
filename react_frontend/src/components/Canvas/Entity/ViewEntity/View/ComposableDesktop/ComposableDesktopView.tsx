@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { nodeSelectorFamily } from '../../../../../../state/entitiesSelectors';
+import { nodeSelectorFamily, childrenByTypeSelector } from '../../../../../../state/entitiesSelectors';
+import { EntityTypes } from '../../../EntityEnum';
 import { StrategyRequests } from '../../../../../../utils/StrategyRequestBuilder';
 import { WindowFrame } from './WindowFrame';
-import { EntityExplorer } from './EntityExplorer';
 import { useWindowManager } from './WindowManager';
 import { AgentDashboard } from './AgentDashboard';
 
@@ -29,6 +29,13 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
   const persistWindowsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserActionInProgressRef = useRef<boolean>(false);
   const hasInitializedRef = useRef<boolean>(false);
+
+  // Get child view entities and check for EntityExplorer view
+  const viewChildren = useRecoilValue(childrenByTypeSelector({ parentId: viewEntityId, type: EntityTypes.VIEW })) as any[];
+  const entityExplorerView = useMemo(() => 
+    viewChildren.find((view) => view.data?.view_component_type === 'entityexplorer'),
+    [viewChildren]
+  );
 
   // Initialize the window manager without any initial windows - clean desktop
   const {
@@ -65,6 +72,35 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
     }
   }, [viewEntity?.data, loadPersistedWindows]);
 
+  // Create EntityExplorer view if it doesn't exist
+  useEffect(() => {
+    const createMissingViews = () => {
+      // Create EntityExplorer view if it doesn't exist
+      if (!entityExplorerView) {
+        const entityExplorerRequest = StrategyRequests.builder()
+          .withStrategyName('CreateEntityStrategy')
+          .withTargetEntity(viewEntityId)
+          .withParams({
+            entity_class: 'shared_utils.entities.view_entity.ViewEntity.ViewEntity',
+            initial_attributes: {
+              parent_attributes: {
+                rootEntityId: parentEntityId
+              },
+              view_component_type: 'entityexplorer',
+              hidden: false
+            }
+          })
+          .build();
+        
+        sendStrategyRequest(entityExplorerRequest);
+      }
+    };
+
+    // Small delay to avoid creating views multiple times during initial render
+    const timer = setTimeout(createMissingViews, 100);
+    return () => clearTimeout(timer);
+  }, [viewEntityId, entityExplorerView, sendStrategyRequest]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -90,8 +126,7 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
         entityId: w.entityId,
         position: w.position,
         size: w.size,
-        windowType: w.entityId.startsWith('explorer-') ? 'explorer' : 
-                   w.entityId === 'agent-dashboard' ? 'agent-dashboard' : 'entity'
+        windowType: w.entityId === 'agent-dashboard' ? 'agent-dashboard' : 'entity'
       }));
       
       const request = StrategyRequests.builder()
@@ -256,10 +291,12 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
   // Dock/Taskbar Component
   const Dock: React.FC = () => {
     const handleOpenEntityExplorer = () => {
-      // Open Entity Explorer as a window
-      openWindow(`explorer-${parentEntityId}`);
-      // Persist after opening explorer
-      persistWindowsStateDebounced(100);
+      // Open EntityExplorer view as a window if it exists
+      if (entityExplorerView?.data?.entity_id) {
+        openWindow(entityExplorerView.data.entity_id);
+        // Persist after opening explorer
+        persistWindowsStateDebounced(100);
+      }
     };
 
     const handleOpenAgentDashboard = () => {
@@ -372,45 +409,9 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
       {/* Window Container */}
       <div className="absolute inset-0 pt-12 pb-20">
         {windows.map((window) => {
-          // Check if this is the EntityExplorer window (starts with 'explorer-')
-          const isExplorerWindow = window.entityId.startsWith('explorer-');
           // Check if this is the Agent Dashboard window
           const isAgentDashboardWindow = window.entityId === 'agent-dashboard';
           
-          if (isExplorerWindow) {
-            // Extract the actual parent entity ID from the explorer window ID
-            const actualEntityId = window.entityId.replace('explorer-', '');
-            
-            // Render EntityExplorer as a draggable window
-            return (
-              <WindowFrame
-                key={window.id}
-                windowId={window.id}
-                entityId={actualEntityId}
-                position={window.position}
-                size={window.size}
-                zIndex={window.zIndex}
-                onClose={handleWindowClose}
-                onFocus={handleWindowFocus}
-                onPositionChange={handleWindowPositionChange}
-                onSizeChange={handleWindowSizeChange}
-                sendStrategyRequest={sendStrategyRequest}
-                updateEntity={updateEntity}
-                customContent={
-                  <EntityExplorer
-                    rootEntityId={actualEntityId}
-                    onEntityDoubleClick={handleEntityDoubleClick}
-                    onEntityPin={handlePinEntity}
-                    sendStrategyRequest={sendStrategyRequest}
-                    viewEntityId={viewEntityId}
-                  />
-                }
-                customTitle="Entity Explorer"
-                customIcon="🌳"
-              />
-            );
-          }
-
           if (isAgentDashboardWindow) {
             // Render Agent Dashboard as a draggable window
             return (
@@ -431,6 +432,8 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
                   <AgentDashboard
                     sendStrategyRequest={sendStrategyRequest}
                     onEntityDoubleClick={handleEntityDoubleClick}
+                    updateEntity={updateEntity}
+                    viewEntityId={viewEntityId}
                   />
                 }
                 customTitle="Agent Dashboard"
@@ -439,7 +442,8 @@ export const ComposableDesktopView: React.FC<ComposableDesktopViewProps> = ({
             );
           }
 
-          // Render regular entity windows using WindowFrame
+          // All other windows (including EntityExplorer view entities) are rendered normally
+          // The WindowFrame will automatically use useRenderStoredView for view entities
           return (
             <WindowFrame
               key={window.id}
