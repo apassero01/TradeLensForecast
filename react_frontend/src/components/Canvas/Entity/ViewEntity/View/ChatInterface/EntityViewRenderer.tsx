@@ -20,6 +20,7 @@ interface EntityViewRendererProps {
     isStandalone?: boolean; // New prop to indicate if this is a standalone page view
 }
 
+// todo: update this hook to accept the name of a view to return 
 export default function EntityViewRenderer({ 
     entityId, 
     sendStrategyRequest, 

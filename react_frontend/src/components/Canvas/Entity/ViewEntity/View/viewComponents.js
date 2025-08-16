@@ -24,6 +24,7 @@ import CalendarMonthlyView from './CalendarEntity/CalendarMonthlyView';
 import { EntityCentricChatView } from './EntityCentricChatView';
 import MainUIPhase1 from './MainUIPhase1/MainUIPhase1';
 import Phase1UIPrototype from './Phase1UIPrototype/Phase1UIPrototype';
+import ComposableDesktopView from './ComposableDesktop';
 
 const viewComponents = {
   histogram: { component: Histogram, displayName: 'Histogram' },
@@ -50,6 +51,7 @@ const viewComponents = {
   entity_centric_chat_view: { component: EntityCentricChatView, displayName: 'Entity Centric Chat View' },
   main_ui_phase1: { component: MainUIPhase1, displayName: 'Main UI (Phase 1)' },
   phase1_ui_prototype: { component: Phase1UIPrototype, displayName: 'Phase 1 UI Prototype' },
+  composable_desktop: { component: ComposableDesktopView, displayName: 'Composable Desktop' },
 };
 
 // Helper function to get component names for backwards compatibility

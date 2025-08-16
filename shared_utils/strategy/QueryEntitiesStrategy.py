@@ -1,4 +1,4 @@
-from shared_utils.strategy.BaseStrategy import Strategy
+from shared_utils.strategy.BaseStrategy import Strategy, SetAttributesStrategy
 from shared_utils.entities.Entity import Entity
 from shared_utils.entities.StrategyRequestEntity import StrategyRequestEntity
 from shared_utils.entities.EnityEnum import EntityEnum
@@ -18,6 +18,7 @@ class QueryEntitiesStrategy(Strategy):
     
     Usage:
     - filters: List of filter objects with keys: attribute, operator, value
+    - result_attribute_name: (Optional) Name of attribute to store results on target entity
     
     Supported operators:
     - equals: Exact match (e.g., entity_type = "document")
@@ -39,7 +40,8 @@ class QueryEntitiesStrategy(Strategy):
                 {"attribute": "entity_type", "operator": "equals", "value": "recipe"},
                 {"attribute": "creation_date", "operator": "greater_than", "value": "2025-06-21"},
                 {"attribute": "name", "operator": "contains", "value": "chicken"}
-            ]
+            ],
+            "result_attribute_name": "search_results"
         }
     }
     
@@ -81,10 +83,11 @@ class QueryEntitiesStrategy(Strategy):
         
         param_config requirements:
         - filters: List of filter dictionaries with keys: attribute, operator, value
-        - result_attribute: Name of attribute to store results on target entity
+        - result_attribute_name: (Optional) Name of attribute to store results on target entity
         """
         config = self.strategy_request.param_config
         filters = config.get('filters', [])
+        result_attribute_name = config.get('result_attribute_name')
         
         try:
             # Use EntityService to find matching entities
@@ -97,6 +100,24 @@ class QueryEntitiesStrategy(Strategy):
             }
             
             logger.info(f"Query found {len(matching_entity_ids)} matching entities")
+            
+            # If result_attribute_name is provided, store results on target entity
+            if result_attribute_name:
+                try:
+                    # Create a SetAttributesStrategy request to store results
+                    set_attributes_request = SetAttributesStrategy.request_constructor(
+                        target_entity_id=self.strategy_request.target_entity_id,
+                        attribute_map={result_attribute_name: matching_entity_ids}
+                    )
+                    
+                    # Execute the SetAttributesStrategy
+                    set_strategy = SetAttributesStrategy(self.strategy_executor, set_attributes_request)
+                    set_strategy.apply(entity)
+                    
+                    logger.info(f"Stored results in attribute '{result_attribute_name}' on entity {entity.entity_id}")
+                    
+                except Exception as attr_error:
+                    logger.error(f"Error storing results in attribute: {str(attr_error)}")
             
         except Exception as e:
             logger.error(f"Error executing query: {str(e)}")
